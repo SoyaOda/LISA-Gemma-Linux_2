@@ -1,9 +1,15 @@
 # model/gemma_lisa.py
+"""
+LISA-Gemma3アーキテクチャ
+Gemma-3の公式API仕様に準拠した実装
+"""
+
 import torch
 import torch.nn as nn
 from typing import Optional, List, Tuple, Dict, Any
+import numpy as np
 
-from transformers import AutoModelForCausalLM, PreTrainedModel, PretrainedConfig
+from transformers import AutoProcessor, Gemma3ForConditionalGeneration, PreTrainedModel, PretrainedConfig
 from segment_anything import sam_model_registry
 from segment_anything.modeling import MaskDecoder, PromptEncoder, TwoWayTransformer
 
@@ -13,16 +19,16 @@ class LisaGemmaConfig(PretrainedConfig):
 
     def __init__(
         self,
-        gemma_model_id="google/gemma-2-2b-it",
+        gemma_model_id="google/gemma-3-4b-it",
         sam_checkpoint_path=None,
-        seg_token_idx=0,
-        gemma_hidden_size=2304,  # Gemma 2 2B の hidden_size
+        seg_token="<SEG>",
+        gemma_hidden_size=2560,  # Gemma 3 4B の hidden_size
         sam_prompt_embed_dim=256,
         **kwargs,
     ):
         self.gemma_model_id = gemma_model_id
         self.sam_checkpoint_path = sam_checkpoint_path
-        self.seg_token_idx = seg_token_idx
+        self.seg_token = seg_token
         self.gemma_hidden_size = gemma_hidden_size
         self.sam_prompt_embed_dim = sam_prompt_embed_dim
         super().__init__(**kwargs)
@@ -33,15 +39,21 @@ class LisaGemmaForCausalLM(PreTrainedModel):
     def __init__(self, config: LisaGemmaConfig):
         super().__init__(config)
 
-        # 1. Gemma-2 LLMのロード
-        self.gemma_model = AutoModelForCausalLM.from_pretrained(
+        # 1. Gemma-3 multimodal model の初期化
+        print("Gemma-3マルチモーダルモデルをロード中...")
+        self.gemma_model = Gemma3ForConditionalGeneration.from_pretrained(
             config.gemma_model_id,
-            torch_dtype=torch.bfloat16,  # bf16で効率化
-            trust_remote_code=True,
+            torch_dtype=torch.bfloat16,
+            device_map="auto"
         )
-
-        # 2. SAMコンポーネントのロードと凍結
+        
+        # 2. Gemma-3用プロセッサーの初期化
+        print("Gemma-3プロセッサーをロード中...")
+        self.gemma_processor = AutoProcessor.from_pretrained(config.gemma_model_id)
+        
+        # 3. SAMコンポーネントのロードと凍結（SAMチェックポイントが存在する場合のみ）
         if config.sam_checkpoint_path and config.sam_checkpoint_path != "":
+            print("SAMモデルをロード中...")
             sam = sam_model_registry["vit_h"](checkpoint=config.sam_checkpoint_path)
             
             # SAMの画像エンコーダを抽出し、凍結する
@@ -54,151 +66,199 @@ class LisaGemmaForCausalLM(PreTrainedModel):
             for param in self.sam_mask_decoder.parameters():
                 param.requires_grad = True
         else:
-            # SAMチェックポイントが指定されていない場合はダミーを作成
-            print("警告: SAMチェックポイントが指定されていません。ダミーコンポーネントを使用します。")
+            print("SAMチェックポイントが指定されていません。SAMコンポーネントは初期化されません。")
             self.sam_image_encoder = None
             self.sam_mask_decoder = None
 
-        # 3. MLPプロジェクタの定義 (GemmaとSAMを繋ぐ橋)
+        # 4. MLPプロジェクタの定義 (GemmaとSAMを繋ぐ橋)
+        print("MLPプロジェクタを初期化中...")
         self.mlp_projector = nn.Sequential(
             nn.Linear(config.gemma_hidden_size, config.gemma_hidden_size),
             nn.GELU(),
             nn.Linear(config.gemma_hidden_size, config.sam_prompt_embed_dim),
-        )
+        ).to(torch.bfloat16)
 
-        # 4. モデルの他の部分のパラメータ管理
-        # LLMの大部分は凍結 (LoRAでファインチューニング)
-        for param in self.gemma_model.parameters():
-            param.requires_grad = False
+        # 5. 特別なセグメンテーショントークンを語彙に追加
+        print("セグメンテーショントークンを追加中...")
+        self.seg_token = config.seg_token
         
-        # 埋め込み層とLMヘッドは訓練可能にする
-        if hasattr(self.gemma_model, 'get_input_embeddings'):
-            self.gemma_model.get_input_embeddings().requires_grad_(True)
-        if hasattr(self.gemma_model, 'get_output_embeddings'):
-            self.gemma_model.get_output_embeddings().requires_grad_(True)
+        # トークナイザーにSEGトークンを追加
+        if self.seg_token not in self.gemma_processor.tokenizer.get_vocab():
+            self.gemma_processor.tokenizer.add_tokens([self.seg_token], special_tokens=True)
+            self.gemma_model.resize_token_embeddings(len(self.gemma_processor.tokenizer))
+            print(f"✅ {self.seg_token}トークンが追加されました")
+        
+        # SEGトークンのIDを取得
+        self.seg_token_id = self.gemma_processor.tokenizer.convert_tokens_to_ids(self.seg_token)
+        
+        print("LISA-Gemmaモデルの初期化が完了しました")
 
-    def get_input_embeddings(self) -> nn.Module:
-        return self.gemma_model.get_input_embeddings()
+    def prepare_multimodal_input(self, image, text_prompt):
+        """
+        Gemma-3の公式チャットテンプレートに従って入力を準備
+        """
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image", "image": image},
+                    {"type": "text", "text": text_prompt}
+                ]
+            }
+        ]
+        
+        # チャットテンプレートを適用
+        inputs = self.gemma_processor.apply_chat_template(
+            messages,
+            add_generation_prompt=True,
+            tokenize=True,
+            return_dict=True,
+            return_tensors="pt"
+        )
+        
+        return inputs
 
-    def set_input_embeddings(self, value: nn.Module):
-        self.gemma_model.set_input_embeddings(value)
-
-    def get_output_embeddings(self) -> nn.Module:
-        return self.gemma_model.get_output_embeddings()
+    def get_trainable_parameters_info(self):
+        """訓練可能なパラメータの情報を取得"""
+        total_params = 0
+        trainable_params = 0
+        
+        for name, param in self.named_parameters():
+            total_params += param.numel()
+            if param.requires_grad:
+                trainable_params += param.numel()
+        
+        return {
+            "total_parameters": total_params,
+            "trainable_parameters": trainable_params,
+            "trainable_percentage": (trainable_params / total_params) * 100 if total_params > 0 else 0
+        }
 
     def forward(
         self,
-        images_for_gemma: Optional[torch.Tensor] = None,
-        images_for_sam: Optional[torch.Tensor] = None,
-        input_ids: torch.LongTensor = None,
-        attention_mask: Optional[torch.LongTensor] = None,
-        labels: Optional[torch.LongTensor] = None,
-        seg_token_mask: Optional[torch.BoolTensor] = None,
-        **kwargs,
+        image,  # PIL Image
+        text_prompt: str,
+        generate_mask: bool = True,
+        **kwargs
     ) -> Dict[str, Any]:
         """
-        デュアルパスウェイ・フォワードパスの実装
+        LISA-Gemmaのフォワードパス
         """
-        # ======================================================================
-        # パスウェイ 1: SAMの画像エンコーディング (セグメンテーション用)
-        # ======================================================================
-        sam_image_features = None
-        if self.sam_image_encoder is not None and images_for_sam is not None:
-            # SAMの画像エンコーダは凍結されているため、勾配計算は不要
-            with torch.no_grad():
-                sam_image_features = self.sam_image_encoder(images_for_sam)
-
-        # ======================================================================
-        # パスウェイ 2: Gemmaの推論 (意図理解用)
-        # ======================================================================
-        # Gemmaモデルに画像とテキストを入力し、出力を得る
-        # images_for_gemmaがあれば処理に含める
-        gemma_kwargs = {
-            'input_ids': input_ids,
-            'attention_mask': attention_mask,
-            'labels': labels,
-            'output_hidden_states': True,  # 隠れ状態を取得するために必要
-        }
-        
-        # Gemma 2の場合、pixel_valuesパラメータがある場合のみ追加
-        if images_for_gemma is not None:
-            gemma_kwargs['pixel_values'] = images_for_gemma
-        
-        gemma_outputs = self.gemma_model(**gemma_kwargs)
-        
-        # テキスト生成の損失（VQAタスクなどで使用）
-        text_loss = gemma_outputs.loss
-        
-        # ======================================================================
-        # 橋渡し: MLPプロジェクタによる特徴量変換
-        # ======================================================================
-        last_hidden_state = gemma_outputs.hidden_states[-1]
-        
-        # バッチ内の<SEG>トークンの隠れ状態を抽出
-        seg_token_embedding = None
-        if seg_token_mask is not None and seg_token_mask.sum() > 0:
-            # seg_token_maskは、<SEG>トークンの位置がTrueのブールマスク
-            # (batch_size, seq_len) -> (batch_size, seq_len, hidden_size)
-            seg_token_mask_expanded = seg_token_mask.unsqueeze(-1).expand_as(last_hidden_state)
+        try:
+            # 1. Gemma-3の公式方式で入力を準備
+            gemma_inputs = self.prepare_multimodal_input(image, text_prompt)
             
-            # <SEG>トークンの隠れ状態のみを抽出 (sum > 0 の場合のみ)
-            # (num_seg_tokens, hidden_size)
-            h_seg_raw = last_hidden_state[seg_token_mask_expanded].view(-1, last_hidden_state.size(-1))
+            # デバイスに移動
+            device = next(self.gemma_model.parameters()).device
+            gemma_inputs = {k: v.to(device) if isinstance(v, torch.Tensor) else v 
+                           for k, v in gemma_inputs.items()}
             
-            # MLPプロジェクタを通して、SAMが理解できる埋め込みに変換
-            # (num_seg_tokens, sam_prompt_embed_dim)
-            seg_token_embedding = self.mlp_projector(h_seg_raw)
-
-        # ======================================================================
-        # 最終段階: SAMマスクデコーダによるマスク生成
-        # ======================================================================
-        predicted_masks = None
-        if (seg_token_embedding is not None and 
-            self.sam_mask_decoder is not None and 
-            sam_image_features is not None):
+            # 2. Gemmaモデルでテキスト生成とセグメンテーション判定
+            with torch.inference_mode():
+                gemma_outputs = self.gemma_model(
+                    **gemma_inputs,
+                    output_hidden_states=True,
+                    return_dict=True
+                )
             
-            # SAMデコーダへの入力を作成
-            # (batch_size, num_prompts, embed_dim) -> (num_seg_tokens, 1, embed_dim)
-            sparse_prompt_embeddings = seg_token_embedding.unsqueeze(1)
+            results = {
+                "gemma_logits": gemma_outputs.logits,
+                "hidden_states": gemma_outputs.hidden_states,
+            }
             
-            # デンスなプロンプトは使用しない
-            dense_prompt_embeddings = torch.zeros(
-                (seg_token_embedding.size(0), 256, 256),
-                device=seg_token_embedding.device,
-                dtype=seg_token_embedding.dtype
-            )
-
-            # SAMデコーダを実行してマスクを予測
-            # 簡単のため、バッチ内の全ての<SEG>トークンが同じ画像特徴を使うと仮定
-            # 実際の実装では、どのトークンがどの画像に対応するかを管理する必要がある
-            
-            # seg_token_maskから、各トークンがどのバッチインデックスに属するかを取得
-            if seg_token_mask.sum() > 0:
-                batch_indices = torch.where(seg_token_mask)[0]  # バッチインデックスを取得
+            # 3. SEGトークンが生成された場合のマスク生成
+            if generate_mask and self.sam_image_encoder is not None:
+                # SEGトークンの存在をチェック
+                generated_ids = torch.argmax(gemma_outputs.logits, dim=-1)
+                seg_positions = (generated_ids == self.seg_token_id).nonzero(as_tuple=True)
                 
-                # 重複を除去して、ユニークなバッチインデックスのみを使用
-                unique_batch_indices = torch.unique(batch_indices)
-                
-                if len(unique_batch_indices) > 0:
-                    # 対応する画像特徴を選択（最初のバッチアイテムを使用）
-                    corresponding_sam_features = sam_image_features[unique_batch_indices[:1]]
-
-                    try:
-                        low_res_masks, iou_predictions = self.sam_mask_decoder(
-                            image_embeddings=corresponding_sam_features,
-                            image_pe=self.sam_mask_decoder.get_dense_pe(),
-                            sparse_prompt_embeddings=sparse_prompt_embeddings[:1],  # 最初のトークンのみ使用
-                            dense_prompt_embeddings=dense_prompt_embeddings[:1],
-                            multimask_output=False,  # LISAは単一マスクを予測
+                if len(seg_positions[0]) > 0:
+                    print(f"SEGトークンが{len(seg_positions[0])}個検出されました")
+                    
+                    # SAM用の画像前処理（1024x1024にリサイズ）
+                    sam_image = image.resize((1024, 1024))
+                    sam_image_tensor = torch.tensor(np.array(sam_image)).permute(2, 0, 1).float()
+                    sam_image_tensor = sam_image_tensor.unsqueeze(0).to(device)
+                    
+                    # SAMの画像エンコーディング
+                    with torch.no_grad():
+                        sam_features = self.sam_image_encoder(sam_image_tensor)
+                    
+                    # SEGトークンの隠れ状態を抽出
+                    last_hidden = gemma_outputs.hidden_states[-1]
+                    seg_embeddings = []
+                    
+                    for batch_idx, token_idx in zip(seg_positions[0], seg_positions[1]):
+                        seg_hidden = last_hidden[batch_idx, token_idx]
+                        seg_embedding = self.mlp_projector(seg_hidden.unsqueeze(0))
+                        seg_embeddings.append(seg_embedding)
+                    
+                    if seg_embeddings:
+                        # SAMデコーダでマスク生成
+                        prompt_embeddings = torch.stack(seg_embeddings)
+                        
+                        # ダミーのdense embeddings
+                        dense_embeddings = torch.zeros(
+                            (prompt_embeddings.size(0), 256, 256),
+                            device=device,
+                            dtype=torch.bfloat16
                         )
                         
-                        predicted_masks = low_res_masks
-                    except Exception as e:
-                        print(f"SAMデコーダエラー: {e}")
-                        predicted_masks = None
+                        # マスク予測
+                        masks, iou_pred = self.sam_mask_decoder(
+                            image_embeddings=sam_features,
+                            image_pe=self.sam_mask_decoder.get_dense_pe(),
+                            sparse_prompt_embeddings=prompt_embeddings,
+                            dense_prompt_embeddings=dense_embeddings,
+                            multimask_output=False,
+                        )
+                        
+                        results["predicted_masks"] = masks
+                        results["iou_predictions"] = iou_pred
+                else:
+                    print("SEGトークンが検出されませんでした")
+                    results["predicted_masks"] = None
+            
+            return results
+            
+        except Exception as e:
+            print(f"フォワードパス中にエラーが発生: {e}")
+            import traceback
+            traceback.print_exc()
+            return {"error": str(e)}
 
-        return {
-            "text_loss": text_loss,
-            "predicted_masks": predicted_masks,
-            "logits": gemma_outputs.logits,
-        } 
+    def generate_with_segmentation(self, image, text_prompt, max_new_tokens=100):
+        """
+        テキスト生成とセグメンテーションを同時に実行
+        """
+        # まずテキスト生成
+        gemma_inputs = self.prepare_multimodal_input(image, text_prompt)
+        
+        device = next(self.gemma_model.parameters()).device
+        gemma_inputs = {k: v.to(device) if isinstance(v, torch.Tensor) else v 
+                       for k, v in gemma_inputs.items()}
+        
+        # テキスト生成
+        with torch.inference_mode():
+            generated_ids = self.gemma_model.generate(
+                **gemma_inputs,
+                max_new_tokens=max_new_tokens,
+                do_sample=False,
+                pad_token_id=self.gemma_processor.tokenizer.eos_token_id
+            )
+        
+        # 生成されたテキストをデコード
+        input_len = gemma_inputs["input_ids"].shape[-1]
+        new_tokens = generated_ids[0][input_len:]
+        generated_text = self.gemma_processor.tokenizer.decode(new_tokens, skip_special_tokens=True)
+        
+        # SEGトークンが含まれているかチェック
+        if self.seg_token in generated_text:
+            print(f"生成されたテキストに{self.seg_token}が含まれています")
+            # セグメンテーション実行
+            results = self.forward(image, text_prompt, generate_mask=True)
+            results["generated_text"] = generated_text
+        else:
+            results = {"generated_text": generated_text, "predicted_masks": None}
+        
+        return results 

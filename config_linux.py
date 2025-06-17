@@ -13,7 +13,7 @@ DATASET_BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dat
 SAM_CHECKPOINT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "weights", "sam_vit_h_4b8939.pth")
 
 # Hugging Faceモデル識別子
-GEMMA_MODEL_ID = "google/gemma-2-2b-it"
+GEMMA_MODEL_ID = "google/gemma-3-4b-it"
 
 # ログと出力の保存先
 LOG_BASE_DIR = "./runs"
@@ -22,7 +22,7 @@ LOG_BASE_DIR = "./runs"
 # 2. MODEL CONFIGURATION
 # ==============================================================================
 # 画像サイズ設定
-# GEMMA_IMAGE_SIZEはGemma-2のSigLIPエンコーダの要求仕様 (896x896)
+# GEMMA_IMAGE_SIZEはGemma-3のSigLIPエンコーダの要求仕様 (896x896)
 GEMMA_IMAGE_SIZE = 896
 # SAM_IMAGE_SIZEはSAM-ViTエンコーダの要求仕様 (1024x1024)
 SAM_IMAGE_SIZE = 1024
