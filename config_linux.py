@@ -3,14 +3,13 @@ import os
 # ==============================================================================
 # 1. PATHS AND IDENTIFIERS
 # ==============================================================================
-# プロジェクトのルートディレクトリからの相対パスでデータセットのベースディレクトリを指定
-# 例: /home/user/LISA-Gemma3/datasets
-# 注意: WSLの '/mnt/h/...' のようなパスではなく、Linuxネイティブの絶対パスまたは相対パスを使用すること
-DATASET_BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "datasets")
+# データセットのベースディレクトリ
+# 環境に応じて修正してください
+DATASET_BASE_DIR = "/mnt/h/download/LISA-dataset/dataset"
 
 # 事前学習済みSAMモデルのチェックポイントへのパス
-# 例: /home/user/LISA-Gemma3/weights/sam_vit_h_4b8939.pth
-SAM_CHECKPOINT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "weights", "sam_vit_h_4b8939.pth")
+# 環境に応じて修正してください
+SAM_CHECKPOINT_PATH = "/mnt/c/Users/oda/foodlmm-llama/weights/sam_vit_h_4b8939.pth"
 
 # Hugging Faceモデル識別子
 GEMMA_MODEL_ID = "google/gemma-3-4b-it"
@@ -108,22 +107,38 @@ def get_dataset_paths():
     }
 
 def check_paths():
-    """重要なパスが存在するかを検証する"""
-    paths_to_check = [SAM_CHECKPOINT_PATH]
+    """重要なパスが存在するかを検証する（存在しない場合はエラーで停止）"""
+    paths_to_check = [
+        ("データセットベースディレクトリ", DATASET_BASE_DIR),
+        ("SAMチェックポイント", SAM_CHECKPOINT_PATH),
+    ]
     
     dataset_paths = get_dataset_paths()
-    # 簡単な存在チェック
-    paths_to_check.append(dataset_paths["sem_seg"]["ade20k"])
-    paths_to_check.append(dataset_paths["vqa"]["llava_instruct_150k"])
+    # 重要なデータセットパスをチェック
+    paths_to_check.extend([
+        ("ADE20k データセット", dataset_paths["sem_seg"]["ade20k"]),
+        ("ReasonSeg データセット", dataset_paths["reason_seg"]["ReasonSeg"]),
+        ("LLaVA VQA データセット", dataset_paths["vqa"]["llava_instruct_150k"]),
+        ("RefCOCO データセット", dataset_paths["refer_seg"]["refcoco"]),
+    ])
 
-    missing_paths = [path for path in paths_to_check if not os.path.exists(path)]
+    missing_paths = []
+    for name, path in paths_to_check:
+        if not os.path.exists(path):
+            missing_paths.append((name, path))
     
     if missing_paths:
-        print("警告: 以下の必須パスまたはファイルが見つかりません:")
-        for path in missing_paths:
-            print(f"  - {path}")
-        print("\nconfig_linux.pyのパス設定と、データセットが正しく配置されているか確認してください。")
-        return False
+        print("エラー: 以下の必須パスまたはファイルが見つかりません:")
+        for name, path in missing_paths:
+            print(f"  - {name}: {path}")
+        print("\n以下の対処を行ってください:")
+        print("1. config_linux.pyのパス設定を環境に合わせて修正")
+        print("2. データセットファイルとSAMチェックポイントが正しく配置されているか確認")
+        print("3. ファイルアクセス権限の確認")
+        print("\nデータセットは必須です。プログラムを終了します。")
+        
+        # エラーで停止
+        raise FileNotFoundError(f"必須ファイルが見つかりません。設定を確認してください。")
     
     return True
 

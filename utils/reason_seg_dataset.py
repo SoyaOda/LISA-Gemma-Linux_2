@@ -7,31 +7,69 @@ import cv2
 import numpy as np
 import torch
 import torch.nn.functional as F
-from transformers import CLIPImageProcessor
+from PIL import Image
 
-from model.llava import conversation as conversation_lib
-from model.segment_anything.utils.transforms import ResizeLongestSide
-
+from .constants import (
+    DEFAULT_IMAGE_TOKEN, 
+    DEFAULT_SEG_TOKEN,
+    ANSWER_LIST, 
+    EXPLANATORY_QUESTION_LIST, 
+    LONG_QUESTION_LIST,
+    SHORT_QUESTION_LIST,
+    SAM_PIXEL_MEAN,
+    SAM_PIXEL_STD,
+    SAM_IMAGE_SIZE,
+    DEFAULT_IGNORE_LABEL
+)
 from .data_processing import get_mask_from_json
-from .utils import (ANSWER_LIST, DEFAULT_IMAGE_TOKEN,
-                    EXPLANATORY_QUESTION_LIST, LONG_QUESTION_LIST,
-                    SHORT_QUESTION_LIST)
+
+# 簡単な会話クラス（LLaVAの代替）
+class SimpleConversation:
+    def __init__(self):
+        self.roles = ["USER", "ASSISTANT"]
+        self.messages = []
+        self.sep = "\n"
+        self.sep2 = "</s>"
+    
+    def copy(self):
+        new_conv = SimpleConversation()
+        new_conv.messages = self.messages.copy()
+        return new_conv
+    
+    def append_message(self, role, message):
+        self.messages.append([role, message])
+    
+    def get_prompt(self):
+        if len(self.messages) == 0:
+            return ""
+        
+        prompt = ""
+        for i, (role, message) in enumerate(self.messages):
+            if i == 0:
+                prompt += f"{role}: {message}"
+            else:
+                prompt += f"{self.sep}{role}: {message}"
+        
+        return prompt + self.sep2
+
+# デフォルト会話インスタンス
+default_conversation = SimpleConversation()
 
 
 class ReasonSegDataset(torch.utils.data.Dataset):
-    pixel_mean = torch.Tensor([123.675, 116.28, 103.53]).view(-1, 1, 1)
-    pixel_std = torch.Tensor([58.395, 57.12, 57.375]).view(-1, 1, 1)
-    img_size = 1024
-    ignore_label = 255
+    pixel_mean = torch.Tensor(SAM_PIXEL_MEAN).view(-1, 1, 1)
+    pixel_std = torch.Tensor(SAM_PIXEL_STD).view(-1, 1, 1)
+    img_size = SAM_IMAGE_SIZE
+    ignore_label = DEFAULT_IGNORE_LABEL
 
     def __init__(
         self,
         base_image_dir,
         tokenizer,
-        vision_tower,
+        vision_tower=None,  # Gemma-3では使用しない
         samples_per_epoch=500 * 8 * 2 * 10,
-        precision: str = "fp32",
-        image_size: int = 224,
+        precision: str = "bf16",
+        image_size: int = SAM_IMAGE_SIZE,
         num_classes_per_sample: int = 3,
         exclude_val=False,
         reason_seg_data="ReasonSeg|train",
@@ -47,8 +85,9 @@ class ReasonSegDataset(torch.utils.data.Dataset):
         self.image_size = image_size
         self.tokenizer = tokenizer
         self.precision = precision
-        self.transform = ResizeLongestSide(image_size)
-        self.clip_image_processor = CLIPImageProcessor.from_pretrained(vision_tower)
+        
+        # Gemma-3では画像変換を簡略化
+        self.target_size = image_size
 
         self.short_question_list = SHORT_QUESTION_LIST
         self.long_question_list = LONG_QUESTION_LIST
@@ -72,24 +111,30 @@ class ReasonSegDataset(torch.utils.data.Dataset):
         if explanatory != -1:
             self.explanatory_question_list = EXPLANATORY_QUESTION_LIST
             self.img_to_explanation = {}
-            with open(
-                os.path.join(
-                    base_image_dir,
-                    "reason_seg",
-                    reason_seg_data,
-                    "explanatory",
-                    "train.json",
-                )
-            ) as f:
-                items = json.load(f)
-            for item in items:
-                img_name = item["image"]
-                self.img_to_explanation[img_name] = {
-                    "query": item["query"],
-                    "outputs": item["outputs"],
-                }
-
-            print("len(self.img_to_explanation): ", len(self.img_to_explanation))
+            explanatory_path = os.path.join(
+                base_image_dir,
+                "reason_seg",
+                reason_seg_data,
+                "explanatory",
+                "train.json",
+            )
+            
+            if os.path.exists(explanatory_path):
+                with open(explanatory_path) as f:
+                    items = json.load(f)
+                for item in items:
+                    img_name = item["image"]
+                    self.img_to_explanation[img_name] = {
+                        "query": item["query"],
+                        "outputs": item["outputs"],
+                    }
+                print("len(self.img_to_explanation): ", len(self.img_to_explanation))
+            else:
+                raise FileNotFoundError(f"必須データファイルが見つかりません: {explanatory_path}")
+        
+        # 画像ファイルの存在確認も追加
+        if len(images) == 0:
+            raise FileNotFoundError(f"画像ファイルが見つかりません: {os.path.join(base_image_dir, 'reason_seg', reason_seg_data)}")
 
     def __len__(self):
         return self.samples_per_epoch
@@ -115,10 +160,8 @@ class ReasonSegDataset(torch.utils.data.Dataset):
         image = cv2.imread(image_path)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         ori_size = image.shape[:2]
-        # preprocess image for clip
-        image_clip = self.clip_image_processor.preprocess(image, return_tensors="pt")[
-            "pixel_values"
-        ][0]
+        # PIL Imageに変換（Gemma-3用）
+        pil_image = Image.fromarray(image)
 
         mask, sents, is_sentence = get_mask_from_json(json_path, image)
         if len(sents) >= self.num_classes_per_sample:
@@ -132,7 +175,16 @@ class ReasonSegDataset(torch.utils.data.Dataset):
             (mask == 1).astype(np.float32) for _ in range(len(sampled_inds))
         ]
 
-        image = self.transform.apply_image(image)  # preprocess image for sam
+        # 画像の簡単なリサイズ（SAM用）
+        height, width = image.shape[:2]
+        if height > width:
+            new_height = self.target_size
+            new_width = int(width * self.target_size / height)
+        else:
+            new_width = self.target_size
+            new_height = int(height * self.target_size / width)
+        
+        image = cv2.resize(image, (new_width, new_height))
         resize = image.shape[:2]
 
         image_name = image_path.split("/")[-1]
@@ -179,7 +231,7 @@ class ReasonSegDataset(torch.utils.data.Dataset):
                 answers.append(random.choice(self.answer_list))
 
             conversations = []
-            conv = conversation_lib.default_conversation.copy()
+            conv = default_conversation.copy()
             roles = {"human": conv.roles[0], "gpt": conv.roles[1]}
 
             i = 0
@@ -205,14 +257,16 @@ class ReasonSegDataset(torch.utils.data.Dataset):
             masks = torch.from_numpy(masks)
             label = torch.ones(masks.shape[1], masks.shape[2]) * self.ignore_label
 
+        # Gemma-3用の形式で返す
+        if len(conversations) > 0:
+            text_prompt = conversations[0]  # 最初の会話を使用
+        else:
+            text_prompt = "Describe this image."
+        
         return (
             image_path,
-            image,
-            image_clip,
-            conversations,
+            pil_image,  # PIL Image形式で返す
+            text_prompt,
             masks,
             label,
-            resize,
-            questions,
-            sampled_sents,
         )
