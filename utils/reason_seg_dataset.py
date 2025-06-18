@@ -112,25 +112,27 @@ class ReasonSegDataset(torch.utils.data.Dataset):
             self.explanatory_question_list = EXPLANATORY_QUESTION_LIST
             self.img_to_explanation = {}
             explanatory_path = os.path.join(
-                base_image_dir,
-                "reason_seg",
-                reason_seg_data,
-                "explanatory",
-                "train.json",
-            )
+                    base_image_dir,
+                    "reason_seg",
+                    reason_seg_data,
+                    "explanatory",
+                    "train.json",
+                )
             
-            if os.path.exists(explanatory_path):
+            try:
                 with open(explanatory_path) as f:
-                    items = json.load(f)
-                for item in items:
-                    img_name = item["image"]
-                    self.img_to_explanation[img_name] = {
-                        "query": item["query"],
-                        "outputs": item["outputs"],
-                    }
-                print("len(self.img_to_explanation): ", len(self.img_to_explanation))
-            else:
-                raise FileNotFoundError(f"必須データファイルが見つかりません: {explanatory_path}")
+                items = json.load(f)
+            for item in items:
+                img_name = item["image"]
+                self.img_to_explanation[img_name] = {
+                    "query": item["query"],
+                    "outputs": item["outputs"],
+                }
+            print("len(self.img_to_explanation): ", len(self.img_to_explanation))
+            except FileNotFoundError:
+                print(f"警告: explanatoryファイルが見つかりません: {explanatory_path}")
+                print("explanatory機能を無効にして続行します。")
+                self.explanatory = -1  # explanatory機能を無効化
         
         # 画像ファイルの存在確認も追加
         if len(images) == 0:
@@ -262,7 +264,7 @@ class ReasonSegDataset(torch.utils.data.Dataset):
             text_prompt = conversations[0]  # 最初の会話を使用
         else:
             text_prompt = "Describe this image."
-        
+
         return (
             image_path,
             pil_image,  # PIL Image形式で返す

@@ -104,7 +104,7 @@ class VQADataset(torch.utils.data.Dataset):
 
         if len(self.vqa_data) == 0:
             raise ValueError(f"VQAデータが空です: {vqa_json_path}")
-        
+
         print("vqa_data: ", len(self.vqa_data))
 
     def __len__(self):
@@ -140,7 +140,7 @@ class VQADataset(torch.utils.data.Dataset):
         image = cv2.imread(image_path)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         ori_size = image.shape[:2]
-        
+
         # PIL Imageに変換（Gemma-3用）
         pil_image = Image.fromarray(image)
 

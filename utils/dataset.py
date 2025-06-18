@@ -103,7 +103,7 @@ def collate_fn_gemma3(
         batch_input_ids.append(input_ids)
         batch_attention_masks.append(attention_mask)
         batch_pixel_values.append(pixel_values)
-    
+
     return {
         "image_paths": image_paths,
         "images": images,  # PIL Images for SAM processing
@@ -119,7 +119,7 @@ class LisaGemma3Dataset(torch.utils.data.Dataset):
     LISA-Gemma3用のメインデータセットクラス
     デュアルストリーム処理（Gemma用とSAM用の画像を同時に処理）
     """
-    
+
     def __init__(
         self,
         base_image_dir: str,
@@ -151,78 +151,78 @@ class LisaGemma3Dataset(torch.utils.data.Dataset):
         # サンプルレートの正規化
         sample_rate = np.array(sample_rate)
         self.sample_rate = sample_rate / sample_rate.sum()
-        
+
         # データセットの初期化
         self.datasets = dataset.split("||")
         self.all_datasets = []
         
         # Semantic Segmentation Dataset
         if "sem_seg" in self.datasets:
-            self.all_datasets.append(
-                SemSegDataset(
-                    base_image_dir,
+                self.all_datasets.append(
+                    SemSegDataset(
+                        base_image_dir,
                     gemma_processor.tokenizer,
                     None,  # vision_tower は使用しない
-                    samples_per_epoch,
-                    precision,
+                        samples_per_epoch,
+                        precision,
                     gemma_image_size,
-                    num_classes_per_sample,
-                    exclude_val,
-                    sem_seg_data,
+                        num_classes_per_sample,
+                        exclude_val,
+                        sem_seg_data,
+                    )
                 )
-            )
         
         # Referring Segmentation Dataset
         if "refer_seg" in self.datasets:
-            self.all_datasets.append(
-                ReferSegDataset(
-                    base_image_dir,
+                self.all_datasets.append(
+                    ReferSegDataset(
+                        base_image_dir,
                     gemma_processor.tokenizer,
                     None,  # vision_tower は使用しない
-                    samples_per_epoch,
-                    precision,
+                        samples_per_epoch,
+                        precision,
                     gemma_image_size,
-                    num_classes_per_sample,
-                    exclude_val,
-                    refer_seg_data,
+                        num_classes_per_sample,
+                        exclude_val,
+                        refer_seg_data,
+                    )
                 )
-            )
         
         # VQA Dataset
         if "vqa" in self.datasets:
-            self.all_datasets.append(
-                VQADataset(
-                    base_image_dir,
+                self.all_datasets.append(
+                    VQADataset(
+                        base_image_dir,
                     gemma_processor.tokenizer,
                     None,  # vision_tower は使用しない
-                    samples_per_epoch,
-                    precision,
+                        samples_per_epoch,
+                        precision,
                     gemma_image_size,
-                    num_classes_per_sample,
-                    exclude_val,
-                    vqa_data,
+                        num_classes_per_sample,
+                        exclude_val,
+                        vqa_data,
+                    )
                 )
-            )
         
         # Reasoning Segmentation Dataset
         if "reason_seg" in self.datasets:
-            self.all_datasets.append(
-                ReasonSegDataset(
-                    base_image_dir,
+                self.all_datasets.append(
+                    ReasonSegDataset(
+                        base_image_dir,
                     gemma_processor.tokenizer,
                     None,  # vision_tower は使用しない
-                    samples_per_epoch,
-                    precision,
+                        samples_per_epoch,
+                        precision,
                     gemma_image_size,
-                    num_classes_per_sample,
-                    exclude_val,
-                    reason_seg_data,
+                        num_classes_per_sample,
+                        exclude_val,
+                        reason_seg_data,
+                    )
                 )
-            )
-    
+
     def __len__(self):
         return self.samples_per_epoch
-    
+
     def __getitem__(self, idx) -> Tuple[str, Image.Image, str, torch.Tensor, torch.Tensor]:
         """
         アイテムを取得してデュアルストリーム処理用の形式で返す
@@ -302,7 +302,7 @@ class LisaGemma3ValDataset(torch.utils.data.Dataset):
     """
     LISA-Gemma3用の評価データセット
     """
-    
+
     def __init__(
         self,
         base_image_dir: str,
@@ -328,10 +328,10 @@ class LisaGemma3ValDataset(torch.utils.data.Dataset):
                 3,
                 False,
                 val_dataset,
-            )
+                    )
         elif "sem_seg" in val_dataset.lower():
             self.dataset = SemSegDataset(
-                base_image_dir,
+                        base_image_dir,
                 gemma_processor.tokenizer,
                 None,
                 1000,  # サンプル数
@@ -343,7 +343,7 @@ class LisaGemma3ValDataset(torch.utils.data.Dataset):
             )
         else:
             raise ValueError(f"不明な評価データセット: {val_dataset}")
-    
+
     def __len__(self):
         return len(self.dataset)
     
@@ -389,10 +389,10 @@ class LisaGemma3ValDataset(torch.utils.data.Dataset):
         except Exception as e:
             print(f"評価データ取得エラー (idx={idx}): {e}")
             # エラー時のフォールバック
-            return (
+        return (
                 f"val_error_sample_{idx}",
                 Image.new('RGB', (224, 224), color='yellow'),
                 "This is a fallback validation image.",
                 torch.zeros(1, 1024, 1024),
                 torch.tensor(0)
-            )
+        )

@@ -75,7 +75,7 @@ LORA_TARGET_MODULES = [
 # データセットの混合比率
 DATASET_SAMPLE_RATES = "9,3,3,1"  # sem_seg, refer_seg, vqa, reason_seg
 # 使用するデータセットの指定
-SEM_SEG_DATA = "ade20k||cocostuff||mapillary"
+SEM_SEG_DATA = "ade20k||cocostuff||mapillary||pascal_part||paco_lvis"
 REFER_SEG_DATA = "refclef||refcoco||refcoco+||refcocog"
 VQA_DATA = "llava_instruct_150k"
 REASON_SEG_DATA = "ReasonSeg|train"
@@ -91,6 +91,8 @@ def get_dataset_paths():
             "ade20k": os.path.join(DATASET_BASE_DIR, "ade20k"),
             "cocostuff": os.path.join(DATASET_BASE_DIR, "cocostuff"),
             "mapillary": os.path.join(DATASET_BASE_DIR, "mapillary"),
+            "pascal_part": os.path.join(DATASET_BASE_DIR, "vlpart", "pascal_part"),
+            "paco_lvis": os.path.join(DATASET_BASE_DIR, "vlpart", "paco"),
         },
         "refer_seg": {
             "refcoco": os.path.join(DATASET_BASE_DIR, "refer_seg"),
