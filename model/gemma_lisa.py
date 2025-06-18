@@ -6,6 +6,7 @@ Gemma-3の公式API仕様に準拠した実装
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from typing import Optional, List, Tuple, Dict, Any
 import numpy as np
 
@@ -61,6 +62,11 @@ class LisaGemmaForCausalLM(PreTrainedModel):
             for param in self.sam_image_encoder.parameters():
                 param.requires_grad = False
             
+            # SAMのプロンプトエンコーダを抽出し、凍結する
+            self.sam_prompt_encoder = sam.prompt_encoder
+            for param in self.sam_prompt_encoder.parameters():
+                param.requires_grad = False
+            
             # SAMのマスクデコーダを抽出し、訓練可能にする
             self.sam_mask_decoder = sam.mask_decoder
             for param in self.sam_mask_decoder.parameters():
@@ -68,6 +74,7 @@ class LisaGemmaForCausalLM(PreTrainedModel):
         else:
             print("SAMチェックポイントが指定されていません。SAMコンポーネントは初期化されません。")
             self.sam_image_encoder = None
+            self.sam_prompt_encoder = None
             self.sam_mask_decoder = None
 
         # 4. MLPプロジェクタの定義 (GemmaとSAMを繋ぐ橋)
@@ -133,99 +140,227 @@ class LisaGemmaForCausalLM(PreTrainedModel):
             "trainable_parameters": trainable_params,
             "trainable_percentage": (trainable_params / total_params) * 100 if total_params > 0 else 0
         }
+    
+    def prepare_inputs_for_generation(self, input_ids, **kwargs):
+        """PEFT対応のため必要なメソッド"""
+        return self.gemma_model.prepare_inputs_for_generation(input_ids, **kwargs)
+    
+    def get_input_embeddings(self):
+        """PEFT対応のため必要なメソッド"""
+        return self.gemma_model.get_input_embeddings()
+    
+    def set_input_embeddings(self, value):
+        """PEFT対応のため必要なメソッド"""
+        self.gemma_model.set_input_embeddings(value)
+    
+    def get_output_embeddings(self):
+        """PEFT対応のため必要なメソッド"""
+        return self.gemma_model.get_output_embeddings()
+    
+    def set_output_embeddings(self, value):
+        """PEFT対応のため必要なメソッド"""
+        self.gemma_model.set_output_embeddings(value)
 
     def forward(
         self,
-        image,  # PIL Image
-        text_prompt: str,
+        input_ids: Optional[torch.LongTensor] = None,
+        attention_mask: Optional[torch.Tensor] = None,
+        pixel_values: Optional[torch.FloatTensor] = None,
+        labels: Optional[torch.LongTensor] = None,
+        image=None,  # PIL Image (単一画像用)
+        text_prompt: str = None,  # 単一テキスト用
         generate_mask: bool = True,
         **kwargs
     ) -> Dict[str, Any]:
         """
         LISA-Gemmaのフォワードパス
+        バッチ処理対応版（学習時）と単一画像処理版（推論時）の両方をサポート
         """
         try:
-            # 1. Gemma-3の公式方式で入力を準備
-            gemma_inputs = self.prepare_multimodal_input(image, text_prompt)
-            
-            # デバイスに移動
             device = next(self.gemma_model.parameters()).device
-            gemma_inputs = {k: v.to(device) if isinstance(v, torch.Tensor) else v 
-                           for k, v in gemma_inputs.items()}
             
-            # 2. Gemmaモデルでテキスト生成とセグメンテーション判定
-            with torch.inference_mode():
-                gemma_outputs = self.gemma_model(
-                    **gemma_inputs,
-                    output_hidden_states=True,
-                    return_dict=True
-                )
+            # 単一画像+テキストの場合（推論時）
+            if image is not None and text_prompt is not None:
+                return self._forward_single(image, text_prompt, generate_mask, device)
             
-            results = {
-                "gemma_logits": gemma_outputs.logits,
-                "hidden_states": gemma_outputs.hidden_states,
-            }
+            # バッチ処理の場合（学習時）
+            if input_ids is not None and pixel_values is not None:
+                return self._forward_batch(input_ids, attention_mask, pixel_values, labels, generate_mask, device)
             
-            # 3. SEGトークンが生成された場合のマスク生成
-            if generate_mask and self.sam_image_encoder is not None:
-                # SEGトークンの存在をチェック
-                generated_ids = torch.argmax(gemma_outputs.logits, dim=-1)
-                seg_positions = (generated_ids == self.seg_token_id).nonzero(as_tuple=True)
-                
-                if len(seg_positions[0]) > 0:
-                    print(f"SEGトークンが{len(seg_positions[0])}個検出されました")
-                    
-                    # SAM用の画像前処理（1024x1024にリサイズ）
-                    sam_image = image.resize((1024, 1024))
-                    sam_image_tensor = torch.tensor(np.array(sam_image)).permute(2, 0, 1).float()
-                    sam_image_tensor = sam_image_tensor.unsqueeze(0).to(device)
-                    
-                    # SAMの画像エンコーディング
-                    with torch.no_grad():
-                        sam_features = self.sam_image_encoder(sam_image_tensor)
-                    
-                    # SEGトークンの隠れ状態を抽出
-                    last_hidden = gemma_outputs.hidden_states[-1]
-                    seg_embeddings = []
-                    
-                    for batch_idx, token_idx in zip(seg_positions[0], seg_positions[1]):
-                        seg_hidden = last_hidden[batch_idx, token_idx]
-                        seg_embedding = self.mlp_projector(seg_hidden.unsqueeze(0))
-                        seg_embeddings.append(seg_embedding)
-                    
-                    if seg_embeddings:
-                        # SAMデコーダでマスク生成
-                        prompt_embeddings = torch.stack(seg_embeddings)
-                        
-                        # ダミーのdense embeddings
-                        dense_embeddings = torch.zeros(
-                            (prompt_embeddings.size(0), 256, 256),
-                            device=device,
-                            dtype=torch.bfloat16
-                        )
-                        
-                        # マスク予測
-                        masks, iou_pred = self.sam_mask_decoder(
-                            image_embeddings=sam_features,
-                            image_pe=self.sam_mask_decoder.get_dense_pe(),
-                            sparse_prompt_embeddings=prompt_embeddings,
-                            dense_prompt_embeddings=dense_embeddings,
-                            multimask_output=False,
-                        )
-                        
-                        results["predicted_masks"] = masks
-                        results["iou_predictions"] = iou_pred
-                else:
-                    print("SEGトークンが検出されませんでした")
-                    results["predicted_masks"] = None
-            
-            return results
+            raise ValueError("Either (image, text_prompt) or (input_ids, pixel_values) must be provided")
             
         except Exception as e:
             print(f"フォワードパス中にエラーが発生: {e}")
             import traceback
             traceback.print_exc()
             return {"error": str(e)}
+    
+    def _forward_single(self, image, text_prompt, generate_mask, device):
+        """単一画像・テキストのフォワードパス（推論用）"""
+        # 1. Gemma-3の公式方式で入力を準備
+        gemma_inputs = self.prepare_multimodal_input(image, text_prompt)
+        
+        # デバイスに移動
+        gemma_inputs = {k: v.to(device) if isinstance(v, torch.Tensor) else v 
+                       for k, v in gemma_inputs.items()}
+        
+        # 2. Gemmaモデルでテキスト生成とセグメンテーション判定
+        with torch.no_grad():
+            gemma_outputs = self.gemma_model(
+                **gemma_inputs,
+                output_hidden_states=True,
+                return_dict=True
+            )
+        
+        results = {
+            "gemma_logits": gemma_outputs.logits,
+            "hidden_states": gemma_outputs.hidden_states,
+        }
+        
+        # 3. SEGトークンが含まれている場合のマスク生成
+        if generate_mask and self.sam_image_encoder is not None:
+            input_ids = gemma_inputs["input_ids"]
+            seg_positions = (input_ids == self.seg_token_id).nonzero(as_tuple=True)
+            
+            if len(seg_positions[0]) > 0:
+                print(f"入力テキストでSEGトークンが{len(seg_positions[0])}個検出されました")
+                
+                # SAM用の画像前処理（1024x1024にリサイズ）
+                sam_image = image.resize((1024, 1024))
+                sam_image_tensor = torch.tensor(np.array(sam_image)).permute(2, 0, 1).float()
+                sam_image_tensor = sam_image_tensor.unsqueeze(0).to(device)
+                
+                # SAMの画像エンコーディング
+                with torch.no_grad():
+                    sam_features = self.sam_image_encoder(sam_image_tensor)
+                
+                # SEGトークンの隠れ状態を抽出してマスク生成
+                masks = self._generate_masks_from_seg_tokens(
+                    gemma_outputs.hidden_states[-1], seg_positions, sam_features, device
+                )
+                results["predicted_masks"] = masks
+            else:
+                results["predicted_masks"] = None
+        
+        return results
+    
+    def _forward_batch(self, input_ids, attention_mask, pixel_values, labels, generate_mask, device):
+        """バッチ処理のフォワードパス（学習用）"""
+        # 1. Gemmaモデルでのフォワードパス
+        gemma_outputs = self.gemma_model(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            pixel_values=pixel_values,
+            labels=labels,
+            output_hidden_states=True,
+            return_dict=True
+        )
+        
+        results = {
+            "text_loss": gemma_outputs.loss,  # Gemmaのlanguage modeling loss
+            "logits": gemma_outputs.logits,
+            "hidden_states": gemma_outputs.hidden_states,
+        }
+        
+        # 2. セグメンテーション処理
+        if generate_mask and self.sam_image_encoder is not None:
+            # SEGトークンの位置を検出
+            seg_positions = (input_ids == self.seg_token_id).nonzero(as_tuple=True)
+            
+            if len(seg_positions[0]) > 0:
+                print(f"バッチ内でSEGトークンが{len(seg_positions[0])}個検出されました")
+                
+                # バッチ内の画像をSAM用に前処理（pixel_valuesから変換）
+                batch_size = pixel_values.shape[0]
+                sam_features_list = []
+                
+                for i in range(batch_size):
+                    # Gemma用の画像をSAM用に変換（896x896 -> 1024x1024）
+                    gemma_img = pixel_values[i]  # (C, H, W)
+                    
+                    # SAM用にリサイズ（bilinear補間を使用）
+                    sam_img = F.interpolate(
+                        gemma_img.unsqueeze(0), 
+                        size=(1024, 1024), 
+                        mode='bilinear', 
+                        align_corners=False
+                    )  # (1, C, H, W)
+                    
+                    # SAMの画像エンコーディング
+                    with torch.no_grad():
+                        sam_features = self.sam_image_encoder(sam_img)
+                    sam_features_list.append(sam_features)
+                
+                # SEGトークンからマスクを生成
+                masks = self._generate_masks_from_seg_tokens_batch(
+                    gemma_outputs.hidden_states[-1], seg_positions, sam_features_list, device
+                )
+                results["predicted_masks"] = masks
+            else:
+                results["predicted_masks"] = None
+        
+        return results
+    
+    def _generate_masks_from_seg_tokens(self, hidden_states, seg_positions, sam_features, device):
+        """SEGトークンから単一画像のマスクを生成"""
+        pred_masks = []
+        
+        for batch_idx, token_idx in zip(seg_positions[0], seg_positions[1]):
+            seg_hidden = hidden_states[batch_idx, token_idx]
+            seg_embedding = self.mlp_projector(seg_hidden.unsqueeze(0))
+            
+            # SAMデコーダでマスク生成
+            sparse_embeddings = seg_embedding.unsqueeze(1)  # (1, 1, embed_dim)
+            dense_embeddings = torch.zeros(
+                (sam_features.shape[0], sam_features.shape[2], sam_features.shape[3]),
+                device=device,
+                dtype=torch.bfloat16
+            )
+            
+            dense_pe = self.sam_prompt_encoder.get_dense_pe()
+            
+            mask, iou_pred = self.sam_mask_decoder(
+                image_embeddings=sam_features,
+                image_pe=dense_pe,
+                sparse_prompt_embeddings=sparse_embeddings,
+                dense_prompt_embeddings=dense_embeddings,
+                multimask_output=False,
+            )
+            pred_masks.append(mask)
+        
+        return torch.cat(pred_masks, dim=0) if len(pred_masks) > 1 else pred_masks[0]
+    
+    def _generate_masks_from_seg_tokens_batch(self, hidden_states, seg_positions, sam_features_list, device):
+        """SEGトークンからバッチのマスクを生成"""
+        pred_masks = []
+        
+        for batch_idx, token_idx in zip(seg_positions[0], seg_positions[1]):
+            seg_hidden = hidden_states[batch_idx, token_idx]
+            seg_embedding = self.mlp_projector(seg_hidden.unsqueeze(0))
+            
+            # 対応するSAM特徴量を取得
+            sam_features = sam_features_list[batch_idx.item()]
+            
+            # SAMデコーダでマスク生成
+            sparse_embeddings = seg_embedding.unsqueeze(1)
+            dense_embeddings = torch.zeros(
+                (sam_features.shape[0], sam_features.shape[2], sam_features.shape[3]),
+                device=device,
+                dtype=torch.bfloat16
+            )
+            
+            dense_pe = self.sam_prompt_encoder.get_dense_pe()
+            
+            mask, iou_pred = self.sam_mask_decoder(
+                image_embeddings=sam_features,
+                image_pe=dense_pe,
+                sparse_prompt_embeddings=sparse_embeddings,
+                dense_prompt_embeddings=dense_embeddings,
+                multimask_output=False,
+            )
+            pred_masks.append(mask)
+        
+        return torch.cat(pred_masks, dim=0) if len(pred_masks) > 1 else pred_masks[0]
 
     def generate_with_segmentation(self, image, text_prompt, max_new_tokens=100):
         """

@@ -4,6 +4,8 @@ LISA-Gemma3 モデルの損失関数モジュール
 
 import torch
 import torch.nn.functional as F
+import torch.nn as nn
+from typing import Dict, Optional, Any
 
 
 def dice_loss(
@@ -50,150 +52,243 @@ def sigmoid_ce_loss(
     return loss
 
 
-class DiceLoss(torch.nn.Module):
-    """
-    DICE損失のモジュール実装
-    """
-    def __init__(self, scale=1000, eps=1e-6):
+class DiceLoss(nn.Module):
+    """DICE損失の実装"""
+    
+    def __init__(self, smooth: float = 1e-6):
         super().__init__()
-        self.scale = scale
-        self.eps = eps
-        
-    def forward(self, inputs, targets, num_masks=1, reduction="mean"):
+        self.smooth = smooth
+    
+    def forward(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         """
-        DICE損失を計算する
-        
         Args:
-            inputs (torch.Tensor): 予測マスク [B, num_masks, H, W]
-            targets (torch.Tensor): 正解マスク [B, num_masks, H, W]
-            num_masks (int): マスクの数
-            reduction (str): 損失値の縮約方法 ('mean'または'sum')
-            
+            pred: 予測マスク (B, 1, H, W) または (B, H, W)
+            target: 正解マスク (B, 1, H, W) または (B, H, W)
         Returns:
-            torch.Tensor: 損失値
+            DICE損失値
         """
-        inputs = inputs.sigmoid()
-        inputs = inputs.flatten(2)
-        targets = targets.flatten(2)
+        # 次元を揃える
+        if pred.dim() == 4 and pred.size(1) == 1:
+            pred = pred.squeeze(1)  # (B, H, W)
+        if target.dim() == 4 and target.size(1) == 1:
+            target = target.squeeze(1)  # (B, H, W)
         
-        numerator = 2 * torch.sum(inputs * targets, dim=-1)
-        denominator = torch.sum(inputs, dim=-1) + torch.sum(targets, dim=-1) + self.eps
+        # シグモイドを適用（予測値が確率でない場合）
+        pred = torch.sigmoid(pred)
         
-        loss = 1 - (numerator / denominator)
+        # バッチ次元以外をフラット化
+        pred_flat = pred.view(pred.size(0), -1)  # (B, H*W)
+        target_flat = target.view(target.size(0), -1)  # (B, H*W)
         
-        if reduction == "none":
-            return loss
+        # DICE係数の計算
+        intersection = (pred_flat * target_flat).sum(dim=1)  # (B,)
+        union = pred_flat.sum(dim=1) + target_flat.sum(dim=1)  # (B,)
         
-        # バッチとマスクの平均を取る
-        if num_masks == 0:
-            return torch.tensor(0.0, device=inputs.device)
+        dice = (2.0 * intersection + self.smooth) / (union + self.smooth)
         
-        return loss.sum() / (loss.shape[0] * num_masks) if reduction == "mean" else loss.sum()
+        # DICE損失 = 1 - DICE係数
+        dice_loss = 1.0 - dice
+        
+        return dice_loss.mean()
 
 
-class SigmoidCELoss(torch.nn.Module):
-    """
-    シグモイドクロスエントロピー損失のモジュール実装
-    """
+class BCELoss(nn.Module):
+    """Binary Cross Entropy損失の実装"""
+    
     def __init__(self):
         super().__init__()
-        
-    def forward(self, inputs, targets, num_masks=1, reduction="mean"):
+        self.bce = nn.BCEWithLogitsLoss()
+    
+    def forward(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         """
-        シグモイドクロスエントロピー損失関数
-        
         Args:
-            inputs (torch.Tensor): 予測マスク [B, num_masks, H, W]
-            targets (torch.Tensor): 正解マスク [B, num_masks, H, W]
-            num_masks (int): マスクの数
-            reduction (str): 損失値の縮約方法 ('mean'または'sum')
-            
+            pred: 予測マスク (B, 1, H, W) または (B, H, W)
+            target: 正解マスク (B, 1, H, W) または (B, H, W)
         Returns:
-            torch.Tensor: 損失値
+            BCE損失値
         """
-        inputs = inputs.flatten(2)
-        targets = targets.flatten(2)
+        # 次元を揃える
+        if pred.dim() == 4 and pred.size(1) == 1:
+            pred = pred.squeeze(1)  # (B, H, W)
+        if target.dim() == 4 and target.size(1) == 1:
+            target = target.squeeze(1)  # (B, H, W)
         
-        loss = F.binary_cross_entropy_with_logits(
-            inputs, targets, reduction="none"
-        ).mean(dim=-1)
-        
-        if reduction == "none":
-            return loss
-        
-        # バッチとマスクの平均を取る
-        if num_masks == 0:
-            return torch.tensor(0.0, device=inputs.device)
-        
-        return loss.sum() / (loss.shape[0] * num_masks) if reduction == "mean" else loss.sum()
+        # BCEWithLogitsLossを使用（内部でシグモイドを適用）
+        return self.bce(pred, target.float())
 
 
-class CompositeLoss(torch.nn.Module):
+class CompositeLoss(nn.Module):
     """
-    LISA-Gemma3用の複合損失関数
-    テキスト生成損失 + セグメンテーション損失
+    複合損失関数
+    テキスト生成損失 + セグメンテーション損失（DICE + BCE）
     """
-    def __init__(self, ce_loss_weight=1.0, dice_loss_weight=0.5, bce_loss_weight=2.0):
+    
+    def __init__(
+        self,
+        ce_loss_weight: float = 1.0,
+        dice_loss_weight: float = 0.5,
+        bce_loss_weight: float = 2.0,
+    ):
         super().__init__()
         self.ce_loss_weight = ce_loss_weight
         self.dice_loss_weight = dice_loss_weight
         self.bce_loss_weight = bce_loss_weight
         
+        # 損失関数の初期化
         self.dice_loss = DiceLoss()
-        self.bce_loss = SigmoidCELoss()
-        
-    def forward(self, outputs, batch):
+        self.bce_loss = BCELoss()
+    
+    def forward(
+        self,
+        model_outputs: Dict[str, Any],
+        batch: Dict[str, Any]
+    ) -> Dict[str, torch.Tensor]:
         """
-        複合損失を計算する
+        複合損失の計算
         
         Args:
-            outputs: モデルの出力辞書
+            model_outputs: モデルの出力
+                - "text_loss": テキスト生成損失 (Optional)
+                - "predicted_masks": 予測マスク (Optional)
+                - "logits": 言語モデルのロジット (Optional)
             batch: バッチデータ
-            
+                - "labels": テキストのラベル (Optional)
+                - "ground_truth_mask": 正解マスク (Optional)
+        
         Returns:
-            dict: 各損失値を含む辞書
+            損失の辞書
+                - "total_loss": 総損失
+                - "text_loss": テキスト損失
+                - "dice_loss": DICE損失
+                - "bce_loss": BCE損失
         """
         losses = {}
-        total_loss = 0.0
         
-        # テキスト生成損失（Gemma-3のlanguage modeling loss）
-        if "gemma_logits" in outputs and "labels" in batch:
-            labels = batch["labels"]
-            logits = outputs["gemma_logits"]
-            
-            # シフトしてlanguage modeling lossを計算
-            shift_logits = logits[..., :-1, :].contiguous()
-            shift_labels = labels[..., 1:].contiguous()
-            
-            # -100でマスクされたトークンは無視
-            loss_fct = torch.nn.CrossEntropyLoss(ignore_index=-100)
-            text_loss = loss_fct(
-                shift_logits.view(-1, shift_logits.size(-1)),
-                shift_labels.view(-1)
-            )
-            
+        # デバイスを安全に取得
+        device = None
+        for value in model_outputs.values():
+            if isinstance(value, torch.Tensor):
+                device = value.device
+                break
+        
+        if device is None:
+            device = torch.device("cpu")
+        
+        total_loss = torch.tensor(0.0, device=device)
+        
+        # 1. テキスト生成損失
+        text_loss = model_outputs.get("text_loss")
+        if text_loss is not None:
             losses["text_loss"] = text_loss
             total_loss += self.ce_loss_weight * text_loss
+        else:
+            losses["text_loss"] = torch.tensor(0.0, device=total_loss.device)
         
-        # セグメンテーション損失
-        if "predicted_masks" in outputs and outputs["predicted_masks"] is not None:
-            predicted_masks = outputs["predicted_masks"]
+        # 2. セグメンテーション損失
+        predicted_masks = model_outputs.get("predicted_masks")
+        ground_truth_mask = batch.get("ground_truth_mask")
+        
+        if predicted_masks is not None and ground_truth_mask is not None:
+            # DICE損失
+            dice_loss = self.dice_loss(predicted_masks, ground_truth_mask)
+            losses["dice_loss"] = dice_loss
+            total_loss += self.dice_loss_weight * dice_loss
             
-            if "ground_truth_mask" in batch and batch["ground_truth_mask"] is not None:
-                ground_truth_mask = batch["ground_truth_mask"]
-                
-                # マスクの数を計算
-                num_masks = predicted_masks.size(0) if predicted_masks.dim() > 2 else 1
-                
-                # DICE損失
-                dice_loss_val = self.dice_loss(predicted_masks, ground_truth_mask, num_masks)
-                losses["dice_loss"] = dice_loss_val
-                total_loss += self.dice_loss_weight * dice_loss_val
-                
-                # BCE損失
-                bce_loss_val = self.bce_loss(predicted_masks, ground_truth_mask, num_masks)
-                losses["bce_loss"] = bce_loss_val
-                total_loss += self.bce_loss_weight * bce_loss_val
+            # BCE損失
+            bce_loss = self.bce_loss(predicted_masks, ground_truth_mask)
+            losses["bce_loss"] = bce_loss
+            total_loss += self.bce_loss_weight * bce_loss
+        else:
+            # マスクデータが存在しない場合（VQAデータなど）
+            losses["dice_loss"] = torch.tensor(0.0, device=total_loss.device)
+            losses["bce_loss"] = torch.tensor(0.0, device=total_loss.device)
         
         losses["total_loss"] = total_loss
-        return losses 
+        
+        return losses
+
+
+class IoUMetric(nn.Module):
+    """IoU（Intersection over Union）メトリクスの計算"""
+    
+    def __init__(self, threshold: float = 0.5, smooth: float = 1e-6):
+        super().__init__()
+        self.threshold = threshold
+        self.smooth = smooth
+    
+    def forward(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            pred: 予測マスク (B, 1, H, W) または (B, H, W)
+            target: 正解マスク (B, 1, H, W) または (B, H, W)
+        Returns:
+            IoUスコア
+        """
+        # 次元を揃える
+        if pred.dim() == 4 and pred.size(1) == 1:
+            pred = pred.squeeze(1)  # (B, H, W)
+        if target.dim() == 4 and target.size(1) == 1:
+            target = target.squeeze(1)  # (B, H, W)
+        
+        # 予測値を二値化
+        pred = torch.sigmoid(pred)
+        pred_binary = (pred > self.threshold).float()
+        target_binary = target.float()
+        
+        # バッチ次元以外をフラット化
+        pred_flat = pred_binary.view(pred_binary.size(0), -1)  # (B, H*W)
+        target_flat = target_binary.view(target_binary.size(0), -1)  # (B, H*W)
+        
+        # IoUの計算
+        intersection = (pred_flat * target_flat).sum(dim=1)  # (B,)
+        union = pred_flat.sum(dim=1) + target_flat.sum(dim=1) - intersection  # (B,)
+        
+        iou = (intersection + self.smooth) / (union + self.smooth)
+        
+        return iou.mean()
+
+
+def test_losses():
+    """損失関数のテスト"""
+    print("=== 損失関数のテスト ===")
+    
+    # ダミーデータの作成
+    batch_size = 2
+    height, width = 64, 64
+    
+    # 予測マスクと正解マスク
+    pred_masks = torch.randn(batch_size, 1, height, width)
+    gt_masks = torch.randint(0, 2, (batch_size, 1, height, width)).float()
+    
+    # テキスト損失
+    text_loss = torch.tensor(2.5)
+    
+    # モデル出力とバッチデータの作成
+    model_outputs = {
+        "text_loss": text_loss,
+        "predicted_masks": pred_masks,
+    }
+    
+    batch = {
+        "ground_truth_mask": gt_masks,
+    }
+    
+    # 複合損失の計算
+    loss_fn = CompositeLoss()
+    losses = loss_fn(model_outputs, batch)
+    
+    print(f"総損失: {losses['total_loss'].item():.4f}")
+    print(f"テキスト損失: {losses['text_loss'].item():.4f}")
+    print(f"DICE損失: {losses['dice_loss'].item():.4f}")
+    print(f"BCE損失: {losses['bce_loss'].item():.4f}")
+    
+    # IoUメトリクスのテスト
+    iou_metric = IoUMetric()
+    iou_score = iou_metric(pred_masks, gt_masks)
+    print(f"IoUスコア: {iou_score.item():.4f}")
+    
+    print("✓ 損失関数のテスト完了")
+
+
+if __name__ == "__main__":
+    test_losses() 
