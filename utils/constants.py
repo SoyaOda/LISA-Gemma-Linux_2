@@ -47,11 +47,11 @@ EXPLANATORY_QUESTION_LIST = [
 ]
 
 ANSWER_LIST = [
-    "[SEG]",
-    "Sure, here is the segmentation: [SEG]",
-    "I can segment that for you: [SEG]",
-    "Here's the segmentation mask: [SEG]",
-    "The segmentation is: [SEG]",
+    "It is [SEG].",
+    "Sure, [SEG].",
+    "Sure, it is [SEG].",
+    "Sure, the segmentation result is [SEG].",
+    "[SEG].",
 ]
 
 # 画像前処理の定数

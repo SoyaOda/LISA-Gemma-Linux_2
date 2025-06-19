@@ -29,6 +29,8 @@ SAM_IMAGE_SIZE = 1024
 MODEL_MAX_LENGTH = 2048
 # MLPプロジェクタからSAMデコーダへの出力次元 (SAMのプロンプト埋め込み次元と一致)
 SEG_PROJECTION_DIM = 256
+# セグメンテーション用の特別なトークン（オリジナルLISAに準拠）
+SEG_TOKEN = "[SEG]"
 
 # ==============================================================================
 # 3. TRAINING HYPERPARAMETERS

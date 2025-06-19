@@ -55,9 +55,9 @@ def init_mapillary(base_image_dir):
     
     try:
         with open(config_path) as f:
-        mapillary_classes = json.load(f)["labels"]
-    mapillary_classes = [x["readable"].lower() for x in mapillary_classes]
-    mapillary_classes = np.array(mapillary_classes)
+            mapillary_classes = json.load(f)["labels"]
+        mapillary_classes = [x["readable"].lower() for x in mapillary_classes]
+        mapillary_classes = np.array(mapillary_classes)
         
         labels_dir = os.path.join(mapillary_data_root, "training", "v2.0", "labels")
         if not os.path.exists(labels_dir):
@@ -70,10 +70,10 @@ def init_mapillary(base_image_dir):
             print(f"警告: Mapillaryラベルファイルが見つかりません")
             return [], [], []
         
-    mapillary_images = [
-        x.replace(".png", ".jpg").replace("v2.0/labels", "images")
-        for x in mapillary_labels
-    ]
+        mapillary_images = [
+            x.replace(".png", ".jpg").replace("v2.0/labels", "images")
+            for x in mapillary_labels
+        ]
         
         # 存在確認
         valid_images = []
@@ -106,8 +106,8 @@ def init_ade20k(base_image_dir):
     
     try:
         with open(classes_file, "r") as f:
-        ade20k_classes = json.load(f)
-    ade20k_classes = np.array(ade20k_classes)
+            ade20k_classes = json.load(f)
+        ade20k_classes = np.array(ade20k_classes)
         
         images_dir = os.path.join(ade_path, "images", "training")
         if not os.path.exists(images_dir):
@@ -115,21 +115,21 @@ def init_ade20k(base_image_dir):
             return [], [], []
             
         image_ids = sorted(os.listdir(images_dir))
-    ade20k_image_ids = []
-    for x in image_ids:
-        if x.endswith(".jpg"):
-            ade20k_image_ids.append(x[:-4])
+        ade20k_image_ids = []
+        for x in image_ids:
+            if x.endswith(".jpg"):
+                ade20k_image_ids.append(x[:-4])
                 
-    ade20k_images = []
+        ade20k_images = []
         for image_id in ade20k_image_ids:
-        ade20k_images.append(
+            ade20k_images.append(
                 os.path.join(images_dir, "{}.jpg".format(image_id))
-        )
+            )
             
-    ade20k_labels = [
-        x.replace(".jpg", ".png").replace("images", "annotations")
-        for x in ade20k_images
-    ]
+        ade20k_labels = [
+            x.replace(".jpg", ".png").replace("images", "annotations")
+            for x in ade20k_images
+        ]
         
         # 存在確認
         valid_images = []
@@ -154,11 +154,11 @@ def init_cocostuff(base_image_dir):
         return [], [], []
     
     try:
-    cocostuff_classes = []
+        cocostuff_classes = []
         with open(classes_file) as f:
-        for line in f.readlines()[1:]:
-            cocostuff_classes.append(line.strip().split(": ")[-1])
-    cocostuff_classes = np.array(cocostuff_classes)
+            for line in f.readlines()[1:]:
+                cocostuff_classes.append(line.strip().split(": ")[-1])
+        cocostuff_classes = np.array(cocostuff_classes)
 
         labels_dir = os.path.join(base_image_dir, "cocostuff", "train2017")
         if not os.path.exists(labels_dir):
@@ -166,9 +166,9 @@ def init_cocostuff(base_image_dir):
             return [], [], []
 
         cocostuff_labels = glob.glob(os.path.join(labels_dir, "*.png"))
-    cocostuff_images = [
-        x.replace(".png", ".jpg").replace("cocostuff", "coco") for x in cocostuff_labels
-    ]
+        cocostuff_images = [
+            x.replace(".png", ".jpg").replace("cocostuff", "coco") for x in cocostuff_labels
+        ]
 
         # 存在確認
         valid_images = []
@@ -195,22 +195,22 @@ def init_paco_lvis(base_image_dir):
     
     try:
         coco_api_paco_lvis = COCO(annotations_path)
-    all_classes = coco_api_paco_lvis.loadCats(coco_api_paco_lvis.getCatIds())
-    class_map_paco_lvis = {}
-    for cat in all_classes:
-        cat_split = cat["name"].strip().split(":")
-        if len(cat_split) == 1:
-            name = cat_split[0].split("_(")[0]
-        else:
-            assert len(cat_split) == 2
-            obj, part = cat_split
-            obj = obj.split("_(")[0]
-            part = part.split("_(")[0]
-            name = (obj, part)
-        class_map_paco_lvis[cat["id"]] = name
-    img_ids = coco_api_paco_lvis.getImgIds()
-    print("paco_lvis: ", len(img_ids))
-    return class_map_paco_lvis, img_ids, coco_api_paco_lvis
+        all_classes = coco_api_paco_lvis.loadCats(coco_api_paco_lvis.getCatIds())
+        class_map_paco_lvis = {}
+        for cat in all_classes:
+            cat_split = cat["name"].strip().split(":")
+            if len(cat_split) == 1:
+                name = cat_split[0].split("_(")[0]
+            else:
+                assert len(cat_split) == 2
+                obj, part = cat_split
+                obj = obj.split("_(")[0]
+                part = part.split("_(")[0]
+                name = (obj, part)
+            class_map_paco_lvis[cat["id"]] = name
+        img_ids = coco_api_paco_lvis.getImgIds()
+        print("paco_lvis: ", len(img_ids))
+        return class_map_paco_lvis, img_ids, coco_api_paco_lvis
     except Exception as e:
         print(f"PACO LVIS初期化エラー: {e}")
         return {}, [], None
@@ -226,15 +226,15 @@ def init_pascal_part(base_image_dir):
     
     try:
         coco_api_pascal_part = COCO(annotations_path)
-    all_classes = coco_api_pascal_part.loadCats(coco_api_pascal_part.getCatIds())
-    class_map_pascal_part = {}
-    for cat in all_classes:
-        cat_main, cat_part = cat["name"].strip().split(":")
-        name = (cat_main, cat_part)
-        class_map_pascal_part[cat["id"]] = name
-    img_ids = coco_api_pascal_part.getImgIds()
-    print("pascal_part: ", len(img_ids))
-    return class_map_pascal_part, img_ids, coco_api_pascal_part
+        all_classes = coco_api_pascal_part.loadCats(coco_api_pascal_part.getCatIds())
+        class_map_pascal_part = {}
+        for cat in all_classes:
+            cat_main, cat_part = cat["name"].strip().split(":")
+            name = (cat_main, cat_part)
+            class_map_pascal_part[cat["id"]] = name
+        img_ids = coco_api_pascal_part.getImgIds()
+        print("pascal_part: ", len(img_ids))
+        return class_map_pascal_part, img_ids, coco_api_pascal_part
     except Exception as e:
         print(f"Pascal Part初期化エラー: {e}")
         return {}, [], None
@@ -313,8 +313,8 @@ class SemSegDataset(torch.utils.data.Dataset):
                     continue
                 
                 if len(images) > 0:
-            self.data2list[ds] = (images, labels)
-            self.data2classes[ds] = classes
+                    self.data2list[ds] = (images, labels)
+                    self.data2classes[ds] = classes
                     valid_datasets.append(ds)
                 else:
                     print(f"警告: データセット {ds} に有効なデータがありません")
@@ -357,7 +357,7 @@ class SemSegDataset(torch.utils.data.Dataset):
         ds = self.sem_seg_datas[ds_idx]
 
         try:
-        if ds in ["paco_lvis", "pascal_part"]:
+            if ds in ["paco_lvis", "pascal_part"]:
                 return self._get_vlpart_item(ds)
             else:
                 return self._get_semseg_item(ds)
@@ -367,21 +367,21 @@ class SemSegDataset(torch.utils.data.Dataset):
 
     def _get_vlpart_item(self, ds):
         """VLPartデータセット（paco_lvis, pascal_part）からアイテムを取得"""
-            class_map = self.data2classes[ds]
-            img_ids, coco_api = self.data2list[ds]
+        class_map = self.data2classes[ds]
+        img_ids, coco_api = self.data2list[ds]
         
         if len(img_ids) == 0:
             raise RuntimeError(f"{ds}にデータがありません")
             
-            idx = random.randint(0, len(img_ids) - 1)
-            img_id = img_ids[idx]
-            image_info = coco_api.loadImgs([img_id])[0]
-            file_name = image_info["file_name"]
+        idx = random.randint(0, len(img_ids) - 1)
+        img_id = img_ids[idx]
+        image_info = coco_api.loadImgs([img_id])[0]
+        file_name = image_info["file_name"]
         
-            if ds == "pascal_part":
+        if ds == "pascal_part":
             image_path = os.path.join(self.base_image_dir, "vlpart", "pascal_part", "VOCdevkit", "VOC2010", "JPEGImages", file_name)
         else:  # paco_lvis
-                image_path = os.path.join(self.base_image_dir, "coco", file_name)
+            image_path = os.path.join(self.base_image_dir, "coco", file_name)
 
         if not os.path.exists(image_path):
             print(f"画像が見つかりません: {image_path}")
@@ -405,20 +405,20 @@ class SemSegDataset(torch.utils.data.Dataset):
         ann_ids = coco_api.getAnnIds(imgIds=[img_id])
         anns = coco_api.loadAnns(ann_ids)
         
-            if len(anns) == 0:
+        if len(anns) == 0:
             print(f"アノテーションが見つかりません: {img_id}")
-                return self.__getitem__(0)
+            return self.__getitem__(0)
 
         # クラスとマスクの選択
-            if len(anns) >= self.num_classes_per_sample:
+        if len(anns) >= self.num_classes_per_sample:
             sampled_anns = np.random.choice(anns, size=self.num_classes_per_sample, replace=False)
-            else:
-                sampled_anns = anns
+        else:
+            sampled_anns = anns
 
         # マスクの作成
         masks = []
-            sampled_classes = []
-            for ann in sampled_anns:
+        sampled_classes = []
+        for ann in sampled_anns:
             try:
                 mask_data = coco_api.annToMask(ann)
                 masks.append(mask_data)
@@ -461,7 +461,7 @@ class SemSegDataset(torch.utils.data.Dataset):
             
         idx = random.randint(0, len(images) - 1)
         image_path = images[idx]
-            label_path = labels[idx]
+        label_path = labels[idx]
 
         if not os.path.exists(image_path):
             print(f"画像が見つかりません: {image_path}")
@@ -502,7 +502,7 @@ class SemSegDataset(torch.utils.data.Dataset):
             valid_labels = [l for l in unique_labels if l < len(classes) and l != 0 and l != 255]
 
         if len(valid_labels) == 0:
-                return self.__getitem__(0)
+            return self.__getitem__(0)
 
         # サンプリング
         if len(valid_labels) >= self.num_classes_per_sample:
@@ -522,7 +522,7 @@ class SemSegDataset(torch.utils.data.Dataset):
                 sampled_classes.append("unknown")
 
         if len(masks) == 0:
-                    return self.__getitem__(0)
+            return self.__getitem__(0)
 
         # テキストプロンプトの生成
         question_template = random.choice(self.short_question_list)
@@ -530,8 +530,8 @@ class SemSegDataset(torch.utils.data.Dataset):
         text_prompt = question_template.format(class_name=class_name.lower())
 
         # マスクをテンソルに変換
-            masks = np.stack(masks, axis=0)
-            masks = torch.from_numpy(masks)
+        masks = np.stack(masks, axis=0)
+        masks = torch.from_numpy(masks)
         label_tensor = torch.ones(masks.shape[1], masks.shape[2]) * self.ignore_label
 
         return (

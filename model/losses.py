@@ -70,8 +70,28 @@ class DiceLoss(nn.Module):
         # 次元を揃える
         if pred.dim() == 4 and pred.size(1) == 1:
             pred = pred.squeeze(1)  # (B, H, W)
-        if target.dim() == 4 and target.size(1) == 1:
-            target = target.squeeze(1)  # (B, H, W)
+        if target.dim() == 4:
+            if target.size(1) == 1:
+                target = target.squeeze(1)  # (B, H, W)
+            elif target.size(1) == 3:
+                # RGBの場合はグレースケールに変換（平均を取る）
+                target = target.mean(dim=1)  # (B, H, W)
+            
+        # サイズが異なる場合、targetをpredのサイズにリサイズ
+        if pred.shape != target.shape:
+            import torch.nn.functional as F
+            if target.dim() == 3:  # (B, H, W)
+                target = F.interpolate(
+                    target.unsqueeze(1),  # (B, 1, H, W)
+                    size=(pred.size(1), pred.size(2)),
+                    mode='nearest'
+                ).squeeze(1)  # (B, H, W)
+            elif target.dim() == 2:  # (H, W)
+                target = F.interpolate(
+                    target.unsqueeze(0).unsqueeze(0),  # (1, 1, H, W)
+                    size=(pred.size(1), pred.size(2)),
+                    mode='nearest'
+                ).squeeze(0).squeeze(0)  # (H, W)
         
         # シグモイドを適用（予測値が確率でない場合）
         pred = torch.sigmoid(pred)
@@ -110,8 +130,28 @@ class BCELoss(nn.Module):
         # 次元を揃える
         if pred.dim() == 4 and pred.size(1) == 1:
             pred = pred.squeeze(1)  # (B, H, W)
-        if target.dim() == 4 and target.size(1) == 1:
-            target = target.squeeze(1)  # (B, H, W)
+        if target.dim() == 4:
+            if target.size(1) == 1:
+                target = target.squeeze(1)  # (B, H, W)
+            elif target.size(1) == 3:
+                # RGBの場合はグレースケールに変換（平均を取る）
+                target = target.mean(dim=1)  # (B, H, W)
+            
+        # サイズが異なる場合、targetをpredのサイズにリサイズ
+        if pred.shape != target.shape:
+            import torch.nn.functional as F
+            if target.dim() == 3:  # (B, H, W)
+                target = F.interpolate(
+                    target.unsqueeze(1),  # (B, 1, H, W)
+                    size=(pred.size(1), pred.size(2)),
+                    mode='nearest'
+                ).squeeze(1)  # (B, H, W)
+            elif target.dim() == 2:  # (H, W)
+                target = F.interpolate(
+                    target.unsqueeze(0).unsqueeze(0),  # (1, 1, H, W)
+                    size=(pred.size(1), pred.size(2)),
+                    mode='nearest'
+                ).squeeze(0).squeeze(0)  # (H, W)
         
         # BCEWithLogitsLossを使用（内部でシグモイドを適用）
         return self.bce(pred, target.float())
@@ -189,6 +229,10 @@ class CompositeLoss(nn.Module):
         ground_truth_mask = batch.get("ground_truth_mask")
         
         if predicted_masks is not None and ground_truth_mask is not None:
+            # デバッグ: テンソルサイズを出力
+            print(f"  predicted_masks shape: {predicted_masks.shape}")
+            print(f"  ground_truth_mask shape: {ground_truth_mask.shape}")
+            
             # DICE損失
             dice_loss = self.dice_loss(predicted_masks, ground_truth_mask)
             losses["dice_loss"] = dice_loss
@@ -227,8 +271,28 @@ class IoUMetric(nn.Module):
         # 次元を揃える
         if pred.dim() == 4 and pred.size(1) == 1:
             pred = pred.squeeze(1)  # (B, H, W)
-        if target.dim() == 4 and target.size(1) == 1:
-            target = target.squeeze(1)  # (B, H, W)
+        if target.dim() == 4:
+            if target.size(1) == 1:
+                target = target.squeeze(1)  # (B, H, W)
+            elif target.size(1) == 3:
+                # RGBの場合はグレースケールに変換（平均を取る）
+                target = target.mean(dim=1)  # (B, H, W)
+            
+        # サイズが異なる場合、targetをpredのサイズにリサイズ
+        if pred.shape != target.shape:
+            import torch.nn.functional as F
+            if target.dim() == 3:  # (B, H, W)
+                target = F.interpolate(
+                    target.unsqueeze(1),  # (B, 1, H, W)
+                    size=(pred.size(1), pred.size(2)),
+                    mode='nearest'
+                ).squeeze(1)  # (B, H, W)
+            elif target.dim() == 2:  # (H, W)
+                target = F.interpolate(
+                    target.unsqueeze(0).unsqueeze(0),  # (1, 1, H, W)
+                    size=(pred.size(1), pred.size(2)),
+                    mode='nearest'
+                ).squeeze(0).squeeze(0)  # (H, W)
         
         # 予測値を二値化
         pred = torch.sigmoid(pred)
