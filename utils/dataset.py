@@ -27,6 +27,18 @@ from .refer_seg_dataset import ReferSegDataset
 from .sem_seg_dataset import SemSegDataset
 from .vqa_dataset import VQADataset
 
+# 設定ファイルのインポート - 実行時にどの設定が使われているかを判定
+try:
+    import config_small_test as config  # 小規模テスト用設定を優先
+except ImportError:
+    try:
+        import config_linux as config  # フォールバック：通常設定
+    except ImportError:
+        # 設定ファイルが見つからない場合のデフォルト値
+        class DefaultConfig:
+            MODEL_MAX_LENGTH = 2048
+        config = DefaultConfig()
+
 # デフォルト設定
 DEFAULT_IMAGE_TOKEN = "<image>"
 DEFAULT_SEG_TOKEN = "[SEG]"
@@ -368,6 +380,11 @@ def collate_fn(batch: List[Dict]) -> Dict[str, Any]:
     """
     仕様書第3章.3 バッチの結合 (collate_fn)
     デュアルストリーム対応のカスタムcollate関数
+    
+    最大シーケンス長は設定ファイルのMODEL_MAX_LENGTHを自動的に使用:
+    - config_small_test.py が利用可能な場合: 512 (メモリ効率優先)
+    - config_linux.py のみの場合: 2048 (通常設定)
+    - 設定ファイルなしの場合: 2048 (デフォルト)
     """
     # 各キーごとにデータを収集
     images_for_gemma = []
@@ -417,6 +434,10 @@ def collate_fn(batch: List[Dict]) -> Dict[str, Any]:
     max_label_length = max(label.size(0) for label in labels)
     # ラベルとinput_idsの長さを統一する場合
     unified_max_length = max(max_length, max_label_length)
+    
+    # 最大長制限を適用（メモリ不足を防ぐため）
+    # 設定ファイルのMODEL_MAX_LENGTHを使用
+    unified_max_length = min(unified_max_length, config.MODEL_MAX_LENGTH)
     
     padded_input_ids = []
     padded_attention_masks = []
@@ -469,7 +490,7 @@ def collate_fn(batch: List[Dict]) -> Dict[str, Any]:
         "images_for_sam": images_for_sam,               # (B, 3, 1024, 1024)
         "input_ids": torch.stack(padded_input_ids),     # (B, unified_max_length)
         "attention_mask": torch.stack(padded_attention_masks),  # (B, unified_max_length)
-        "labels": torch.stack(padded_labels),           # (B, unified_max_length)
+        "labels": torch.stack(padded_labels).long(),    # (B, unified_max_length) - 必ずlong型に変換
         "seg_token_mask": torch.stack(padded_seg_token_masks),  # (B, unified_max_length)
         "ground_truth_mask": ground_truth_masks,        # (num_masks, 1, 1024, 1024) or None
         "has_mask": has_masks,                          # List[bool]
