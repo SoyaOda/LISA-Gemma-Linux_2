@@ -14,3 +14,175 @@ LISA-Gemma3 段階的検証プロトコル
 Gemma-3マルチモーダルモデルをロード中...
 Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:01<00:01,  1.72s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.27s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:02<00:00,  1.33s/it]
 Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+Gemma-3プロセッサーをロード中...
+SAMモデルをロード中...
+MLPプロジェクタを初期化中...
+セグメンテーショントークンを追加中...
+✅ [SEG]トークンが追加されました
+LISA-Gemmaモデルの初期化が完了しました
+トークナイザー語彙サイズ: 262146
+[SEG]トークンID: 262145
+✅ [SEG]トークンが正しく認識されています
+LoRA設定を適用中...
+総パラメータ数: 5,014,082,720
+訓練可能パラメータ数: 65,859,584
+訓練可能パラメータ率: 1.31%
+MLPプロジェクタを訓練可能に設定中...
+  MLPパラメータ: torch.Size([2560, 2560]) -> requires_grad = True
+  MLPパラメータ: torch.Size([2560]) -> requires_grad = True
+  MLPパラメータ: torch.Size([256, 2560]) -> requires_grad = True
+  MLPパラメータ: torch.Size([256]) -> requires_grad = True
+MLP追加後の訓練可能パラメータ数: 73,071,360
+MLP追加後の訓練可能パラメータ率: 1.46%
+✅ モデルとLoRAの設定完了
+============================================================
+📊 データセットとデータローダーの設定
+============================================================
+プロセッサーのトークナイザーに[SEG]トークンを追加中...
+プロセッサーのトークナイザー語彙サイズ: 262146
+number of reason_seg samples:  239
+len(self.img_to_explanation):  239
+✅ データセット作成完了: 10 サンプル
+✅ データローダー作成完了: バッチサイズ 2
+✅ サンプル取得テスト成功: <class 'tuple'>
+   タプル長: 5
+   要素タイプ: ['str', 'Image', 'str', 'Tensor', 'Tensor']
+   テキストサンプル: <start_of_turn>user
+Please segment the area that matches: People sometimes use makeup to enhance the...
+
+============================================================
+📋 ステップ1: データ健全性チェック
+============================================================
+============================================================
+📊 データ形式の検証
+============================================================
+🔍 Collate処理: 2 画像, 2 テキスト
+  ✅ サンプル1: 成功
+  ✅ サンプル2: 成功
+✅ バッチ処理成功:
+  - input_ids: torch.Size([2, 421])
+  - attention_mask: torch.Size([2, 421])
+  - pixel_values: torch.Size([2, 3, 896, 896])
+✅ データローダーからバッチ取得成功
+バッチサイズ: 2
+Input IDs shape: torch.Size([2, 421])
+Attention mask shape: torch.Size([2, 421])
+Pixel values shape: torch.Size([2, 3, 896, 896])
+Labels shape: torch.Size([2, 421])
+
+🔍 テキストプロンプトの検証:
+  サンプル1: <bos><start_of_turn>user
+You are a helpful assistant.
+
+
+
+<start_of_image><image_soft_token><image_so...
+    [SEG]トークン: ✅ 存在
+    [SEG]トークンID: 262145
+    [SEG]トークン位置: [310]
+  サンプル2: <bos><start_of_turn>user
+You are a helpful assistant.
+
+
+
+<start_of_image><image_soft_token><image_so...
+    [SEG]トークン: ✅ 存在
+    [SEG]トークンID: 262145
+    [SEG]トークン位置: [336]
+🔍 Collate処理: 2 画像, 2 テキスト
+  ✅ サンプル1: 成功
+  ✅ サンプル2: 成功
+✅ バッチ処理成功:
+  - input_ids: torch.Size([2, 327])
+  - attention_mask: torch.Size([2, 327])
+  - pixel_values: torch.Size([2, 3, 896, 896])
+🔍 バッチ内容の検証:
+  input_ids: torch.Size([2, 327]) (torch.int64)
+  attention_mask: torch.Size([2, 327]) (torch.int64)
+  pixel_values: torch.Size([2, 3, 896, 896]) (torch.float32)
+  labels: torch.Size([2, 327]) (torch.int64)
+  images: list of 2 items
+  masks: list of 2 items
+✅ Gemma画像形状が正しい: torch.Size([2, 3, 896, 896])
+可視化エラー: Invalid shape (3, 2336, 3504) for image data
+✅ マスクの可視化を保存: step1_mask_overlay.png
+✅ ステップ1: データ健全性チェック完了
+
+============================================================
+🎯 ステップ3: 単一バッチ過学習（最重要テスト）
+============================================================
+🎯 100ステップの過学習開始...
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+  Step   0: Loss = 29.4967
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+  Step  10: Loss = 7.8220
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+  Step  20: Loss = 1.8766
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])

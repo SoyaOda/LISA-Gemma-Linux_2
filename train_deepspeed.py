@@ -26,7 +26,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from config_linux import *
 from model.gemma_lisa import LisaGemmaForCausalLM, LisaGemmaConfig
 from model.losses import CompositeLoss
-from utils.dataset import LisaGemma3Dataset, collate_fn_gemma3
+from utils.dataset import LisaGemma3Dataset, collate_fn_gemma3, HybridDataset, collate_fn
 
 
 def parse_args():
@@ -145,7 +145,7 @@ def setup_model_and_lora(args):
 
 
 def setup_dataset_and_dataloader(args, gemma_processor):
-    """データセットとデータローダーの設定"""
+    """データセットとデータローダーの設定（デュアルストリーム対応）"""
     print("=== データセットとデータローダーの設定 ===")
     
     # サンプルレートの解析
@@ -158,8 +158,8 @@ def setup_dataset_and_dataloader(args, gemma_processor):
     print(f"ワールドサイズ: {world_size}")
     print(f"エポックあたりサンプル数: {samples_per_epoch:,}")
     
-    # データセットの作成
-    train_dataset = LisaGemma3Dataset(
+    # デュアルストリーム対応のHybridDatasetを使用
+    train_dataset = HybridDataset(
         base_image_dir=args.dataset_base_dir,
         gemma_processor=gemma_processor,
         samples_per_epoch=samples_per_epoch,
@@ -174,7 +174,9 @@ def setup_dataset_and_dataloader(args, gemma_processor):
         reason_seg_data=args.reason_seg_data,
     )
     
-    print(f"訓練データセット作成完了: {len(train_dataset):,} サンプル")
+    print(f"✅ デュアルストリーム訓練データセット作成完了: {len(train_dataset):,} サンプル")
+    print(f"   - Gemma画像サイズ: {GEMMA_IMAGE_SIZE}x{GEMMA_IMAGE_SIZE}")
+    print(f"   - SAM画像サイズ: {SAM_IMAGE_SIZE}x{SAM_IMAGE_SIZE}")
     
     return train_dataset
 
@@ -195,91 +197,98 @@ def setup_loss_function(args):
 
 
 def train_epoch(model_engine, train_dataloader, loss_fn, epoch, args, writer=None):
-    """1エポックの学習（仕様書第4章.5）"""
+    """1エポックの学習（仕様書第4章.5 - デュアルストリーム対応）"""
     model_engine.train()
     
     total_loss = 0.0
     total_text_loss = 0.0
-    total_dice_loss = 0.0
-    total_bce_loss = 0.0
+    total_mask_loss = 0.0
     step_count = 0
     
-    print(f"\n=== エポック {epoch+1}/{args.epochs} 開始 ===")
+    print(f"=== エポック {epoch+1} 開始 ===")
     
     for step, batch in enumerate(train_dataloader):
         if step >= args.steps_per_epoch:
             break
             
-        step_count += 1
-        
-        # バッチをGPUに移動
-        device = next(model_engine.parameters()).device
-        for key in batch:
-            if isinstance(batch[key], torch.Tensor):
-                batch[key] = batch[key].to(device)
-        
-        # collate_fn_gemma3からの出力を処理
-        # batch keys: "image_paths", "images", "input_ids", "attention_mask", "pixel_values", "masks", "labels"
-        
-        # フォワードパス - LisaGemmaForCausalLMのforwardメソッドに合わせる
-        outputs = model_engine(
-            input_ids=batch["input_ids"],
-            attention_mask=batch["attention_mask"],
-            pixel_values=batch["pixel_values"],
-            labels=batch["labels"] if "labels" in batch else None,
-        )
-        
-        # 損失計算用のバッチデータを準備
-        batch_for_loss = {
-            "labels": batch.get("labels"),
-            "ground_truth_mask": batch.get("masks")
-        }
-        
-        losses = loss_fn(outputs, batch_for_loss)
-        total_loss_val = losses["total_loss"]
-        
-        # バックワードパス
-        model_engine.backward(total_loss_val)
-        model_engine.step()
-        
-        # 統計の更新
-        total_loss += total_loss_val.item()
-        if "text_loss" in losses:
-            total_text_loss += losses["text_loss"].item()
-        if "dice_loss" in losses:
-            total_dice_loss += losses["dice_loss"].item()
-        if "bce_loss" in losses:
-            total_bce_loss += losses["bce_loss"].item()
-        
-        # ログ出力
-        if step % 10 == 0:
-            avg_loss = total_loss / step_count
-            print(f"Step {step}/{args.steps_per_epoch}, Loss: {total_loss_val.item():.4f}, Avg Loss: {avg_loss:.4f}")
+        try:
+            # デュアルストリーム・バッチの処理
+            # バッチをGPUに転送
+            device = model_engine.device
+            batch_gpu = {}
             
-            # TensorBoardログ
-            if writer and torch.distributed.get_rank() == 0:
-                global_step = epoch * args.steps_per_epoch + step
-                writer.add_scalar("train/total_loss", total_loss_val.item(), global_step)
-                if "text_loss" in losses:
-                    writer.add_scalar("train/text_loss", losses["text_loss"].item(), global_step)
-                if "dice_loss" in losses:
-                    writer.add_scalar("train/dice_loss", losses["dice_loss"].item(), global_step)
-                if "bce_loss" in losses:
-                    writer.add_scalar("train/bce_loss", losses["bce_loss"].item(), global_step)
+            for key, value in batch.items():
+                if isinstance(value, torch.Tensor):
+                    batch_gpu[key] = value.to(device)
+                else:
+                    batch_gpu[key] = value
+            
+            # デュアルストリーム・フォワードパス
+            outputs = model_engine(
+                input_ids=batch_gpu["input_ids"],
+                attention_mask=batch_gpu["attention_mask"],
+                images_for_gemma=batch_gpu["images_for_gemma"],  # (B, 3, 896, 896)
+                images_for_sam=batch_gpu["images_for_sam"],      # (B, 3, 1024, 1024)
+                labels=batch_gpu["labels"],
+                generate_mask=True
+            )
+            
+            # 複合損失の計算（仕様書第4章.4）
+            composite_loss_result = loss_fn(
+                outputs=outputs,
+                ground_truth_masks=batch_gpu.get("ground_truth_mask"),
+                has_masks=batch_gpu.get("has_mask", [])
+            )
+            
+            total_loss_step = composite_loss_result["total_loss"]
+            text_loss_step = composite_loss_result["text_loss"]
+            mask_loss_step = composite_loss_result["mask_loss"]
+            
+            # バックワードパス
+            model_engine.backward(total_loss_step)
+            model_engine.step()
+            
+            # 統計の更新
+            total_loss += total_loss_step.item()
+            total_text_loss += text_loss_step.item() if text_loss_step is not None else 0.0
+            total_mask_loss += mask_loss_step.item() if mask_loss_step is not None else 0.0
+            step_count += 1
+            
+            # ログ出力
+            if step % 10 == 0:
+                avg_loss = total_loss / max(step_count, 1)
+                avg_text_loss = total_text_loss / max(step_count, 1)
+                avg_mask_loss = total_mask_loss / max(step_count, 1)
+                
+                print(f"Step {step:4d}/{args.steps_per_epoch} | "
+                      f"Loss: {avg_loss:.4f} (Text: {avg_text_loss:.4f}, Mask: {avg_mask_loss:.4f})")
+                
+                if writer:
+                    global_step = epoch * args.steps_per_epoch + step
+                    writer.add_scalar("train/total_loss", avg_loss, global_step)
+                    writer.add_scalar("train/text_loss", avg_text_loss, global_step)
+                    writer.add_scalar("train/mask_loss", avg_mask_loss, global_step)
+            
+        except Exception as e:
+            print(f"⚠️ ステップ {step} でエラー: {e}")
+            import traceback
+            traceback.print_exc()
+            continue
     
-    # エポック終了時の統計
-    avg_total_loss = total_loss / step_count
-    avg_text_loss = total_text_loss / step_count
-    avg_dice_loss = total_dice_loss / step_count
-    avg_bce_loss = total_bce_loss / step_count
+    # エポック統計
+    avg_loss = total_loss / max(step_count, 1)
+    avg_text_loss = total_text_loss / max(step_count, 1)
+    avg_mask_loss = total_mask_loss / max(step_count, 1)
     
-    print(f"エポック {epoch+1} 完了:")
-    print(f"  平均総損失: {avg_total_loss:.4f}")
-    print(f"  平均テキスト損失: {avg_text_loss:.4f}")
-    print(f"  平均DICE損失: {avg_dice_loss:.4f}")
-    print(f"  平均BCE損失: {avg_bce_loss:.4f}")
+    print(f"✅ エポック {epoch+1} 完了")
+    print(f"   平均損失: {avg_loss:.4f} (Text: {avg_text_loss:.4f}, Mask: {avg_mask_loss:.4f})")
     
-    return avg_total_loss
+    return {
+        "avg_loss": avg_loss,
+        "avg_text_loss": avg_text_loss,
+        "avg_mask_loss": avg_mask_loss,
+        "steps": step_count
+    }
 
 
 def save_checkpoint(model_engine, epoch, args):
@@ -294,91 +303,94 @@ def save_checkpoint(model_engine, epoch, args):
 
 
 def main():
-    """メイン関数（仕様書第4章.5）"""
-    print("LISA-Gemma3 DeepSpeed学習開始")
-    print("=" * 60)
-    
-    # 1. 引数解析
+    """メイン関数（仕様書第4章統合）"""
     args = parse_args()
     
-    # 2. 必須パスの検証
-    print("=== 設定の検証 ===")
-    try:
-        check_paths()
-        print("✓ 必須パスの検証に成功しました")
-    except FileNotFoundError as e:
-        print(f"✗ 必須パスの検証に失敗しました: {e}")
-        return
-    
-    # 3. ログディレクトリの作成
+    # ログディレクトリの作成
     log_dir = os.path.join(args.log_dir, args.exp_name)
     os.makedirs(log_dir, exist_ok=True)
-    args.log_dir = log_dir
     
-    # 4. 分散学習の初期化
-    deepspeed.init_distributed()
+    # TensorBoardライター
+    writer = SummaryWriter(log_dir) if torch.distributed.get_rank() == 0 else None
     
-    # 5. Gemma-3プロセッサーの初期化
-    print("=== Gemma-3プロセッサーの初期化 ===")
-    gemma_processor = AutoProcessor.from_pretrained(args.gemma_model_id)
+    print("=" * 60)
+    print("🚀 LISA-Gemma3 学習開始")
+    print("=" * 60)
+    print(f"実験名: {args.exp_name}")
+    print(f"ログディレクトリ: {log_dir}")
+    print(f"エポック数: {args.epochs}")
+    print(f"バッチサイズ: {args.batch_size}")
+    print(f"学習率: {args.lr}")
     
-    # 6. モデルとLoRAの設定
+    # 1. モデルとLoRAの設定
     model = setup_model_and_lora(args)
     
-    # 7. データセットとデータローダーの設定
+    # 2. Gemmaプロセッサーの取得
+    gemma_processor = model.gemma_processor if hasattr(model, 'gemma_processor') else None
+    if gemma_processor is None:
+        from transformers import AutoProcessor
+        gemma_processor = AutoProcessor.from_pretrained(args.gemma_model_id)
+    
+    # 3. データセットとデータローダーの設定（デュアルストリーム対応）
     train_dataset = setup_dataset_and_dataloader(args, gemma_processor)
     
-    # 8. 損失関数の設定
-    loss_fn = setup_loss_function(args)
-    
-    # 9. DeepSpeedエンジンの初期化
-    print("=== DeepSpeedエンジンの初期化 ===")
-    
-    # collate_fnの準備
-    collate_fn = partial(collate_fn_gemma3, gemma_processor=gemma_processor)
-    
-    model_engine, optimizer, train_dataloader, lr_scheduler = deepspeed.initialize(
-        model=model,
-        model_parameters=model.parameters(),
-        training_data=train_dataset,
-        collate_fn=collate_fn,
-        config=args.deepspeed_config,
+    # 4. デュアルストリーム対応のcollate_fn
+    train_dataloader = DataLoader(
+        train_dataset,
+        batch_size=args.batch_size // torch.distributed.get_world_size() if torch.distributed.is_initialized() else args.batch_size,
+        shuffle=True,
+        num_workers=args.num_workers,
+        collate_fn=collate_fn,  # デュアルストリーム対応
+        pin_memory=True,
+        drop_last=True
     )
     
-    print(f"DeepSpeedエンジン初期化完了")
-    print(f"使用GPU数: {torch.distributed.get_world_size()}")
+    print(f"✅ デュアルストリーム・データローダー作成完了")
+    print(f"   - バッチサイズ（GPU毎）: {train_dataloader.batch_size}")
+    print(f"   - ワーカー数: {args.num_workers}")
     
-    # 10. TensorBoardライターの初期化
-    writer = None
-    if torch.distributed.get_rank() == 0:
-        writer = SummaryWriter(log_dir)
-        print(f"TensorBoardログ: {log_dir}")
+    # 5. 損失関数の設定
+    loss_fn = setup_loss_function(args)
     
-    # 11. 学習ループ
-    print("\n=== 学習開始 ===")
+    # 6. DeepSpeed初期化
+    model_engine, optimizer, _, _ = deepspeed.initialize(
+        model=model,
+        config=args.deepspeed_config,
+        model_parameters=model.parameters(),
+    )
+    
+    print(f"✅ DeepSpeed初期化完了")
+    print(f"   - ZeRO Stage: {model_engine.zero_optimization_stage()}")
+    print(f"   - 精度: {args.precision}")
+    
+    # 7. 学習ループ
+    print("\n" + "=" * 60)
+    print("📚 学習開始")
+    print("=" * 60)
     
     for epoch in range(args.epochs):
         # 1エポックの学習
-        avg_loss = train_epoch(model_engine, train_dataloader, loss_fn, epoch, args, writer)
+        epoch_results = train_epoch(model_engine, train_dataloader, loss_fn, epoch, args, writer)
         
         # チェックポイントの保存
         if (epoch + 1) % args.save_interval == 0:
             save_checkpoint(model_engine, epoch, args)
         
-        # 学習率のログ
-        if writer and torch.distributed.get_rank() == 0:
-            current_lr = optimizer.param_groups[0]['lr']
-            writer.add_scalar("train/learning_rate", current_lr, epoch)
+        # TensorBoardログ
+        if writer:
+            writer.add_scalar("epoch/avg_loss", epoch_results["avg_loss"], epoch)
+            writer.add_scalar("epoch/avg_text_loss", epoch_results["avg_text_loss"], epoch)
+            writer.add_scalar("epoch/avg_mask_loss", epoch_results["avg_mask_loss"], epoch)
     
-    # 12. 最終チェックポイントの保存
+    # 最終チェックポイントの保存
     save_checkpoint(model_engine, args.epochs - 1, args)
     
-    # 13. TensorBoardライターのクローズ
     if writer:
         writer.close()
     
-    print("\n=== 学習完了 ===")
-    print(f"最終チェックポイント: {args.log_dir}/checkpoint_epoch_{args.epochs}")
+    print("\n" + "=" * 60)
+    print("🎉 学習完了!")
+    print("=" * 60)
 
 
 if __name__ == "__main__":
