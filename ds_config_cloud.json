@@ -1,8 +1,8 @@
 {
   "train_batch_size": "auto",
-  "train_micro_batch_size_per_gpu": "auto",
+  "train_micro_batch_size_per_gpu": "auto", 
   "gradient_accumulation_steps": "auto",
-  "steps_per_print": 10,
+  "steps_per_print": 100,
 
   "optimizer": {
     "type": "AdamW",
@@ -18,7 +18,7 @@
     "type": "WarmupLR",
     "params": {
       "warmup_min_lr": "auto",
-      "warmup_max_lr": "auto",
+      "warmup_max_lr": "auto", 
       "warmup_num_steps": "auto"
     }
   },
@@ -37,7 +37,7 @@
       "pin_memory": true
     },
     "offload_param": {
-      "device": "cpu", 
+      "device": "cpu",
       "pin_memory": true
     },
     "contiguous_gradients": true,
@@ -48,5 +48,7 @@
   },
 
   "gradient_clipping": 1.0,
-  "wall_clock_breakdown": false
+  "wall_clock_breakdown": false,
+  
+  "_comment": "クラウドGPU環境用設定: 大規模学習向けCPUオフロード有効・メモリ効率最適化"
 } 

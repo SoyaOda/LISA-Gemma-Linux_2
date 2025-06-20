@@ -186,3 +186,152 @@ You are a helpful assistant.
   ground_truth_mask shape: torch.Size([2, 3, 256, 256])
 バッチ内でSEGトークンが2個検出されました
   predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+  Step  30: Loss = 1.3324
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+  Step  40: Loss = 1.0706
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+  Step  50: Loss = 0.8066
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+  Step  60: Loss = 0.6302
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])
+  ground_truth_mask shape: torch.Size([2, 3, 256, 256])
+  Step  70: Loss = 0.4966
+バッチ内でSEGトークンが2個検出されました
+  predicted_masks shape: torch.Size([2, 1, 256, 256])

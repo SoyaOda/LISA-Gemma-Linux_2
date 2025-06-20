@@ -1,13 +1,13 @@
 {
-  "train_batch_size": "auto",
-  "train_micro_batch_size_per_gpu": "auto",
-  "gradient_accumulation_steps": "auto",
-  "steps_per_print": 10,
+  "train_batch_size": 8,
+  "train_micro_batch_size_per_gpu": 2,
+  "gradient_accumulation_steps": 2,
+  "steps_per_print": 5,
 
   "optimizer": {
     "type": "AdamW",
     "params": {
-      "lr": "auto",
+      "lr": 2e-4,
       "betas": [0.9, 0.95],
       "eps": 1e-8,
       "weight_decay": 1e-2
@@ -17,9 +17,9 @@
   "scheduler": {
     "type": "WarmupLR",
     "params": {
-      "warmup_min_lr": "auto",
-      "warmup_max_lr": "auto",
-      "warmup_num_steps": "auto"
+      "warmup_min_lr": 1e-5,
+      "warmup_max_lr": 2e-4,
+      "warmup_num_steps": 5
     }
   },
 
@@ -36,17 +36,16 @@
       "device": "cpu",
       "pin_memory": true
     },
-    "offload_param": {
-      "device": "cpu", 
-      "pin_memory": true
-    },
     "contiguous_gradients": true,
     "overlap_comm": true,
-    "reduce_bucket_size": 5e8,
-    "stage3_prefetch_bucket_size": 5e8,
-    "stage3_param_persistence_threshold": 1e6
+    "reduce_bucket_size": 5e8
   },
 
   "gradient_clipping": 1.0,
-  "wall_clock_breakdown": false
+  "wall_clock_breakdown": false,
+  "tensorboard": {
+    "enabled": true,
+    "output_path": "./runs/small_test_logs/",
+    "job_name": "lisa_gemma3_small_test"
+  }
 } 

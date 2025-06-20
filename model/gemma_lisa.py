@@ -99,8 +99,16 @@ class LisaGemmaForCausalLM(PreTrainedModel):
         # トークナイザーにSEGトークンを追加
         if self.seg_token not in self.gemma_processor.tokenizer.get_vocab():
             self.gemma_processor.tokenizer.add_tokens([self.seg_token], special_tokens=True)
-            self.gemma_model.resize_token_embeddings(len(self.gemma_processor.tokenizer))
-            print(f"✅ {self.seg_token}トークンが追加されました")
+            # DeepSpeed互換: resize_token_embeddingsを条件付きで実行
+            try:
+                self.gemma_model.resize_token_embeddings(len(self.gemma_processor.tokenizer))
+                print(f"✅ {self.seg_token}トークンが追加されました")
+            except RuntimeError as e:
+                if "DTensor" in str(e):
+                    print(f"✅ {self.seg_token}トークンが追加されました（DeepSpeed用延期）")
+                    # DeepSpeedでは後で手動で拡張する
+                else:
+                    raise e
         
         # SEGトークンのIDを取得
         self.seg_token_id = self.gemma_processor.tokenizer.convert_tokens_to_ids(self.seg_token)

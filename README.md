@@ -14,7 +14,8 @@
     <a href="#installation"><strong>インストール</strong></a> | 
     <a href="#training"><strong>学習</strong></a> | 
     <a href="#testing"><strong>テスト</strong></a> | 
-    <a href="#dataset"><strong>データセット</strong></a>
+    <a href="#dataset"><strong>データセット</strong></a> | 
+    <a href="#deepspeed-configs"><strong>環境別設定</strong></a>
 </div>
 
 ## 📋 概要 {#overview}
@@ -241,22 +242,92 @@ tensorboard --logdir ./runs/
 
 ### 🔧 DeepSpeed対応版
 
-#### train_small_test.py（小規模分散学習）
+#### 🌐 **環境別設定ファイル** - **NEW!** {#deepspeed-configs}
+
+プロジェクトでは**3種類のDeepSpeed設定ファイル**を提供し、環境に応じて最適化された学習を実現：
+
+| 設定ファイル | 環境 | CPUオフロード | 用途 |
+|-------------|------|---------------|------|
+| **ds_config_local.json** | ローカル環境 | ❌ 無効 | CUDA不整合問題回避 |
+| **ds_config_cloud.json** | クラウドGPU | ✅ 有効 | 大規模学習・コスト効率 |
+| **ds_config.json** | 本格運用 | ✅ 有効 | プロダクション環境 |
+
+#### 🏠 **ローカル環境用（CUDA不整合対応）**
 ```bash
-# DeepSpeed ZeRO Stage 2使用（環境依存問題あり）
-python train_small_test.py --batch_size 1 --lr 1e-4
+# ローカル開発・テスト用（CUDA 12.9 vs 12.6問題回避）
+python train_small_test.py --deepspeed_config ds_config_local.json
 ```
 
-#### train_deepspeed.py（本格分散学習）
+**特徴**:
+- ✅ **CUDA問題回避**: CPUオフロード無効でコンパイルエラー回避
+- ✅ **動作安定性**: ローカル環境での確実な動作
+- ⚠️ **メモリ使用量**: やや多い（GPUメモリに依存）
+
+#### ☁️ **クラウドGPU環境用（大規模学習）**
 ```bash
-# 複数GPU分散学習（環境整備後）
+# クラウドGPU環境での本格学習
+deepspeed --include localhost:0,1,2,3,7 train_deepspeed.py \
+    --deepspeed_config ds_config_cloud.json \
+    --exp_name "lisa-gemma3-large-scale" \
+    --batch_size 64 --lr 1e-4
+```
+
+**特徴**:
+- 🚀 **大規模対応**: パラメータ・オプティマイザ両方をCPUオフロード
+- 💰 **コスト効率**: より安いGPUインスタンスで大規模学習
+- 📈 **スケーラビリティ**: 大きなバッチサイズ・モデルサイズ対応
+- 🔧 **高度最適化**: `stage3_prefetch_bucket_size`等の最適化パラメータ
+
+#### 🏭 **本格運用環境用**
+```bash
+# プロダクション環境での学習
 deepspeed --include localhost:0,1,2,3 train_deepspeed.py \
     --deepspeed_config ds_config.json \
     --exp_name "lisa-gemma3-production" \
-    --batch_size 16 --lr 1e-4
+    --batch_size 32 --lr 1e-4
 ```
 
-**注意**: DeepSpeed版は環境依存の問題があります。`train_simple_test.py`が最も安定しています。
+### 📊 **CPUオフロードの効果比較**
+
+| 項目 | CPUオフロード無し | CPUオフロード有り |
+|------|------------------|-------------------|
+| **GPUメモリ使用量** | 高い（約15-20GB） | 低い（約8-12GB） |
+| **学習可能バッチサイズ** | 小さい（1-4） | 大きい（8-32+） |
+| **学習速度** | 速い | やや遅い（CPU転送オーバーヘッド） |
+| **対応モデルサイズ** | 限定的 | 大規模モデル対応 |
+| **コスト効率** | 高スペックGPU必要 | 中スペックGPUで可能 |
+
+### 🎯 **推奨使い分け**
+
+```python
+# 環境判定による設定選択
+if development_phase == "概念実証・デバッグ":
+    use_config = "ds_config_local.json"     # 安定性優先
+elif development_phase == "性能評価・中規模学習":  
+    use_config = "ds_config_cloud.json"     # コスト効率
+elif development_phase == "本格運用・プロダクション":
+    use_config = "ds_config.json"           # 最適化済み
+```
+
+**注意**: 環境移行時は設定ファイルの切り替えを忘れずに！クラウド環境では必ずCPUオフロード有効版を使用してください。
+
+### 📁 **作成済み設定ファイル**
+
+プロジェクトルートに以下の設定ファイルが配置されています：
+
+```
+LISA-Gemma-Linux/
+├── ds_config_local.json    # ローカル環境用（CUDA問題回避）
+├── ds_config_cloud.json    # クラウドGPU用（大規模学習）
+├── ds_config.json          # 本格運用用（プロダクション）
+├── ds_config_small_test.json # 小規模テスト用
+└── ...
+```
+
+**ファイル詳細**:
+- **ds_config_local.json**: `"offload_optimizer": {"device": "none"}` でCUDA問題回避
+- **ds_config_cloud.json**: パラメータ・オプティマイザ両方のCPUオフロード有効
+- **ds_config.json**: 本格運用向け最適化済み設定
 
 ## 📚 データセット準備 {#dataset}
 

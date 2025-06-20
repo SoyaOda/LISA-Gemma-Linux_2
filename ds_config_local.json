@@ -32,21 +32,14 @@
 
   "zero_optimization": {
     "stage": 2,
-    "offload_optimizer": {
-      "device": "cpu",
-      "pin_memory": true
-    },
-    "offload_param": {
-      "device": "cpu", 
-      "pin_memory": true
-    },
+    "offload_optimizer": {"device": "none"},
     "contiguous_gradients": true,
     "overlap_comm": true,
-    "reduce_bucket_size": 5e8,
-    "stage3_prefetch_bucket_size": 5e8,
-    "stage3_param_persistence_threshold": 1e6
+    "reduce_bucket_size": 5e8
   },
 
   "gradient_clipping": 1.0,
-  "wall_clock_breakdown": false
+  "wall_clock_breakdown": false,
+  
+  "_comment": "ローカル環境用設定: CUDA不整合問題回避のためCPUオフロード無効化"
 } 
