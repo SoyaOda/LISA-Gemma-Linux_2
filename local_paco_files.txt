@@ -1,0 +1,4 @@
+annotations/paco_lvis_v1.zip
+annotations/paco_lvis_v1/paco_lvis_v1_test.json
+annotations/paco_lvis_v1/paco_lvis_v1_train.json
+annotations/paco_lvis_v1/paco_lvis_v1_val.json

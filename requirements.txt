@@ -1,0 +1,21 @@
+# Core ML/DL Frameworks
+torch>=2.4.0
+torchvision
+torchaudio
+
+# Hugging Face Ecosystem
+transformers>=4.51.3
+accelerate
+peft
+bitsandbytes
+huggingface_hub
+
+# Distributed Training
+deepspeed
+
+# Data Handling and Utilities
+pycocotools
+numpy
+tqdm
+tensorboard
+Pillow
