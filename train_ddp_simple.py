@@ -21,7 +21,36 @@ import time
 # プロジェクトのルートディレクトリをパスに追加
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-import config_linux as config
+# 動的設定管理機能を追加
+def get_config():
+    """動的設定読み込み（環境変数対応）"""
+    config_path = os.environ.get('LISA_CONFIG_PATH', None)
+    
+    if config_path:
+        # 環境変数で指定された設定ファイル
+        try:
+            config_module = __import__(config_path)
+            print(f"✓ カスタム設定ファイルを使用: {config_path}")
+            return config_module
+        except ImportError:
+            print(f"⚠️ カスタム設定ファイル {config_path} が見つかりません")
+    
+    # デフォルトの設定ファイル検索順序
+    config_candidates = ['config_small_test', 'config_linux']
+    
+    for config_name in config_candidates:
+        try:
+            config_module = __import__(config_name)
+            print(f"✓ 設定ファイルを使用: {config_name}")
+            return config_module
+        except ImportError:
+            continue
+    
+    raise ImportError("利用可能な設定ファイルが見つかりません")
+
+# 動的設定読み込み
+config = get_config()
+
 from model.gemma_lisa import LisaGemmaForCausalLM, LisaGemmaConfig
 from model.losses import CompositeLoss
 from utils.dataset import HybridDataset, collate_fn
@@ -50,6 +79,9 @@ def parse_args():
     parser.add_argument("--epochs", default=1, type=int, help="エポック数")
     parser.add_argument("--lr", default=1e-4, type=float, help="学習率")
     parser.add_argument("--exp_name", default="ddp_simple", type=str, help="実験名")
+    
+    # 設定ファイル
+    parser.add_argument("--config_path", default=None, type=str, help="設定ファイルパス")
     
     # DDP設定
     parser.add_argument("--world_size", default=1, type=int, help="プロセス数")
@@ -198,26 +230,20 @@ def single_gpu_train(args):
             progress_tracker.update(loss.item())
             
             # ログ出力
-            global_step = epoch * args.steps_per_epoch + step
-            writer.add_scalar('Loss/Train', loss.item(), global_step)
-            writer.add_scalar('Learning_Rate', args.lr, global_step)
-            
-            print(f"   Step {step+1}/{args.steps_per_epoch}: Loss = {loss.item():.4f}")
+            if step % 5 == 0:
+                avg_loss = progress_tracker.average()
+                print(f"  Step {step}/{args.steps_per_epoch} | Loss: {loss.item():.4f} | Avg: {avg_loss:.4f}")
+                
+                # TensorBoard記録
+                global_step = epoch * args.steps_per_epoch + step
+                writer.add_scalar("Loss/total", loss.item(), global_step)
+                writer.add_scalar("Loss/avg", avg_loss, global_step)
         
+        # エポック終了
         avg_loss = progress_tracker.average()
-        print(f"Epoch {epoch+1} 完了 - Average Loss: {avg_loss:.4f}")
-        writer.add_scalar('Loss/Epoch', avg_loss, epoch)
+        print(f"Epoch {epoch+1} 完了 | 平均損失: {avg_loss:.4f}")
     
-    # モデル保存
-    save_dir = os.path.join(config.LOG_BASE_DIR, args.exp_name)
-    save_path = os.path.join(save_dir, "final_model.pt")
-    torch.save({
-        'model_state_dict': model.state_dict(),
-        'optimizer_state_dict': optimizer.state_dict(),
-        'args': args,
-    }, save_path)
-    print(f"✅ モデル保存: {save_path}")
-    
+    # 学習完了
     writer.close()
     print("🎉 学習完了!")
 

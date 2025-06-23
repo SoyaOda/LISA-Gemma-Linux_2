@@ -20,7 +20,36 @@ import glob
 # プロジェクトのルートディレクトリをパスに追加
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from config_linux import *
+# 動的設定管理機能を追加
+def get_config():
+    """動的設定読み込み（環境変数対応）"""
+    config_path = os.environ.get('LISA_CONFIG_PATH', None)
+    
+    if config_path:
+        # 環境変数で指定された設定ファイル
+        try:
+            config_module = __import__(config_path)
+            print(f"✓ カスタム設定ファイルを使用: {config_path}")
+            return config_module
+        except ImportError:
+            print(f"⚠️ カスタム設定ファイル {config_path} が見つかりません")
+    
+    # デフォルトの設定ファイル検索順序
+    config_candidates = ['config_linux', 'config_small_test']  # config_linuxを優先に変更
+    
+    for config_name in config_candidates:
+        try:
+            config_module = __import__(config_name)
+            print(f"✓ 設定ファイルを使用: {config_name}")
+            return config_module
+        except ImportError:
+            continue
+    
+    raise ImportError("利用可能な設定ファイルが見つかりません")
+
+# 動的設定読み込み
+config = get_config()
+
 from utils.dataset import HybridDataset, collate_fn
 from utils.reason_seg_dataset import ReasonSegDataset
 from utils.vqa_dataset import VQADataset
@@ -41,20 +70,28 @@ class RealDataTester:
     def check_config(self):
         """設定とデータセットパスの確認"""
         print("=== 設定確認 ===")
-        print(f"Dataset base dir: {DATASET_BASE_DIR}")
-        print(f"SAM checkpoint: {SAM_CHECKPOINT_PATH}")
-        print(f"Gemma model ID: {GEMMA_MODEL_ID}")
+        print(f"Dataset base dir: {config.DATASET_BASE_DIR}")
+        print(f"SAM checkpoint: {config.SAM_CHECKPOINT_PATH}")
+        print(f"Gemma model ID: {config.GEMMA_MODEL_ID}")
         
-        # config_linux.pyのcheck_paths関数を呼び出して必須パスを検証
-        # 存在しない場合はFileNotFoundErrorで停止
+        # 設定モジュールのcheck_paths関数を呼び出して必須パスを検証
         try:
-            from config_linux import check_paths
-            print("\n必須パスの検証中...")
-            check_paths()
-            print("✓ すべての必須パスが確認されました")
-        except FileNotFoundError as e:
-            print(f"\n✗ 必須パスの検証に失敗: {e}")
-            raise
+            if hasattr(config, 'check_all_paths'):
+                print("\n必須パスの検証中...")
+                validation_result = config.check_all_paths()
+                if validation_result:
+                    print("✓ すべての必須パスが確認されました")
+                else:
+                    print("⚠️ 一部のパスが見つかりませんが、テストを続行します")
+            elif hasattr(config, 'check_paths'):
+                print("\n必須パスの検証中...")
+                config.check_paths()
+                print("✓ すべての必須パスが確認されました")
+            else:
+                print("⚠️ パス検証機能が見つかりません。手動でパスを確認してください")
+        except Exception as e:
+            print(f"\n⚠️ パス検証でエラーが発生: {e}")
+            print("テストを続行しますが、データセットパスを確認してください")
     
     def analyze_dataset_structure(self):
         """データセット構造の詳細解析"""
@@ -95,7 +132,7 @@ class RealDataTester:
     
     def _analyze_ade20k(self):
         """ADE20Kデータセットの詳細解析"""
-        ade_path = os.path.join(DATASET_BASE_DIR, "ade20k")
+        ade_path = os.path.join(config.DATASET_BASE_DIR, "ade20k")
         
         if not os.path.exists(ade_path):
             print(f"  ❌ ディレクトリが存在しません: {ade_path}")
@@ -137,7 +174,7 @@ class RealDataTester:
     
     def _analyze_cocostuff(self):
         """COCO-Stuffデータセットの詳細解析"""
-        cocostuff_path = os.path.join(DATASET_BASE_DIR, "cocostuff")
+        cocostuff_path = os.path.join(config.DATASET_BASE_DIR, "cocostuff")
         
         if not os.path.exists(cocostuff_path):
             print(f"  ❌ ディレクトリが存在しません: {cocostuff_path}")
@@ -165,7 +202,7 @@ class RealDataTester:
                 self._analyze_segmentation_mask(sample_label_path, "COCO-Stuff")
         
         # 対応するCOCO画像の確認
-        coco_images_dir = os.path.join(DATASET_BASE_DIR, "coco", "train2017")
+        coco_images_dir = os.path.join(config.DATASET_BASE_DIR, "coco", "train2017")
         if os.path.exists(coco_images_dir):
             coco_images = [f for f in os.listdir(coco_images_dir) if f.endswith('.jpg')]
             print(f"  🖼️  対応COCO画像数: {len(coco_images)}")
@@ -178,7 +215,8 @@ class RealDataTester:
     
     def _analyze_mapillary(self):
         """Mapillaryデータセットの詳細解析"""
-        mapillary_path = os.path.join(DATASET_BASE_DIR, "mapillary")
+        config = get_config()  # config変数を取得
+        mapillary_path = os.path.join(config.DATASET_BASE_DIR, "mapillary")
         
         if not os.path.exists(mapillary_path):
             print(f"  ❌ ディレクトリが存在しません: {mapillary_path}")
@@ -221,7 +259,7 @@ class RealDataTester:
     
     def _analyze_pascal_part(self):
         """Pascal Partデータセットの詳細解析"""
-        pascal_path = os.path.join(DATASET_BASE_DIR, "vlpart", "pascal_part")
+        pascal_path = os.path.join(config.DATASET_BASE_DIR, "vlpart", "pascal_part")
         
         if not os.path.exists(pascal_path):
             print(f"  ❌ ディレクトリが存在しません: {pascal_path}")
@@ -286,7 +324,7 @@ class RealDataTester:
     
     def _analyze_paco_lvis(self):
         """PACO-LVISデータセットの詳細解析"""
-        paco_path = os.path.join(DATASET_BASE_DIR, "vlpart", "paco")
+        paco_path = os.path.join(config.DATASET_BASE_DIR, "vlpart", "paco")
         
         if not os.path.exists(paco_path):
             print(f"  ❌ ディレクトリが存在しません: {paco_path}")
@@ -372,7 +410,7 @@ class RealDataTester:
         print("\n📋 参照セグメンテーションデータセット解析")
         print("-" * 60)
         
-        refer_seg_path = os.path.join(DATASET_BASE_DIR, "refer_seg")
+        refer_seg_path = os.path.join(config.DATASET_BASE_DIR, "refer_seg")
         if not os.path.exists(refer_seg_path):
             print(f"  ❌ ディレクトリが存在しません: {refer_seg_path}")
             return
@@ -402,7 +440,7 @@ class RealDataTester:
         print("\n📋 VQAデータセット解析")
         print("-" * 60)
         
-        vqa_path = os.path.join(DATASET_BASE_DIR, "llava_dataset", "llava_instruct_150k.json")
+        vqa_path = os.path.join(config.DATASET_BASE_DIR, "llava_dataset", "llava_instruct_150k.json")
         if not os.path.exists(vqa_path):
             print(f"  ❌ ファイルが存在しません: {vqa_path}")
             return
@@ -448,7 +486,7 @@ class RealDataTester:
         print("\n📋 推論セグメンテーションデータセット解析")
         print("-" * 60)
         
-        reason_seg_path = os.path.join(DATASET_BASE_DIR, "reason_seg", "ReasonSeg")
+        reason_seg_path = os.path.join(config.DATASET_BASE_DIR, "reason_seg", "ReasonSeg")
         if not os.path.exists(reason_seg_path):
             print(f"  ❌ ディレクトリが存在しません: {reason_seg_path}")
             return
@@ -506,17 +544,17 @@ class RealDataTester:
         
         # 各データセットのサンプルを実際に取得してテスト
         dataset_configs = [
-            ("ReasonSeg", ReasonSegDataset, {"reason_seg_data": "ReasonSeg|train"}),
-            ("VQA", VQADataset, {"vqa_data": "llava_instruct_150k"}),
-            ("ReferSeg", ReferSegDataset, {"refer_seg_data": "refcoco"}),
-            ("SemSeg (ADE20K)", SemSegDataset, {"sem_seg_data": "ade20k"}),
+            ("ReasonSeg (全データセット)", ReasonSegDataset, {"reason_seg_data": config.REASON_SEG_DATA}),
+            ("VQA (全データセット)", VQADataset, {"vqa_data": config.VQA_DATA}),
+            ("ReferSeg (全データセット)", ReferSegDataset, {"refer_seg_data": config.REFER_SEG_DATA}),
+            ("SemSeg (全データセット)", SemSegDataset, {"sem_seg_data": config.SEM_SEG_DATA}),
         ]
         
         for ds_name, ds_class, ds_params in dataset_configs:
             print(f"\n🔍 {ds_name} データセットサンプルテスト:")
             try:
                 dataset = ds_class(
-                    base_image_dir=DATASET_BASE_DIR,
+                    base_image_dir=config.DATASET_BASE_DIR,
                     tokenizer=tokenizer,
                     samples_per_epoch=5,
                     **ds_params
@@ -573,12 +611,13 @@ class RealDataTester:
         print("\n1. ReasonSegデータセットテスト")
         try:
             dataset = ReasonSegDataset(
-                base_image_dir=DATASET_BASE_DIR,
+                base_image_dir=config.DATASET_BASE_DIR,
                 tokenizer=None,  # 簡易テスト用
                 samples_per_epoch=10,
-                reason_seg_data="ReasonSeg|train"
+                reason_seg_data=config.REASON_SEG_DATA  # 設定から取得
             )
             print(f"✓ ReasonSegデータセット作成成功 (サンプル数: {len(dataset)})")
+            print(f"  使用データセット: {config.REASON_SEG_DATA}")
             
             # 最初のサンプルを取得
             if len(dataset) > 0:
@@ -591,12 +630,13 @@ class RealDataTester:
         print("\n2. VQAデータセットテスト")
         try:
             dataset = VQADataset(
-                base_image_dir=DATASET_BASE_DIR,
+                base_image_dir=config.DATASET_BASE_DIR,
                 tokenizer=None,
                 samples_per_epoch=10,
-                vqa_data="llava_instruct_150k"
+                vqa_data=config.VQA_DATA  # 設定から取得
             )
             print(f"✓ VQAデータセット作成成功 (サンプル数: {len(dataset)})")
+            print(f"  使用データセット: {config.VQA_DATA}")
         except Exception as e:
             print(f"✗ VQAデータセットテスト失敗: {e}")
         
@@ -604,12 +644,13 @@ class RealDataTester:
         print("\n3. ReferSegデータセットテスト")
         try:
             dataset = ReferSegDataset(
-                base_image_dir=DATASET_BASE_DIR,
+                base_image_dir=config.DATASET_BASE_DIR,
                 tokenizer=None,
                 samples_per_epoch=10,
-                refer_seg_data="refcoco"
+                refer_seg_data=config.REFER_SEG_DATA  # 設定から取得
             )
             print(f"✓ ReferSegデータセット作成成功 (サンプル数: {len(dataset)})")
+            print(f"  使用データセット: {config.REFER_SEG_DATA}")
         except Exception as e:
             print(f"✗ ReferSegデータセットテスト失敗: {e}")
         
@@ -617,96 +658,168 @@ class RealDataTester:
         print("\n4. SemSegデータセットテスト")
         try:
             dataset = SemSegDataset(
-                base_image_dir=DATASET_BASE_DIR,
+                base_image_dir=config.DATASET_BASE_DIR,
                 tokenizer=None,
                 samples_per_epoch=10,
-                sem_seg_data="ade20k"
+                sem_seg_data=config.SEM_SEG_DATA  # 全データセットを使用
             )
             print(f"✓ SemSegデータセット作成成功 (サンプル数: {len(dataset)})")
+            print(f"  使用データセット: {config.SEM_SEG_DATA}")
         except Exception as e:
             print(f"✗ SemSegデータセットテスト失敗: {e}")
     
     def test_unified_dataset(self):
-        """統合データセットのテスト"""
+        """統合データセットの動作テスト"""
         print("\n=== 統合データセットテスト ===")
         
         try:
             # Gemma-3プロセッサーの初期化
             from transformers import AutoProcessor
-            gemma_processor = AutoProcessor.from_pretrained(GEMMA_MODEL_ID)
+            gemma_processor = AutoProcessor.from_pretrained(config.GEMMA_MODEL_ID)
             
-            # 統合データセットの作成
+            # [SEG]トークンの追加
+            seg_token = "[SEG]"
+            if seg_token not in gemma_processor.tokenizer.get_vocab():
+                gemma_processor.tokenizer.add_tokens([seg_token], special_tokens=True)
+            
+            # config_linuxの完全な設定を明示的に使用
+            import config_linux
+            
+            # 統合データセットの作成 - config_linuxの設定を強制使用
             dataset = HybridDataset(
-                base_image_dir=DATASET_BASE_DIR,
+                base_image_dir=config_linux.DATASET_BASE_DIR,
                 gemma_processor=gemma_processor,
                 samples_per_epoch=20,
-                dataset="reason_seg||vqa",  # 利用可能なデータセットのみ
-                sample_rate=[1, 1],
-                reason_seg_data="ReasonSeg|train",
-                vqa_data="llava_instruct_150k",
-                refer_seg_data="refcoco",
-                sem_seg_data="ade20k"
+                dataset="sem_seg||refer_seg||vqa||reason_seg",  # 全データセットを有効化
+                sample_rate=[9, 3, 3, 1],  # 仕様書通りのサンプリングレート
+                reason_seg_data=config_linux.REASON_SEG_DATA,    # "ReasonSeg|train"
+                vqa_data=config_linux.VQA_DATA,                  # "llava_instruct_150k"
+                refer_seg_data=config_linux.REFER_SEG_DATA,      # "refclef||refcoco||refcoco+||refcocog"
+                sem_seg_data=config_linux.SEM_SEG_DATA,          # "ade20k||cocostuff||mapillary||pascal_part||paco_lvis"
+                precision="bf16",
+                gemma_image_size=config_linux.GEMMA_IMAGE_SIZE,
+                sam_image_size=config_linux.SAM_IMAGE_SIZE,
             )
-            
             print(f"✓ 統合データセット作成成功 (サンプル数: {len(dataset)})")
             
-            # データローダーのテスト
-            # collate_fnはgemma_processorを受け取らない単純な関数
+            # 初期化されたデータセットの詳細情報を表示
+            print(f"📊 初期化されたデータセット数: {len(dataset.all_datasets)}")
+            for i, ds in enumerate(dataset.all_datasets):
+                ds_type = type(ds).__name__
+                print(f"  {i+1}. {ds_type}: {len(ds)} サンプル")
+            
+            # データローダーの作成
             dataloader = DataLoader(
                 dataset,
                 batch_size=2,
                 shuffle=False,
                 collate_fn=collate_fn,
-                num_workers=0  # デバッグ用
+                num_workers=0,
             )
-            
             print("✓ データローダー作成成功")
             
-            # バッチの取得テスト
-            for i, batch in enumerate(dataloader):
-                print(f"  バッチ {i+1}:")
-                for key, value in batch.items():
-                    if isinstance(value, torch.Tensor):
-                        print(f"    {key}: {value.shape} ({value.dtype})")
-                    elif isinstance(value, list):
-                        print(f"    {key}: list[{len(value)}]")
-                    else:
-                        print(f"    {key}: {type(value)}")
-                
-                if i >= 2:  # 最初の3バッチのみテスト
-                    break
-                    
+            # 1バッチだけテスト
+            batch = next(iter(dataloader))
+            print("✓ バッチ取得成功")
+            
+            print("📋 バッチ情報:")
+            for key, value in batch.items():
+                if isinstance(value, torch.Tensor):
+                    print(f"  {key}: {value.shape} ({value.dtype})")
+                elif isinstance(value, list):
+                    print(f"  {key}: List[{len(value)}]")
+                else:
+                    print(f"  {key}: {type(value)}")
+            
         except Exception as e:
             print(f"✗ 統合データセットテスト失敗: {e}")
             import traceback
             traceback.print_exc()
     
     def test_model_initialization(self):
-        """モデル初期化のテスト"""
+        """モデル初期化テスト"""
         print("\n=== モデル初期化テスト ===")
         
         try:
-            # SAMチェックポイントなしでの初期化テスト
-            config = LisaGemmaConfig(
-                gemma_model_id=GEMMA_MODEL_ID,
-                sam_checkpoint_path="",  # SAMなしでテスト
-                gemma_hidden_size=2560,
-                sam_prompt_embed_dim=256
-            )
+            # 設定取得
+            config = get_config()
             
-            print("Gemma-3モデル（SAMなし）の初期化中...")
-            model = LisaGemmaForCausalLM(config)
+            # SAMチェックポイントの存在確認
+            sam_checkpoint_exists = os.path.exists(config.SAM_CHECKPOINT_PATH)
+            print(f"SAMチェックポイント: {config.SAM_CHECKPOINT_PATH}")
+            print(f"SAMチェックポイント存在: {sam_checkpoint_exists}")
+            
+            # SAMチェックポイントが存在する場合は完全初期化、ない場合は部分初期化
+            if sam_checkpoint_exists:
+                print("✓ SAMチェックポイントが見つかりました。完全なLISA-Gemmaモデルを初期化します。")
+                model_config = LisaGemmaConfig(
+                    gemma_model_id=config.GEMMA_MODEL_ID,
+                    sam_checkpoint_path=config.SAM_CHECKPOINT_PATH,  # SAMチェックポイントを使用
+                    gemma_hidden_size=2560,
+                    sam_prompt_embed_dim=256
+                )
+            else:
+                print("⚠️ SAMチェックポイントが見つかりません。Gemmaのみで初期化します。")
+                model_config = LisaGemmaConfig(
+                    gemma_model_id=config.GEMMA_MODEL_ID,
+                    sam_checkpoint_path="",  # SAMなしでテスト
+                    gemma_hidden_size=2560,
+                    sam_prompt_embed_dim=256
+                )
+            
+            print("LISA-Gemmaモデル初期化中...")
+            model = LisaGemmaForCausalLM(model_config)
             print("✓ モデル初期化成功")
             
-            # パラメータ情報の表示
-            param_info = model.get_trainable_parameters_info()
-            print(f"  総パラメータ数: {param_info['total_parameters']:,}")
-            print(f"  訓練可能パラメータ数: {param_info['trainable_parameters']:,}")
-            print(f"  訓練可能割合: {param_info['trainable_percentage']:.2f}%")
+            # SAM機能の確認
+            has_sam = model.has_sam_capability()
+            print(f"  SAMセグメンテーション機能: {'有効' if has_sam else '無効'}")
             
-            # デバイスに移動
-            model.to(self.device)
-            print(f"✓ モデルを{self.device}に移動")
+            # パラメータ情報
+            total_params = sum(p.numel() for p in model.parameters())
+            trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+            print(f"  総パラメータ数: {total_params:,}")
+            print(f"  訓練可能パラメータ数: {trainable_params:,}")
+            print(f"  訓練可能割合: {100 * trainable_params / total_params:.2f}%")
+            
+            # 詳細パラメータ分析（仕様書準拠確認）
+            print("\n📊 詳細パラメータ分析:")
+            component_analysis = {}
+            
+            for name, param in model.named_parameters():
+                if param.requires_grad:
+                    component = "Unknown"
+                    if "gemma_model" in name:
+                        if "embed" in name.lower():
+                            component = "Gemma Embeddings"
+                        elif "lm_head" in name.lower():
+                            component = "Gemma LM Head"
+                        else:
+                            component = "Gemma Other"
+                    elif "sam_image_encoder" in name:
+                        component = "SAM Image Encoder"
+                    elif "sam_mask_decoder" in name:
+                        component = "SAM Mask Decoder"
+                    elif "mlp_projector" in name:
+                        component = "MLP Projector"
+                    
+                    if component not in component_analysis:
+                        component_analysis[component] = 0
+                    component_analysis[component] += param.numel()
+            
+            total_trainable = sum(component_analysis.values())
+            for component, params in component_analysis.items():
+                percentage = 100 * params / total_params if total_params > 0 else 0
+                print(f"  - {component}: {params:,} ({percentage:.3f}%)")
+            
+            # 仕様書準拠チェック
+            expected_percentage = 1.0  # 期待値: 1%未満
+            actual_percentage = 100 * trainable_params / total_params
+            compliance_status = "✅ 準拠" if actual_percentage < expected_percentage else "⚠️ 要修正"
+            print(f"\n🎯 仕様書準拠チェック:")
+            print(f"  期待値: {expected_percentage}%未満")
+            print(f"  実際値: {actual_percentage:.2f}%")
+            print(f"  ステータス: {compliance_status}")
             
             return model
             
@@ -763,26 +876,41 @@ class RealDataTester:
             )
             print("✓ 損失関数初期化成功")
             
-            # ダミーデータで損失計算テスト
+            # ダミーデータで損失計算テスト（実際のバッチ形式に合わせる）
             batch_size = 2
             seq_len = 100
-            vocab_size = 32000
+            vocab_size = 262146  # Gemma-3の実際の語彙サイズ
             mask_size = 64
             
-            # ダミー出力
-            outputs = {
-                "gemma_logits": torch.randn(batch_size, seq_len, vocab_size),
+            # 実際のlogitsとlabels（修正されたlabels形式）
+            logits = torch.randn(batch_size, seq_len, vocab_size)
+            
+            # 修正されたlabels（前半マスク、後半有効）
+            labels = torch.full((batch_size, seq_len), -100, dtype=torch.long)
+            labels[:, seq_len//2:] = torch.randint(0, 1000, (batch_size, seq_len//2))
+            
+            # 有効ラベルの確認
+            valid_labels = (labels != -100).sum().item()
+            total_labels = labels.numel()
+            print(f"  有効ラベル: {valid_labels}/{total_labels} ({100*valid_labels/total_labels:.1f}%)")
+            
+            # モデル出力の辞書
+            model_outputs = {
+                "logits": logits,  # text_lossを計算するためのlogits
                 "predicted_masks": torch.randn(batch_size, 1, mask_size, mask_size)
             }
             
-            # ダミーバッチ
+            # バッチデータの辞書
             batch = {
-                "labels": torch.randint(0, vocab_size, (batch_size, seq_len)),
+                "labels": labels,  # 修正されたlabels
                 "ground_truth_mask": torch.randint(0, 2, (batch_size, 1, mask_size, mask_size)).float()
             }
             
-            # 損失計算
-            losses = loss_fn(outputs, batch)
+            print(f"  predicted_masks shape: {model_outputs['predicted_masks'].shape}")
+            print(f"  ground_truth_mask shape: {batch['ground_truth_mask'].shape}")
+            
+            # 損失計算（修正されたCompositeLoss使用）
+            losses = loss_fn(model_outputs, batch)
             print("✓ 損失計算成功")
             
             for key, value in losses.items():

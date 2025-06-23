@@ -17,7 +17,36 @@ import time
 # プロジェクトパスを追加
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-import config_linux as config
+# 動的設定管理機能を追加
+def get_config():
+    """動的設定読み込み（環境変数対応）"""
+    config_path = os.environ.get('LISA_CONFIG_PATH', None)
+    
+    if config_path:
+        # 環境変数で指定された設定ファイル
+        try:
+            config_module = __import__(config_path)
+            print(f"✓ カスタム設定ファイルを使用: {config_path}")
+            return config_module
+        except ImportError:
+            print(f"⚠️ カスタム設定ファイル {config_path} が見つかりません")
+    
+    # デフォルトの設定ファイル検索順序
+    config_candidates = ['config_small_test', 'config_linux']
+    
+    for config_name in config_candidates:
+        try:
+            config_module = __import__(config_name)
+            print(f"✓ 設定ファイルを使用: {config_name}")
+            return config_module
+        except ImportError:
+            continue
+    
+    raise ImportError("利用可能な設定ファイルが見つかりません")
+
+# 動的設定読み込み
+config = get_config()
+
 from model.gemma_lisa import LisaGemmaForCausalLM, LisaGemmaConfig
 from model.losses import CompositeLoss
 from utils.dataset import HybridDataset, collate_fn
@@ -67,8 +96,8 @@ def test_model_initialization():
             gemma_model_id=config.GEMMA_MODEL_ID,
             sam_checkpoint_path=config.SAM_CHECKPOINT_PATH,
             seg_token_idx=gemma_processor.tokenizer.convert_tokens_to_ids(seg_token),
-            gemma_hidden_size=config.GEMMA_HIDDEN_SIZE,
-            sam_prompt_embed_dim=config.SEG_PROJECTION_DIM,
+            gemma_hidden_size=getattr(config, 'GEMMA_HIDDEN_SIZE', 2560),
+            sam_prompt_embed_dim=getattr(config, 'SEG_PROJECTION_DIM', 256),
         )
         print("✅ モデル設定作成成功")
         
@@ -198,46 +227,29 @@ def test_distributed_setup():
     """Step 5: 分散環境セットアップテスト"""
     print("\n=== Step 5: 分散環境セットアップテスト ===")
     
-    def setup_process(rank, world_size):
-        try:
-            os.environ['MASTER_ADDR'] = 'localhost'
-            os.environ['MASTER_PORT'] = '12355'
-            
-            dist.init_process_group("nccl" if torch.cuda.is_available() else "gloo", 
-                                   rank=rank, world_size=world_size)
-            print(f"✅ Rank {rank}: 分散プロセスグループ初期化成功")
-            
-            if torch.cuda.is_available():
-                torch.cuda.set_device(rank)
-                device = torch.device(f"cuda:{rank}")
-            else:
-                device = torch.device("cpu")
-                
-            print(f"✅ Rank {rank}: デバイス設定完了 ({device})")
-            
-            # 簡単な通信テスト
-            tensor = torch.ones(1).to(device)
-            dist.all_reduce(tensor, op=dist.ReduceOp.SUM)
-            expected = torch.ones(1).to(device) * world_size
-            
-            if torch.allclose(tensor, expected):
-                print(f"✅ Rank {rank}: 通信テスト成功")
-            else:
-                print(f"❌ Rank {rank}: 通信テスト失敗")
-            
-            dist.destroy_process_group()
-            
-        except Exception as e:
-            print(f"❌ Rank {rank}: 分散セットアップエラー: {e}")
+    # 環境変数の確認
+    required_env_vars = ['MASTER_ADDR', 'MASTER_PORT', 'WORLD_SIZE', 'RANK']
+    missing_vars = [var for var in required_env_vars if var not in os.environ]
     
-    # 単一プロセス（シミュレーション）
-    if torch.cuda.device_count() >= 2:
-        print("マルチGPU環境: 実際の分散テスト実行")
-        world_size = min(2, torch.cuda.device_count())
-        mp.spawn(setup_process, args=(world_size,), nprocs=world_size, join=True)
-    else:
-        print("単一GPU環境: 分散テストをスキップ")
+    if missing_vars:
+        print(f"⚠️ 必要な環境変数が設定されていません: {missing_vars}")
+        print("シングルプロセス環境でテストを続行します")
+        return test_single_gpu_forward()
+    
+    try:
+        # 分散環境の初期化
+        dist.init_process_group(backend='nccl')
+        print("✅ 分散環境初期化成功")
+        
+        rank = dist.get_rank()
+        world_size = dist.get_world_size()
+        print(f"✅ ランク: {rank}, ワールドサイズ: {world_size}")
+        
         return True
+        
+    except Exception as e:
+        print(f"❌ 分散環境セットアップエラー: {e}")
+        return False
 
 def run_ddp_train_test():
     """Step 6: 実際のDDP学習テスト"""

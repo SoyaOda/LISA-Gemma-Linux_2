@@ -14,7 +14,36 @@ from transformers import AutoProcessor
 # プロジェクトのルートディレクトリをパスに追加
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from config_linux import *
+# 動的設定管理機能を追加
+def get_config():
+    """動的設定読み込み（環境変数対応）"""
+    config_path = os.environ.get('LISA_CONFIG_PATH', None)
+    
+    if config_path:
+        # 環境変数で指定された設定ファイル
+        try:
+            config_module = __import__(config_path)
+            print(f"✓ カスタム設定ファイルを使用: {config_path}")
+            return config_module
+        except ImportError:
+            print(f"⚠️ カスタム設定ファイル {config_path} が見つかりません")
+    
+    # デフォルトの設定ファイル検索順序
+    config_candidates = ['config_small_test', 'config_linux']
+    
+    for config_name in config_candidates:
+        try:
+            config_module = __import__(config_name)
+            print(f"✓ 設定ファイルを使用: {config_name}")
+            return config_module
+        except ImportError:
+            continue
+    
+    raise ImportError("利用可能な設定ファイルが見つかりません")
+
+# 動的設定読み込み
+config = get_config()
+
 from utils.dataset import HybridDataset, collate_fn, preprocess_sam_image, preprocess_mask
 
 def test_sam_preprocessing():
@@ -48,7 +77,7 @@ def test_gemma_preprocessing():
     
     # Gemmaプロセッサーの初期化
     try:
-        gemma_processor = AutoProcessor.from_pretrained(GEMMA_MODEL_ID)
+        gemma_processor = AutoProcessor.from_pretrained(config.GEMMA_MODEL_ID)
     except Exception as e:
         print(f"⚠️ Gemmaプロセッサーの初期化に失敗: {e}")
         print("ダミープロセッサーを使用します")
@@ -113,7 +142,7 @@ def test_hybrid_dataset():
     print("=" * 60)
     
     # Gemmaプロセッサーの初期化
-    gemma_processor = AutoProcessor.from_pretrained(GEMMA_MODEL_ID)
+    gemma_processor = AutoProcessor.from_pretrained(config.GEMMA_MODEL_ID)
     
     # [SEG]トークンを追加
     seg_token = "[SEG]"
@@ -123,7 +152,7 @@ def test_hybrid_dataset():
     
     # HybridDatasetの作成
     dataset = HybridDataset(
-        base_image_dir=DATASET_BASE_DIR,
+        base_image_dir=config.DATASET_BASE_DIR,
         gemma_processor=gemma_processor,
         samples_per_epoch=10,  # 少数のサンプルでテスト
         dataset="reason_seg",  # ReasonSegのみでテスト
@@ -220,7 +249,7 @@ def test_integration():
     print("=" * 60)
     
     # Gemmaプロセッサーの初期化
-    gemma_processor = AutoProcessor.from_pretrained(GEMMA_MODEL_ID)
+    gemma_processor = AutoProcessor.from_pretrained(config.GEMMA_MODEL_ID)
     
     # [SEG]トークンを追加
     seg_token = "[SEG]"
@@ -229,7 +258,7 @@ def test_integration():
     
     # HybridDatasetの作成
     dataset = HybridDataset(
-        base_image_dir=DATASET_BASE_DIR,
+        base_image_dir=config.DATASET_BASE_DIR,
         gemma_processor=gemma_processor,
         samples_per_epoch=5,
         dataset="reason_seg",

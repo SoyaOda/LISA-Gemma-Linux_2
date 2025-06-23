@@ -20,11 +20,14 @@ class LisaGemmaConfig(PretrainedConfig):
 
     def __init__(
         self,
-        gemma_model_id="google/gemma-3-4b-it",
-        sam_checkpoint_path=None,
-        seg_token="[SEG]",
-        gemma_hidden_size=2560,  # Gemma 3 4B の hidden_size
-        sam_prompt_embed_dim=256,
+        gemma_model_id: str = "google/gemma-3-4b-it",
+        sam_checkpoint_path: Optional[str] = None,
+        seg_token: str = "[SEG]",
+        gemma_hidden_size: int = 2560,  # Gemma 3 4B の hidden_size
+        sam_prompt_embed_dim: int = 256,
+        gemma_image_size: int = 896,
+        sam_image_size: int = 1024,
+        model_max_length: int = 2048,
         **kwargs,
     ):
         self.gemma_model_id = gemma_model_id
@@ -32,6 +35,9 @@ class LisaGemmaConfig(PretrainedConfig):
         self.seg_token = seg_token
         self.gemma_hidden_size = gemma_hidden_size
         self.sam_prompt_embed_dim = sam_prompt_embed_dim
+        self.gemma_image_size = gemma_image_size
+        self.sam_image_size = sam_image_size
+        self.model_max_length = model_max_length
         super().__init__(**kwargs)
 
 class LisaGemmaForCausalLM(PreTrainedModel):
@@ -41,44 +47,69 @@ class LisaGemmaForCausalLM(PreTrainedModel):
         super().__init__(config)
 
         # 1. Gemma-3 multimodal model の初期化
-        print("Gemma-3マルチモーダルモデルをロード中...")
+        print(f"Gemma-3マルチモーダルモデルをロード中... ({config.gemma_model_id})")
         self.gemma_model = Gemma3ForConditionalGeneration.from_pretrained(
             config.gemma_model_id,
             torch_dtype=torch.bfloat16,
             device_map="auto"
         )
         
+        # 1.1 仕様書第2章: Gemmaモデル本体のパラメータを凍結
+        print("Gemmaモデルのパラメータを仕様書に従って凍結中...")
+        for param in self.gemma_model.parameters():
+            param.requires_grad = False
+        
+        # 1.2 例外: 埋め込み層とLMヘッドは訓練可能に（新しいSEGトークン対応）
+        if hasattr(self.gemma_model, 'get_input_embeddings'):
+            for param in self.gemma_model.get_input_embeddings().parameters():
+                param.requires_grad = True
+        if hasattr(self.gemma_model, 'get_output_embeddings'):
+            for param in self.gemma_model.get_output_embeddings().parameters():
+                param.requires_grad = True
+        
+        print("✅ Gemmaパラメータ凍結が完了（埋め込み層とLMヘッドは訓練可能）")
+        
         # 2. Gemma-3用プロセッサーの初期化
-        print("Gemma-3プロセッサーをロード中...")
+        print(f"Gemma-3プロセッサーをロード中... ({config.gemma_model_id})")
         self.gemma_processor = AutoProcessor.from_pretrained(config.gemma_model_id)
         
         # 3. SAMコンポーネントのロードと凍結（SAMチェックポイントが存在する場合のみ）
         if config.sam_checkpoint_path and config.sam_checkpoint_path != "":
-            print("SAMモデルをロード中...")
-            sam = sam_model_registry["vit_h"](checkpoint=config.sam_checkpoint_path)
-            
-            # SAMの画像エンコーダを抽出し、凍結する
-            self.sam_image_encoder = sam.image_encoder
-            for param in self.sam_image_encoder.parameters():
-                param.requires_grad = False
-            
-            # SAMのプロンプトエンコーダを抽出し、凍結する
-            self.sam_prompt_encoder = sam.prompt_encoder
-            for param in self.sam_prompt_encoder.parameters():
-                param.requires_grad = False
-            
-            # SAMのマスクデコーダを抽出し、訓練可能にする
-            self.sam_mask_decoder = sam.mask_decoder
-            for param in self.sam_mask_decoder.parameters():
-                param.requires_grad = True
+            print(f"SAMモデルをロード中... ({config.sam_checkpoint_path})")
+            try:
+                sam = sam_model_registry["vit_h"](checkpoint=config.sam_checkpoint_path)
                 
-            # SAMコンポーネントをGemmaと同じデバイスに移動
-            device = next(self.gemma_model.parameters()).device
-            self.sam_image_encoder = self.sam_image_encoder.to(device)
-            self.sam_prompt_encoder = self.sam_prompt_encoder.to(device)
-            self.sam_mask_decoder = self.sam_mask_decoder.to(device)
+                # SAMの画像エンコーダを抽出し、凍結する
+                self.sam_image_encoder = sam.image_encoder
+                for param in self.sam_image_encoder.parameters():
+                    param.requires_grad = False
+                
+                # SAMのプロンプトエンコーダを抽出し、凍結する
+                self.sam_prompt_encoder = sam.prompt_encoder
+                for param in self.sam_prompt_encoder.parameters():
+                    param.requires_grad = False
+                
+                # SAMのマスクデコーダを抽出し、訓練可能にする
+                self.sam_mask_decoder = sam.mask_decoder
+                for param in self.sam_mask_decoder.parameters():
+                    param.requires_grad = True
+                    
+                # SAMコンポーネントをGemmaと同じデバイスに移動
+                device = next(self.gemma_model.parameters()).device
+                self.sam_image_encoder = self.sam_image_encoder.to(device)
+                self.sam_prompt_encoder = self.sam_prompt_encoder.to(device)
+                self.sam_mask_decoder = self.sam_mask_decoder.to(device)
+                
+                print("✅ SAMコンポーネントの初期化が完了しました")
+                
+            except Exception as e:
+                print(f"❌ SAMの初期化に失敗しました: {e}")
+                print("SAMコンポーネントなしで続行します（セグメンテーション機能は利用できません）")
+                self.sam_image_encoder = None
+                self.sam_prompt_encoder = None
+                self.sam_mask_decoder = None
         else:
-            print("SAMチェックポイントが指定されていません。SAMコンポーネントは初期化されません。")
+            print("⚠️  SAMチェックポイントが指定されていません。SAMコンポーネントは初期化されません。")
             self.sam_image_encoder = None
             self.sam_prompt_encoder = None
             self.sam_mask_decoder = None
@@ -113,7 +144,47 @@ class LisaGemmaForCausalLM(PreTrainedModel):
         # SEGトークンのIDを取得
         self.seg_token_id = self.gemma_processor.tokenizer.convert_tokens_to_ids(self.seg_token)
         
-        print("LISA-Gemmaモデルの初期化が完了しました")
+        # 設定情報を保存
+        self.gemma_image_size = config.gemma_image_size
+        self.sam_image_size = config.sam_image_size
+        self.model_max_length = config.model_max_length
+        
+        print("✅ LISA-Gemmaモデルの初期化が完了しました")
+
+    @classmethod
+    def from_config_file(cls, config_path: str, **kwargs):
+        """設定ファイルからモデルを初期化するクラスメソッド"""
+        import importlib.util
+        import sys
+        
+        # 設定ファイルをモジュールとして読み込み
+        spec = importlib.util.spec_from_file_location("config", config_path)
+        config_module = importlib.util.module_from_spec(spec)
+        sys.modules["config"] = config_module
+        spec.loader.exec_module(config_module)
+        
+        # 設定からLisaGemmaConfigを作成
+        lisa_config = LisaGemmaConfig(
+            gemma_model_id=getattr(config_module, 'GEMMA_MODEL_ID', "google/gemma-3-4b-it"),
+            sam_checkpoint_path=getattr(config_module, 'SAM_CHECKPOINT_PATH', None),
+            seg_token=getattr(config_module, 'SEG_TOKEN', "[SEG]"),
+            gemma_hidden_size=getattr(config_module, 'GEMMA_HIDDEN_SIZE', 2560),
+            sam_prompt_embed_dim=getattr(config_module, 'SEG_PROJECTION_DIM', 256),
+            gemma_image_size=getattr(config_module, 'GEMMA_IMAGE_SIZE', 896),
+            sam_image_size=getattr(config_module, 'SAM_IMAGE_SIZE', 1024),
+            model_max_length=getattr(config_module, 'MODEL_MAX_LENGTH', 2048),
+            **kwargs
+        )
+        
+        return cls(lisa_config)
+
+    def has_sam_capability(self) -> bool:
+        """SAMセグメンテーション機能が利用可能かチェック"""
+        return all([
+            self.sam_image_encoder is not None,
+            self.sam_prompt_encoder is not None,
+            self.sam_mask_decoder is not None
+        ])
 
     def prepare_multimodal_input(self, image, text_prompt):
         """

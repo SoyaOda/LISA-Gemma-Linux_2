@@ -23,7 +23,29 @@ from peft import LoraConfig, get_peft_model
 # プロジェクトのルートディレクトリをパスに追加
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from config_linux import *
+# 設定ファイルの動的インポート
+def get_config():
+    """実行時の設定ファイルを動的に取得"""
+    config_path = os.environ.get('LISA_CONFIG_PATH', 'config_linux')
+    
+    try:
+        if config_path == 'config_linux':
+            import config_linux as config
+            print(f"設定: {config_path}.py を使用")
+        else:
+            import importlib
+            config = importlib.import_module(config_path)
+            print(f"設定: {config_path}.py を使用")
+        
+        return config
+    except ImportError as e:
+        print(f"設定ファイル '{config_path}' の読み込みに失敗: {e}")
+        print("config_linux.py が存在することを確認してください。")
+        sys.exit(1)
+
+# 設定をインポート
+config = get_config()
+
 from model.gemma_lisa import LisaGemmaForCausalLM, LisaGemmaConfig
 from model.losses import CompositeLoss
 from utils.dataset import HybridDataset, collate_fn
@@ -36,41 +58,41 @@ def parse_args():
     # 基本設定
     parser.add_argument("--local_rank", default=0, type=int, help="Local rank for distributed training")
     parser.add_argument("--exp_name", default="lisa-gemma3-run1", type=str, help="Experiment name")
-    parser.add_argument("--log_dir", default=LOG_BASE_DIR, type=str, help="Log directory")
+    parser.add_argument("--log_dir", default=config.LOG_BASE_DIR, type=str, help="Log directory")
     
     # モデル設定
-    parser.add_argument("--gemma_model_id", default=GEMMA_MODEL_ID, type=str, help="Gemma model ID")
-    parser.add_argument("--sam_checkpoint_path", default=SAM_CHECKPOINT_PATH, type=str, help="SAM checkpoint path")
+    parser.add_argument("--gemma_model_id", default=config.GEMMA_MODEL_ID, type=str, help="Gemma model ID")
+    parser.add_argument("--sam_checkpoint_path", default=config.SAM_CHECKPOINT_PATH, type=str, help="SAM checkpoint path")
     parser.add_argument("--precision", default="bf16", type=str, choices=["fp32", "bf16", "fp16"])
     
     # 学習設定
-    parser.add_argument("--epochs", default=EPOCHS, type=int, help="Number of training epochs")
-    parser.add_argument("--steps_per_epoch", default=STEPS_PER_EPOCH, type=int, help="Steps per epoch")
+    parser.add_argument("--epochs", default=config.EPOCHS, type=int, help="Number of training epochs")
+    parser.add_argument("--steps_per_epoch", default=config.STEPS_PER_EPOCH, type=int, help="Steps per epoch")
     parser.add_argument("--batch_size", default=16, type=int, help="Global batch size")
     parser.add_argument("--grad_accumulation_steps", default=2, type=int, help="Gradient accumulation steps")
-    parser.add_argument("--lr", default=LEARNING_RATE, type=float, help="Learning rate")
-    parser.add_argument("--weight_decay", default=WEIGHT_DECAY, type=float, help="Weight decay")
-    parser.add_argument("--beta1", default=BETA1, type=float, help="Adam beta1")
-    parser.add_argument("--beta2", default=BETA2, type=float, help="Adam beta2")
+    parser.add_argument("--lr", default=config.LEARNING_RATE, type=float, help="Learning rate")
+    parser.add_argument("--weight_decay", default=config.WEIGHT_DECAY, type=float, help="Weight decay")
+    parser.add_argument("--beta1", default=config.BETA1, type=float, help="Adam beta1")
+    parser.add_argument("--beta2", default=config.BETA2, type=float, help="Adam beta2")
     
     # LoRA設定
-    parser.add_argument("--lora_r", default=LORA_R, type=int, help="LoRA rank")
-    parser.add_argument("--lora_alpha", default=LORA_ALPHA, type=int, help="LoRA alpha")
-    parser.add_argument("--lora_dropout", default=LORA_DROPOUT, type=float, help="LoRA dropout")
+    parser.add_argument("--lora_r", default=config.LORA_R, type=int, help="LoRA rank")
+    parser.add_argument("--lora_alpha", default=config.LORA_ALPHA, type=int, help="LoRA alpha")
+    parser.add_argument("--lora_dropout", default=config.LORA_DROPOUT, type=float, help="LoRA dropout")
     
     # 損失関数の重み
-    parser.add_argument("--ce_loss_weight", default=CE_LOSS_WEIGHT, type=float, help="Cross entropy loss weight")
-    parser.add_argument("--dice_loss_weight", default=DICE_LOSS_WEIGHT, type=float, help="Dice loss weight")
-    parser.add_argument("--bce_loss_weight", default=BCE_LOSS_WEIGHT, type=float, help="BCE loss weight")
+    parser.add_argument("--ce_loss_weight", default=config.CE_LOSS_WEIGHT, type=float, help="Cross entropy loss weight")
+    parser.add_argument("--dice_loss_weight", default=config.DICE_LOSS_WEIGHT, type=float, help="Dice loss weight")
+    parser.add_argument("--bce_loss_weight", default=config.BCE_LOSS_WEIGHT, type=float, help="BCE loss weight")
     
-    # データセット設定
-    parser.add_argument("--dataset_base_dir", default=DATASET_BASE_DIR, type=str, help="Dataset base directory")
+    # データセット設定（設定ファイルから取得）
+    parser.add_argument("--dataset_base_dir", default=config.DATASET_BASE_DIR, type=str, help="Dataset base directory")
     parser.add_argument("--dataset", default="sem_seg||refer_seg||vqa||reason_seg", type=str, help="Datasets to use")
-    parser.add_argument("--sample_rates", default=DATASET_SAMPLE_RATES, type=str, help="Dataset sample rates")
-    parser.add_argument("--sem_seg_data", default=SEM_SEG_DATA, type=str, help="Semantic segmentation data")
-    parser.add_argument("--refer_seg_data", default=REFER_SEG_DATA, type=str, help="Referring segmentation data")
-    parser.add_argument("--vqa_data", default=VQA_DATA, type=str, help="VQA data")
-    parser.add_argument("--reason_seg_data", default=REASON_SEG_DATA, type=str, help="Reasoning segmentation data")
+    parser.add_argument("--sample_rates", default=config.DATASET_SAMPLE_RATES, type=str, help="Dataset sample rates")
+    parser.add_argument("--sem_seg_data", default=config.SEM_SEG_DATA, type=str, help="Semantic segmentation data")
+    parser.add_argument("--refer_seg_data", default=config.REFER_SEG_DATA, type=str, help="Referring segmentation data")
+    parser.add_argument("--vqa_data", default=config.VQA_DATA, type=str, help="VQA data")
+    parser.add_argument("--reason_seg_data", default=config.REASON_SEG_DATA, type=str, help="Reasoning segmentation data")
     
     # DeepSpeed設定
     parser.add_argument("--deepspeed_config", default="ds_config.json", type=str, help="DeepSpeed config file")
@@ -81,7 +103,48 @@ def parse_args():
     parser.add_argument("--eval_interval", default=1, type=int, help="Evaluation interval in epochs")
     parser.add_argument("--resume", default="", type=str, help="Resume from checkpoint")
     
+    # 設定ファイル上書き用
+    parser.add_argument("--config_path", default=None, type=str, help="Override config file path (environment variable LISA_CONFIG_PATH will be set)")
+    
     return parser.parse_args()
+
+
+def validate_paths(args):
+    """重要なパスの存在をチェック"""
+    print("=== パス検証 ===")
+    
+    errors = []
+    
+    # データセットベースディレクトリ
+    if not os.path.exists(args.dataset_base_dir):
+        errors.append(f"データセットベースディレクトリが見つかりません: {args.dataset_base_dir}")
+    
+    # SAMチェックポイント
+    if not os.path.exists(args.sam_checkpoint_path):
+        errors.append(f"SAMチェックポイントが見つかりません: {args.sam_checkpoint_path}")
+        # SAMのダウンロードURL情報を提供
+        weights_info = config.get_required_weights() if hasattr(config, 'get_required_weights') else None
+        if weights_info and 'sam_vit_h' in weights_info:
+            errors.append(f"ダウンロード: wget {weights_info['sam_vit_h']['url']} -O {args.sam_checkpoint_path}")
+    
+    # DeepSpeed設定ファイル
+    if not os.path.exists(args.deepspeed_config):
+        errors.append(f"DeepSpeed設定ファイルが見つかりません: {args.deepspeed_config}")
+    
+    if errors:
+        print("❌ パス検証エラー:")
+        for error in errors:
+            print(f"  - {error}")
+        print("\n対処方法:")
+        print("1. 環境変数を設定してパスを変更:")
+        print(f"   export LISA_DATASET_BASE_DIR=/path/to/your/dataset")
+        print(f"   export LISA_SAM_CHECKPOINT_PATH=/path/to/sam_vit_h_4b8939.pth")
+        print("2. または、コマンドライン引数で指定")
+        print("3. 必要なファイルをダウンロード・配置")
+        return False
+    
+    print("✅ パス検証成功")
+    return True
 
 
 def setup_model_and_lora(args):
@@ -89,17 +152,20 @@ def setup_model_and_lora(args):
     print("=== モデルとLoRAの設定 ===")
     
     # 1. LisaGemmaConfigの作成
-    config = LisaGemmaConfig(
+    lisa_config = LisaGemmaConfig(
         gemma_model_id=args.gemma_model_id,
         sam_checkpoint_path=args.sam_checkpoint_path,
-        seg_token="<SEG>",
-        gemma_hidden_size=2560,
-        sam_prompt_embed_dim=256,
+        seg_token=config.SEG_TOKEN,
+        gemma_hidden_size=config.GEMMA_HIDDEN_SIZE,
+        sam_prompt_embed_dim=config.SEG_PROJECTION_DIM,
+        gemma_image_size=config.GEMMA_IMAGE_SIZE,
+        sam_image_size=config.SAM_IMAGE_SIZE,
+        model_max_length=config.MODEL_MAX_LENGTH,
     )
     
     # 2. モデルの初期化
     print(f"LISA-Gemmaモデルを初期化中... (precision: {args.precision})")
-    model = LisaGemmaForCausalLM(config)
+    model = LisaGemmaForCausalLM(lisa_config)
     
     # 3. 精度設定
     if args.precision == "bf16":
@@ -112,7 +178,7 @@ def setup_model_and_lora(args):
     lora_config = LoraConfig(
         r=args.lora_r,
         lora_alpha=args.lora_alpha,
-        target_modules=LORA_TARGET_MODULES,  # config_linux.pyから取得
+        target_modules=config.LORA_TARGET_MODULES,  # config_linux.pyから取得
         lora_dropout=args.lora_dropout,
         bias="none",
         task_type="CAUSAL_LM",
@@ -128,18 +194,12 @@ def setup_model_and_lora(args):
         # PEFTモデルにprint_trainable_parametersがない場合
         pass
     
-    param_info = model.get_trainable_parameters_info() if hasattr(model, 'get_trainable_parameters_info') else None
-    if param_info:
-        print(f"総パラメータ数: {param_info['total_parameters']:,}")
-        print(f"訓練可能パラメータ数: {param_info['trainable_parameters']:,}")
-        print(f"訓練可能な割合: {param_info['trainable_percentage']:.2f}%")
-    else:
-        # 手動でパラメータ数を計算
-        total_params = sum(p.numel() for p in model.parameters())
-        trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-        print(f"総パラメータ数: {total_params:,}")
-        print(f"訓練可能パラメータ数: {trainable_params:,}")
-        print(f"訓練可能な割合: {trainable_params/total_params*100:.2f}%")
+    # 手動でパラメータ数を計算
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"総パラメータ数: {total_params:,}")
+    print(f"訓練可能パラメータ数: {trainable_params:,}")
+    print(f"訓練可能な割合: {trainable_params/total_params*100:.2f}%")
     
     return model
 
@@ -164,8 +224,8 @@ def setup_dataset_and_dataloader(args, gemma_processor):
         gemma_processor=gemma_processor,
         samples_per_epoch=samples_per_epoch,
         precision=args.precision,
-        gemma_image_size=GEMMA_IMAGE_SIZE,
-        sam_image_size=SAM_IMAGE_SIZE,
+        gemma_image_size=config.GEMMA_IMAGE_SIZE,
+        sam_image_size=config.SAM_IMAGE_SIZE,
         dataset=args.dataset,
         sample_rate=sample_rates,
         sem_seg_data=args.sem_seg_data,
@@ -175,8 +235,8 @@ def setup_dataset_and_dataloader(args, gemma_processor):
     )
     
     print(f"✅ デュアルストリーム訓練データセット作成完了: {len(train_dataset):,} サンプル")
-    print(f"   - Gemma画像サイズ: {GEMMA_IMAGE_SIZE}x{GEMMA_IMAGE_SIZE}")
-    print(f"   - SAM画像サイズ: {SAM_IMAGE_SIZE}x{SAM_IMAGE_SIZE}")
+    print(f"   - Gemma画像サイズ: {config.GEMMA_IMAGE_SIZE}x{config.GEMMA_IMAGE_SIZE}")
+    print(f"   - SAM画像サイズ: {config.SAM_IMAGE_SIZE}x{config.SAM_IMAGE_SIZE}")
     
     return train_dataset
 

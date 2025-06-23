@@ -282,7 +282,7 @@ class SemSegDataset(torch.utils.data.Dataset):
         image_size: int = 224,
         num_classes_per_sample: int = 3,
         exclude_val=False,
-        sem_seg_data="ade20k||cocostuff||mapillary",
+        sem_seg_data="ade20k||cocostuff||mapillary||pascal_part||paco_lvis",
         processor=None,  # 親クラスから渡されるプロセッサ（未使用だが互換性のため）
         image_processor=None,  # 親クラスから渡される画像プロセッサ（未使用だが互換性のため）
     ):
@@ -424,8 +424,15 @@ class SemSegDataset(torch.utils.data.Dataset):
             print(f"画像処理エラー: {e}")
             return self.__getitem__(0)
 
-        # PIL Imageとして返すためのコピーを保存
-        pil_image = Image.fromarray(image)
+        # デュアルエンコーダ対応: Gemma用とSAM用の画像前処理
+        # Gemma用画像前処理（896x896）
+        image_for_gemma = cv2.resize(image, (896, 896))
+        image_for_gemma = torch.from_numpy(image_for_gemma).permute(2, 0, 1).float() / 255.0
+        
+        # SAM用画像前処理（1024x1024）
+        image_for_sam = self.transform.apply_image(image)
+        image_for_sam = self.preprocess(torch.from_numpy(image_for_sam).permute(2, 0, 1).contiguous())
+        resize = image.shape[:2]
 
         # アノテーションの取得
         ann_ids = coco_api.getAnnIds(imgIds=[img_id])
@@ -441,7 +448,7 @@ class SemSegDataset(torch.utils.data.Dataset):
         else:
             sampled_anns = anns
 
-        # マスクの作成
+        # マスクとクラス名の作成
         masks = []
         sampled_classes = []
         for ann in sampled_anns:
@@ -450,8 +457,14 @@ class SemSegDataset(torch.utils.data.Dataset):
                 masks.append(mask_data)
                 class_name = class_map[ann["category_id"]]
                 if isinstance(class_name, tuple):
-                    class_name = f"{class_name[0]} {class_name[1]}"
-                sampled_classes.append(str(class_name).lower())
+                    obj, part = class_name
+                    if random.random() < 0.5:
+                        name = obj + " " + part
+                    else:
+                        name = "the {} of the {}".format(part, obj)
+                else:
+                    name = str(class_name)
+                sampled_classes.append(name)
             except Exception as e:
                 print(f"マスク作成エラー: {e}")
                 continue
@@ -459,22 +472,41 @@ class SemSegDataset(torch.utils.data.Dataset):
         if len(masks) == 0:
             return self.__getitem__(0)
 
-        # テキストプロンプトの生成
-        question_template = random.choice(self.short_question_list)
-        class_name = random.choice(sampled_classes)
-        text_prompt = question_template.format(class_name=class_name)
+        # 会話形式の生成（オリジナルLISA準拠）
+        questions = []
+        answers = []
+        for sampled_cls in sampled_classes:
+            question_template = random.choice(self.short_question_list)
+            questions.append(question_template.format(class_name=sampled_cls.lower()))
+            answers.append(random.choice(self.answer_list))
+
+        conversations = []
+        conv = default_conversation.copy()
+        
+        i = 0
+        while i < len(questions):
+            conv.messages = []
+            conv.append_message(conv.roles[0], questions[i])
+            conv.append_message(conv.roles[1], answers[i])
+            conversations.append(conv.get_prompt())
+            i += 1
 
         # マスクをテンソルに変換
         masks = np.stack(masks, axis=0)
         masks = torch.from_numpy(masks)
         label = torch.ones(masks.shape[1], masks.shape[2]) * self.ignore_label
 
+        # オリジナルLISA準拠の返り値形式
         return (
-            image_path,  # 画像パス
-            pil_image,   # PIL Image
-            text_prompt, # テキストプロンプト
-            masks,       # マスク
-            label        # ラベル
+            image_path,        # 0: 画像パス
+            image_for_sam,     # 1: SAM用前処理済み画像 (torch.Tensor)
+            image_for_gemma,   # 2: Gemma用前処理済み画像 (torch.Tensor)
+            conversations,     # 3: 会話形式のテキスト (List[str])
+            masks,             # 4: マスク (torch.Tensor)
+            label,             # 5: ラベル (torch.Tensor)
+            resize,            # 6: リサイズ情報 (Tuple)
+            questions,         # 7: 質問リスト (List[str])
+            sampled_classes    # 8: クラス名リスト (List[str])
         )
 
     def _get_semseg_item(self, ds):
@@ -508,8 +540,15 @@ class SemSegDataset(torch.utils.data.Dataset):
             print(f"画像処理エラー: {e}")
             return self.__getitem__(0)
 
-        # PIL Imageとして返すためのコピーを保存
-        pil_image = Image.fromarray(image)
+        # デュアルエンコーダ対応: Gemma用とSAM用の画像前処理
+        # Gemma用画像前処理（896x896）
+        image_for_gemma = cv2.resize(image, (896, 896))
+        image_for_gemma = torch.from_numpy(image_for_gemma).permute(2, 0, 1).float() / 255.0
+        
+        # SAM用画像前処理（1024x1024）
+        image_for_sam = self.transform.apply_image(image)
+        image_for_sam = self.preprocess(torch.from_numpy(image_for_sam).permute(2, 0, 1).contiguous())
+        resize = image.shape[:2]
 
         # ラベルの読み込み
         try:
@@ -519,51 +558,77 @@ class SemSegDataset(torch.utils.data.Dataset):
             print(f"ラベル読み込みエラー: {e}")
             return self.__getitem__(0)
 
-        # クラスの選択とマスクの作成
-        unique_labels = np.unique(label)
-        if ds == "cocostuff":
-            # COCOStuffの場合、特定のクラスのみを使用
-            valid_labels = [l for l in unique_labels if l < len(classes) and l != 255]
-        else:
-            valid_labels = [l for l in unique_labels if l < len(classes) and l != 0 and l != 255]
+        # データセット固有の前処理（オリジナルLISA準拠）
+        if ds == "ade20k":
+            label[label == 0] = 255
+            label -= 1
+            label[label == 254] = 255
+        elif ds == "cocostuff":
+            if hasattr(self, 'cocostuff_class2index'):
+                for c, i in self.cocostuff_class2index.items():
+                    if "-" in c:
+                        label[label == i] = 255
 
-        if len(valid_labels) == 0:
+        # クラスの選択とマスクの作成
+        unique_labels = np.unique(label).tolist()
+        if 255 in unique_labels:
+            unique_labels.remove(255)
+        if len(unique_labels) == 0:
             return self.__getitem__(0)
 
-        # サンプリング
-        if len(valid_labels) >= self.num_classes_per_sample:
-            sampled_labels = np.random.choice(valid_labels, size=self.num_classes_per_sample, replace=False)
+        classes_list = [classes[class_id] for class_id in unique_labels if class_id < len(classes)]
+        if len(classes_list) >= self.num_classes_per_sample:
+            sampled_classes = np.random.choice(classes_list, size=self.num_classes_per_sample, replace=False).tolist()
         else:
-            sampled_labels = valid_labels
+            sampled_classes = classes_list
 
-        # マスクとクラス名の作成
+        # 会話形式の生成（オリジナルLISA準拠）
+        questions = []
+        answers = []
+        class_ids = []
+        for sampled_cls in sampled_classes:
+            question_template = random.choice(self.short_question_list)
+            questions.append(question_template.format(class_name=sampled_cls.lower()))
+            answers.append(random.choice(self.answer_list))
+            
+            # クラスIDの取得
+            try:
+                class_id = classes.tolist().index(sampled_cls)
+                class_ids.append(class_id)
+            except ValueError:
+                continue
+
+        conversations = []
+        conv = default_conversation.copy()
+        
+        i = 0
+        while i < len(questions):
+            conv.messages = []
+            conv.append_message(conv.roles[0], questions[i])
+            conv.append_message(conv.roles[1], answers[i])
+            conversations.append(conv.get_prompt())
+            i += 1
+
+        # マスクの作成
+        label_tensor = torch.from_numpy(label).long()
         masks = []
-        sampled_classes = []
-        for label_id in sampled_labels:
-            mask = (label == label_id).astype(np.uint8)
-            masks.append(mask)
-            if label_id < len(classes):
-                sampled_classes.append(classes[label_id])
-            else:
-                sampled_classes.append("unknown")
-
+        for class_id in class_ids:
+            masks.append(label_tensor == class_id)
+        
         if len(masks) == 0:
             return self.__getitem__(0)
+            
+        masks = torch.stack(masks, dim=0)
 
-        # テキストプロンプトの生成
-        question_template = random.choice(self.short_question_list)
-        class_name = random.choice(sampled_classes)
-        text_prompt = question_template.format(class_name=class_name.lower())
-
-        # マスクをテンソルに変換
-        masks = np.stack(masks, axis=0)
-        masks = torch.from_numpy(masks)
-        label_tensor = torch.ones(masks.shape[1], masks.shape[2]) * self.ignore_label
-
+        # オリジナルLISA準拠の返り値形式
         return (
-            image_path,  # 画像パス
-            pil_image,   # PIL Image
-            text_prompt, # テキストプロンプト
-            masks,       # マスク
-            label_tensor # ラベル
+            image_path,        # 0: 画像パス
+            image_for_sam,     # 1: SAM用前処理済み画像 (torch.Tensor)
+            image_for_gemma,   # 2: Gemma用前処理済み画像 (torch.Tensor)
+            conversations,     # 3: 会話形式のテキスト (List[str])
+            masks,             # 4: マスク (torch.Tensor)
+            label_tensor,      # 5: ラベル (torch.Tensor)
+            resize,            # 6: リサイズ情報 (Tuple)
+            questions,         # 7: 質問リスト (List[str])
+            sampled_classes    # 8: クラス名リスト (List[str])
         )

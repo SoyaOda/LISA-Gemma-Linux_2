@@ -18,8 +18,35 @@ from peft import LoraConfig, get_peft_model
 # プロジェクトのルートディレクトリをパスに追加
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-# 小規模テスト用設定をインポート
-import config_small_test as config
+# 動的設定管理機能を追加
+def get_config():
+    """動的設定読み込み（環境変数対応）"""
+    config_path = os.environ.get('LISA_CONFIG_PATH', None)
+    
+    if config_path:
+        # 環境変数で指定された設定ファイル
+        try:
+            config_module = __import__(config_path)
+            print(f"✓ カスタム設定ファイルを使用: {config_path}")
+            return config_module
+        except ImportError:
+            print(f"⚠️ カスタム設定ファイル {config_path} が見つかりません")
+    
+    # デフォルトの設定ファイル検索順序（小規模テスト優先）
+    config_candidates = ['config_small_test', 'config_linux']
+    
+    for config_name in config_candidates:
+        try:
+            config_module = __import__(config_name)
+            print(f"✓ 設定ファイルを使用: {config_name}")
+            return config_module
+        except ImportError:
+            continue
+    
+    raise ImportError("利用可能な設定ファイルが見つかりません")
+
+# 動的設定読み込み
+config = get_config()
 
 from model.gemma_lisa import LisaGemmaForCausalLM, LisaGemmaConfig
 from model.losses import CompositeLoss
@@ -37,6 +64,9 @@ def parse_args():
     parser.add_argument("--batch_size", type=int, default=1, help="バッチサイズ")
     parser.add_argument("--lr", type=float, default=config.LEARNING_RATE, help="学習率")
     parser.add_argument("--exp_name", type=str, default="lisa_gemma3_simple_test", help="実験名")
+    
+    # 設定ファイル
+    parser.add_argument("--config_path", default=None, type=str, help="設定ファイルパス")
     
     return parser.parse_args()
 
@@ -62,8 +92,8 @@ def setup_model_and_tokenizer():
         gemma_model_id=config.GEMMA_MODEL_ID,
         sam_checkpoint_path=config.SAM_CHECKPOINT_PATH,
         seg_token_idx=gemma_processor.tokenizer.convert_tokens_to_ids(seg_token),
-        gemma_hidden_size=config.GEMMA_HIDDEN_SIZE,  # 設定ファイルから取得
-        sam_prompt_embed_dim=config.SEG_PROJECTION_DIM,  # 設定ファイルから取得
+        gemma_hidden_size=getattr(config, 'GEMMA_HIDDEN_SIZE', 2560),  # 設定ファイルから取得
+        sam_prompt_embed_dim=getattr(config, 'SEG_PROJECTION_DIM', 256),  # 設定ファイルから取得
     )
     
     # カスタムモデルの初期化

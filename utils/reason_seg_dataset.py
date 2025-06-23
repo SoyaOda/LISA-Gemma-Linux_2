@@ -93,50 +93,83 @@ class ReasonSegDataset(torch.utils.data.Dataset):
         self.long_question_list = LONG_QUESTION_LIST
         self.answer_list = ANSWER_LIST
 
-        reason_seg_data, splits = reason_seg_data.split("|")
-        splits = splits.split("_")
-        images = []
-        for split in splits:
-            images_split = glob.glob(
-                os.path.join(
-                    base_image_dir, "reason_seg", reason_seg_data, split, "*.jpg"
+        # 複数データセット対応（例：ReasonSeg|train||AnotherDataset|val）
+        self.reason_seg_datasets = reason_seg_data.split("||") if "||" in reason_seg_data else [reason_seg_data]
+        all_images = []
+        all_jsons = []
+        
+        for dataset_spec in self.reason_seg_datasets:
+            dataset_name, splits = dataset_spec.split("|")
+            splits = splits.split("_")
+            dataset_images = []
+            
+            for split in splits:
+                images_split = glob.glob(
+                    os.path.join(
+                        base_image_dir, "reason_seg", dataset_name, split, "*.jpg"
+                    )
                 )
-            )
-            images.extend(images_split)
-        jsons = [path.replace(".jpg", ".json") for path in images]
-        self.reason_seg_data = (images, jsons)
-
-        print("number of reason_seg samples: ", len(images))
+                dataset_images.extend(images_split)
+            
+            dataset_jsons = [path.replace(".jpg", ".json") for path in dataset_images]
+            
+            # 存在確認
+            valid_images = []
+            valid_jsons = []
+            for img, json_path in zip(dataset_images, dataset_jsons):
+                if os.path.exists(img) and os.path.exists(json_path):
+                    valid_images.append(img)
+                    valid_jsons.append(json_path)
+            
+            if len(valid_images) > 0:
+                all_images.extend(valid_images)
+                all_jsons.extend(valid_jsons)
+                print(f"ReasonSegデータセット '{dataset_name}' ({splits}): {len(valid_images)} サンプル")
+            else:
+                print(f"警告: ReasonSegデータセット '{dataset_name}' に有効なサンプルがありません")
+        
+        self.reason_seg_data = (all_images, all_jsons)
+        print(f"ReasonSeg総サンプル数: {len(all_images)}")
 
         if explanatory != -1:
             self.explanatory_question_list = EXPLANATORY_QUESTION_LIST
             self.img_to_explanation = {}
-            explanatory_path = os.path.join(
-                    base_image_dir,
-                    "reason_seg",
-                    reason_seg_data,
-                    "explanatory",
-                    "train.json",
-                )
             
-            try:
-                with open(explanatory_path) as f:
-                    items = json.load(f)
-                for item in items:
-                    img_name = item["image"]
-                    self.img_to_explanation[img_name] = {
-                        "query": item["query"],
-                        "outputs": item["outputs"],
-                    }
-                print("len(self.img_to_explanation): ", len(self.img_to_explanation))
-            except FileNotFoundError:
-                print(f"警告: explanatoryファイルが見つかりません: {explanatory_path}")
-                print("explanatory機能を無効にして続行します。")
+            # 各データセットのexplanatoryファイルを読み込み
+            for dataset_spec in self.reason_seg_datasets:
+                dataset_name, _ = dataset_spec.split("|")
+                explanatory_path = os.path.join(
+                        base_image_dir,
+                        "reason_seg",
+                        dataset_name,
+                        "explanatory",
+                        "train.json",
+                    )
+                
+                try:
+                    with open(explanatory_path) as f:
+                        items = json.load(f)
+                    for item in items:
+                        img_name = item["image"]
+                        self.img_to_explanation[img_name] = {
+                            "query": item["query"],
+                            "outputs": item["outputs"],
+                        }
+                    print(f"explanatory '{dataset_name}': {len(items)} 説明")
+                except FileNotFoundError:
+                    print(f"警告: explanatoryファイルが見つかりません: {explanatory_path}")
+                except Exception as e:
+                    print(f"警告: explanatory読み込みエラー ({dataset_name}): {e}")
+            
+            if len(self.img_to_explanation) == 0:
+                print("警告: explanatory機能を無効にして続行します。")
                 self.explanatory = -1  # explanatory機能を無効化
+            else:
+                print(f"explanatory総数: {len(self.img_to_explanation)}")
         
         # 画像ファイルの存在確認も追加
-        if len(images) == 0:
-            raise FileNotFoundError(f"画像ファイルが見つかりません: {os.path.join(base_image_dir, 'reason_seg', reason_seg_data)}")
+        if len(all_images) == 0:
+            raise FileNotFoundError(f"ReasonSegデータセットに有効な画像ファイルが見つかりません")
 
     def __len__(self):
         return self.samples_per_epoch

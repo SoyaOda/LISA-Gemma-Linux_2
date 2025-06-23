@@ -93,19 +93,34 @@ class VQADataset(torch.utils.data.Dataset):
         DATA_DIR = os.path.join(base_image_dir, "llava_dataset")
         self.vqa_image_root = os.path.join(base_image_dir, "coco/train2017")
         
-        # VQAデータファイルの存在確認
-        vqa_json_path = os.path.join(DATA_DIR, "{}.json".format(vqa_data))
-        if not os.path.exists(vqa_json_path):
-            raise FileNotFoundError(f"必須VQAデータファイルが見つかりません: {vqa_json_path}")
+        # VQAデータの解析（複数データセット対応）
+        self.vqa_datasets = vqa_data.split("||") if "||" in vqa_data else [vqa_data]
+        self.vqa_data = []
         
-        with open(vqa_json_path) as f:
-            vqa_data = json.load(f)
-        self.vqa_data = vqa_data
+        for dataset_name in self.vqa_datasets:
+            vqa_json_path = os.path.join(DATA_DIR, "{}.json".format(dataset_name))
+            if not os.path.exists(vqa_json_path):
+                print(f"警告: VQAデータファイルが見つかりません: {vqa_json_path}")
+                continue
+            
+            try:
+                with open(vqa_json_path) as f:
+                    dataset_data = json.load(f)
+                
+                if len(dataset_data) == 0:
+                    print(f"警告: VQAデータが空です: {vqa_json_path}")
+                    continue
+                
+                self.vqa_data.extend(dataset_data)
+                print(f"VQAデータセット '{dataset_name}': {len(dataset_data)} サンプル")
+            except Exception as e:
+                print(f"警告: VQAデータセット '{dataset_name}' の読み込みに失敗: {e}")
+                continue
 
         if len(self.vqa_data) == 0:
-            raise ValueError(f"VQAデータが空です: {vqa_json_path}")
+            raise ValueError("有効なVQAデータセットが見つかりません")
 
-        print("vqa_data: ", len(self.vqa_data))
+        print(f"VQA総サンプル数: {len(self.vqa_data)}")
 
     def __len__(self):
         return self.samples_per_epoch

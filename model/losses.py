@@ -222,7 +222,28 @@ class CompositeLoss(nn.Module):
             losses["text_loss"] = text_loss
             total_loss += self.ce_loss_weight * text_loss
         else:
-            losses["text_loss"] = torch.tensor(0.0, device=total_loss.device)
+            # text_lossが直接渡されていない場合、logitsとlabelsから計算
+            logits = model_outputs.get("logits")
+            labels = batch.get("labels")
+            
+            if logits is not None and labels is not None:
+                # CrossEntropyLossでtext_lossを計算
+                ce_loss_fn = nn.CrossEntropyLoss(ignore_index=-100)
+                
+                # logitsを(batch_size * seq_length, vocab_size)に変形
+                logits_flat = logits.view(-1, logits.size(-1))
+                labels_flat = labels.view(-1)
+                
+                # 有効なラベルがあるかチェック
+                valid_labels = (labels_flat != -100).sum().item()
+                if valid_labels > 0:
+                    text_loss = ce_loss_fn(logits_flat, labels_flat)
+                    losses["text_loss"] = text_loss
+                    total_loss += self.ce_loss_weight * text_loss
+                else:
+                    losses["text_loss"] = torch.tensor(0.0, device=device)
+            else:
+                losses["text_loss"] = torch.tensor(0.0, device=device)
         
         # 2. セグメンテーション損失
         predicted_masks = model_outputs.get("predicted_masks")

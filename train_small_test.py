@@ -23,8 +23,35 @@ from transformers import AutoProcessor
 # プロジェクトのルートディレクトリをパスに追加
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-# 小規模テスト用設定をインポート
-import config_small_test as config
+# 動的設定管理機能を追加
+def get_config():
+    """動的設定読み込み（環境変数対応）"""
+    config_path = os.environ.get('LISA_CONFIG_PATH', None)
+    
+    if config_path:
+        # 環境変数で指定された設定ファイル
+        try:
+            config_module = __import__(config_path)
+            print(f"✓ カスタム設定ファイルを使用: {config_path}")
+            return config_module
+        except ImportError:
+            print(f"⚠️ カスタム設定ファイル {config_path} が見つかりません")
+    
+    # デフォルトの設定ファイル検索順序（小規模テスト優先）
+    config_candidates = ['config_small_test', 'config_linux']
+    
+    for config_name in config_candidates:
+        try:
+            config_module = __import__(config_name)
+            print(f"✓ 設定ファイルを使用: {config_name}")
+            return config_module
+        except ImportError:
+            continue
+    
+    raise ImportError("利用可能な設定ファイルが見つかりません")
+
+# 動的設定読み込み
+config = get_config()
 
 from model.gemma_lisa import LisaGemmaForCausalLM, LisaGemmaConfig
 from model.losses import CompositeLoss
@@ -39,16 +66,17 @@ def parse_args():
     )
     
     # 学習設定
-    parser.add_argument("--batch_size", type=int, default=config.SMALL_TEST_SAMPLES_PER_EPOCH // 10, help="グローバルバッチサイズ")
+    parser.add_argument("--batch_size", type=int, default=getattr(config, 'SMALL_TEST_SAMPLES_PER_EPOCH', 40) // 10, help="グローバルバッチサイズ")
     parser.add_argument("--grad_accumulation_steps", type=int, default=4, help="勾配累積ステップ")
     parser.add_argument("--lr", type=float, default=config.LEARNING_RATE, help="学習率")
-    parser.add_argument("--epochs", type=int, default=config.SMALL_TEST_EPOCHS, help="エポック数")
-    parser.add_argument("--steps_per_epoch", type=int, default=config.SMALL_TEST_STEPS_PER_EPOCH, help="エポック毎のステップ数")
+    parser.add_argument("--epochs", type=int, default=getattr(config, 'SMALL_TEST_EPOCHS', 2), help="エポック数")
+    parser.add_argument("--steps_per_epoch", type=int, default=getattr(config, 'SMALL_TEST_STEPS_PER_EPOCH', 10), help="エポック毎のステップ数")
     parser.add_argument("--print_freq", type=int, default=5, help="ログ出力間隔")
     
     # パス設定
     parser.add_argument("--exp_name", type=str, default="lisa_gemma3_small_test", help="実験名")
     parser.add_argument("--deepspeed_config", type=str, default="ds_config_small_test.json", help="DeepSpeed設定ファイル")
+    parser.add_argument("--config_path", default=None, type=str, help="設定ファイルパス")
     
     # DeepSpeed必須引数
     parser.add_argument("--local_rank", type=int, default=0, help="DeepSpeed local rank")
@@ -77,8 +105,8 @@ def setup_model_and_tokenizer():
         gemma_model_id=config.GEMMA_MODEL_ID,
         sam_checkpoint_path=config.SAM_CHECKPOINT_PATH,
         seg_token_idx=gemma_processor.tokenizer.convert_tokens_to_ids(seg_token),
-        gemma_hidden_size=config.GEMMA_HIDDEN_SIZE,  # 設定ファイルから取得
-        sam_prompt_embed_dim=config.SEG_PROJECTION_DIM,  # 設定ファイルから取得
+        gemma_hidden_size=getattr(config, 'GEMMA_HIDDEN_SIZE', 2560),  # 設定ファイルから取得
+        sam_prompt_embed_dim=getattr(config, 'SEG_PROJECTION_DIM', 256),  # 設定ファイルから取得
     )
     
     # カスタムモデルの初期化
@@ -122,7 +150,7 @@ def create_dataset_and_dataloader(gemma_processor, args):
     dataset = HybridDataset(
         base_image_dir=config.DATASET_BASE_DIR,
         gemma_processor=gemma_processor,
-        samples_per_epoch=config.SMALL_TEST_SAMPLES_PER_EPOCH,  # 40サンプル
+        samples_per_epoch=getattr(config, 'SMALL_TEST_SAMPLES_PER_EPOCH', 40),  # 40サンプル
         dataset="reason_seg||vqa",  # 利用可能なデータセットのみ
         sample_rate=[1, 1],  # シンプルな比率
         reason_seg_data="ReasonSeg|train",
