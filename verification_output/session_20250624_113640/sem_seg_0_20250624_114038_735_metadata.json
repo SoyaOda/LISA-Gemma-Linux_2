@@ -1,0 +1,23 @@
+{
+  "dataset_name": "sem_seg",
+  "sample_idx": 0,
+  "session_timestamp": "20250624_113640",
+  "item_timestamp": "20250624_114038_735",
+  "original_image_path": "/mnt/h/download/LISA-dataset/dataset/coco/train2017/000000048682.jpg",
+  "conversations": [
+    "A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the human's questions.\n### Human: Where is the bicycle? Please segment it.\n### Assistant: Sure, [SEG].\n### ",
+    "A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the human's questions.\n### Human: Please provide a segmentation mask for the pavement.\n### Assistant: Sure, it is [SEG].\n### "
+  ],
+  "questions": [
+    "Where is the bicycle? Please segment it.",
+    "Please provide a segmentation mask for the pavement."
+  ],
+  "class_names": [
+    "bicycle",
+    "pavement"
+  ],
+  "comparison_image": "verification_output/session_20250624_113640/sem_seg_0_20250624_114038_735_comparison.png",
+  "processing_note": "Simple resize: mask resized to match processed image size",
+  "image_size": "640x427",
+  "mask_size": "640x427"
+}

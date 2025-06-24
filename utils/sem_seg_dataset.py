@@ -13,31 +13,13 @@ from pycocotools.coco import COCO
 from transformers import CLIPImageProcessor
 
 from model.segment_anything.utils.transforms import ResizeLongestSide
-
-from .constants import ANSWER_LIST, SHORT_QUESTION_LIST, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN, SYSTEM_PROMPT
+from . import conversation as conversation_lib
+from .constants import (ANSWER_LIST, DEFAULT_IMAGE_TOKEN, LONG_QUESTION_LIST, 
+                       SHORT_QUESTION_LIST, SAM_IMAGE_SIZE, SYSTEM_PROMPT)
 from .data_processing import get_mask_from_json
 
-# 簡単な会話クラス（LLaVA依存を削除）
-class SimpleConversation:
-    def __init__(self):
-        self.messages = []
-        self.roles = ["human", "gpt"]
-    
-    def copy(self):
-        new_conv = SimpleConversation()
-        new_conv.messages = self.messages.copy()
-        return new_conv
-    
-    def append_message(self, role, message):
-        self.messages.append([role, message])
-    
-    def get_prompt(self):
-        if len(self.messages) >= 2:
-            return f"<start_of_turn>user\n{self.messages[0][1]}<end_of_turn>\n<start_of_turn>model\n{self.messages[1][1]}<end_of_turn>\n"
-        return ""
-
 # デフォルト会話テンプレート
-default_conversation = SimpleConversation()
+default_conversation = conversation_lib.default_conversation
 
 
 def init_mapillary(base_image_dir):
@@ -82,7 +64,7 @@ def init_mapillary(base_image_dir):
         if len(valid_images) == 0:
             raise ValueError("Mapillaryデータセットの有効な画像がありません")
         
-        print(f"mapillary: {len(valid_images)} 有効画像")
+        print(f"mapillary: {len(valid_images)} サンプル")
         return mapillary_classes, valid_images, valid_labels
     except Exception as e:
         raise RuntimeError(f"Mapillary初期化に失敗しました: {e}") from e
@@ -137,7 +119,7 @@ def init_ade20k(base_image_dir):
         if len(valid_images) == 0:
             raise ValueError("ADE20Kデータセットの有効な画像がありません")
         
-        print(f"ade20k: {len(valid_images)} 有効画像")
+        print(f"ade20k: {len(valid_images)} サンプル")
         return ade20k_classes, valid_images, valid_labels
     except Exception as e:
         raise RuntimeError(f"ADE20K初期化に失敗しました: {e}") from e
@@ -176,7 +158,7 @@ def init_cocostuff(base_image_dir):
         if len(valid_images) == 0:
             raise ValueError("COCOStuffデータセットの有効な画像がありません")
         
-        print(f"cocostuff: {len(valid_images)} 有効画像")
+        print(f"cocostuff: {len(valid_images)} サンプル")
         return cocostuff_classes, valid_images, valid_labels
     except Exception as e:
         raise RuntimeError(f"COCOStuff初期化に失敗しました: {e}") from e
@@ -212,7 +194,7 @@ def init_paco_lvis(base_image_dir):
         if len(class_map_paco_lvis) == 0:
             raise ValueError("PACO LVISデータセットに有効なクラスがありません")
         
-        print(f"paco_lvis: {len(img_ids)} 画像")
+        print(f"paco_lvis: {len(img_ids)} サンプル")
         return class_map_paco_lvis, img_ids, coco_api_paco_lvis
     except Exception as e:
         raise RuntimeError(f"PACO LVIS初期化に失敗しました: {e}") from e
@@ -259,7 +241,7 @@ def init_pascal_part(base_image_dir):
         if len(valid_img_ids) == 0:
             raise ValueError("Pascal Partデータセットに有効なセグメンテーションアノテーションがありません")
         
-        print(f"pascal_part: {len(valid_img_ids)} 有効画像 / {len(img_ids)} 総画像")
+        print(f"pascal_part: {len(valid_img_ids)} サンプル")
         return class_map_pascal_part, valid_img_ids, coco_api_pascal_part
         
     except Exception as e:
@@ -276,30 +258,26 @@ class SemSegDataset(torch.utils.data.Dataset):
         self,
         base_image_dir,
         tokenizer,
-        model_name=None,  # Gemma3モデル名（未使用だが互換性のため）
+        vision_tower=None,  # Original-LISA互換性のため
         samples_per_epoch=500 * 8 * 2 * 10,
         precision: str = "fp32",
         image_size: int = 224,
         num_classes_per_sample: int = 3,
         exclude_val=False,
         sem_seg_data="ade20k||cocostuff||mapillary||pascal_part||paco_lvis",
-        processor=None,  # 親クラスから渡されるプロセッサ（未使用だが互換性のため）
-        image_processor=None,  # 親クラスから渡される画像プロセッサ（未使用だが互換性のため）
     ):
         """初期化
         
         Args:
             base_image_dir: ベースとなる画像ディレクトリ
             tokenizer: トークナイザ
-            model_name: Gemma3モデル名（互換性のため）
+            vision_tower: Original-LISA互換性のため
             samples_per_epoch: エポックあたりのサンプル数
             precision: 精度
             image_size: 画像サイズ
             num_classes_per_sample: サンプルあたりのクラス数
             exclude_val: 検証データを除外するか
             sem_seg_data: セマンティックセグメンテーションデータ
-            processor: 親クラスから渡されるプロセッサ（互換性のため）
-            image_processor: 親クラスから渡される画像プロセッサ（互換性のため）
         """
         self.exclude_val = exclude_val
         self.samples_per_epoch = samples_per_epoch
@@ -397,7 +375,7 @@ class SemSegDataset(torch.utils.data.Dataset):
         img_ids, coco_api = self.data2list[ds]
         
         if len(img_ids) == 0:
-            raise RuntimeError(f"{ds}にデータがありません")
+            return self.__getitem__(0)
             
         idx = random.randint(0, len(img_ids) - 1)
         img_id = img_ids[idx]
@@ -409,20 +387,9 @@ class SemSegDataset(torch.utils.data.Dataset):
         else:  # paco_lvis
             image_path = os.path.join(self.base_image_dir, "coco", file_name)
 
-        if not os.path.exists(image_path):
-            print(f"画像が見つかりません: {image_path}")
-            return self.__getitem__(0)
-
-        # 画像の読み込み
-        try:
-            image = cv2.imread(image_path)
-            if image is None:
-                print(f"画像の読み込みに失敗: {image_path}")
-                return self.__getitem__(0)
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        except Exception as e:
-            print(f"画像処理エラー: {e}")
-            return self.__getitem__(0)
+        # 画像の読み込み（オリジナルのようにエラーチェック最小限）
+        image = cv2.imread(image_path)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
         # デュアルエンコーダ対応: Gemma用とSAM用の画像前処理
         # Gemma用画像前処理（896x896）
@@ -439,12 +406,11 @@ class SemSegDataset(torch.utils.data.Dataset):
         anns = coco_api.loadAnns(ann_ids)
         
         if len(anns) == 0:
-            print(f"アノテーションが見つかりません: {img_id}")
             return self.__getitem__(0)
 
         # クラスとマスクの選択
         if len(anns) >= self.num_classes_per_sample:
-            sampled_anns = np.random.choice(anns, size=self.num_classes_per_sample, replace=False)
+            sampled_anns = np.random.choice(anns, size=self.num_classes_per_sample, replace=False).tolist()
         else:
             sampled_anns = anns
 
@@ -466,8 +432,8 @@ class SemSegDataset(torch.utils.data.Dataset):
                     name = str(class_name)
                 sampled_classes.append(name)
             except Exception as e:
-                print(f"マスク作成エラー: {e}")
-                continue
+                # オリジナルと同様に単純な再帰呼び出し
+                return self.__getitem__(0)
 
         if len(masks) == 0:
             return self.__getitem__(0)
@@ -475,9 +441,14 @@ class SemSegDataset(torch.utils.data.Dataset):
         # 会話形式の生成（オリジナルLISA準拠）
         questions = []
         answers = []
-        for sampled_cls in sampled_classes:
+        for i, sampled_cls in enumerate(sampled_classes):
             question_template = random.choice(self.short_question_list)
-            questions.append(question_template.format(class_name=sampled_cls.lower()))
+            # 最初の質問にのみ画像トークンを含める
+            if i == 0 and DEFAULT_IMAGE_TOKEN not in question_template:
+                question = DEFAULT_IMAGE_TOKEN + "\n" + question_template.format(class_name=sampled_cls.lower())
+            else:
+                question = question_template.format(class_name=sampled_cls.lower())
+            questions.append(question)
             answers.append(random.choice(self.answer_list))
 
         conversations = []
@@ -515,30 +486,15 @@ class SemSegDataset(torch.utils.data.Dataset):
         classes = self.data2classes[ds]
         
         if len(images) == 0:
-            raise RuntimeError(f"{ds}にデータがありません")
+            return self.__getitem__(0)
             
         idx = random.randint(0, len(images) - 1)
         image_path = images[idx]
         label_path = labels[idx]
 
-        if not os.path.exists(image_path):
-            print(f"画像が見つかりません: {image_path}")
-            return self.__getitem__(0)
-            
-        if not os.path.exists(label_path):
-            print(f"ラベルが見つかりません: {label_path}")
-            return self.__getitem__(0)
-
-        # 画像の読み込み
-        try:
-            image = cv2.imread(image_path)
-            if image is None:
-                print(f"画像の読み込みに失敗: {image_path}")
-                return self.__getitem__(0)
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        except Exception as e:
-            print(f"画像処理エラー: {e}")
-            return self.__getitem__(0)
+        # 画像の読み込み（オリジナルのようにエラーチェック最小限）
+        image = cv2.imread(image_path)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
         # デュアルエンコーダ対応: Gemma用とSAM用の画像前処理
         # Gemma用画像前処理（896x896）
@@ -551,12 +507,8 @@ class SemSegDataset(torch.utils.data.Dataset):
         resize = image.shape[:2]
 
         # ラベルの読み込み
-        try:
-            label = Image.open(label_path)
-            label = np.array(label)
-        except Exception as e:
-            print(f"ラベル読み込みエラー: {e}")
-            return self.__getitem__(0)
+        label = Image.open(label_path)
+        label = np.array(label)
 
         # データセット固有の前処理（オリジナルLISA準拠）
         if ds == "ade20k":
@@ -585,18 +537,10 @@ class SemSegDataset(torch.utils.data.Dataset):
         # 会話形式の生成（オリジナルLISA準拠）
         questions = []
         answers = []
-        class_ids = []
         for sampled_cls in sampled_classes:
             question_template = random.choice(self.short_question_list)
             questions.append(question_template.format(class_name=sampled_cls.lower()))
             answers.append(random.choice(self.answer_list))
-            
-            # クラスIDの取得
-            try:
-                class_id = classes.tolist().index(sampled_cls)
-                class_ids.append(class_id)
-            except ValueError:
-                continue
 
         conversations = []
         conv = default_conversation.copy()
@@ -612,8 +556,26 @@ class SemSegDataset(torch.utils.data.Dataset):
         # マスクの作成
         label_tensor = torch.from_numpy(label).long()
         masks = []
+        class_ids = []
+        
+        # クラス名からIDを取得
+        for sampled_cls in sampled_classes:
+            try:
+                if isinstance(classes, np.ndarray):
+                    class_id = np.where(classes == sampled_cls)[0]
+                    if len(class_id) > 0:
+                        class_ids.append(class_id[0])
+                else:
+                    class_id = classes.index(sampled_cls)
+                    class_ids.append(class_id)
+            except (ValueError, IndexError):
+                # クラスが見つからない場合はスキップ
+                continue
+        
+        # マスクを作成
         for class_id in class_ids:
-            masks.append(label_tensor == class_id)
+            mask = (label_tensor == class_id).float()
+            masks.append(mask)
         
         if len(masks) == 0:
             return self.__getitem__(0)

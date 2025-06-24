@@ -1,0 +1,13 @@
+{
+  "session_info": {
+    "session_timestamp": "20250624_112821",
+    "start_time": "20250624_112821",
+    "end_time": "20250624_113226",
+    "datasets_verified": [
+      "sem_seg"
+    ],
+    "samples_per_dataset": 1,
+    "config_used": "unknown"
+  },
+  "verification_results": "See individual metadata files for detailed results"
+}

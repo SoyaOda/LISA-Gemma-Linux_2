@@ -1,0 +1,26 @@
+{
+  "dataset_name": "reason_seg",
+  "sample_idx": 0,
+  "session_timestamp": "20250624_114924",
+  "item_timestamp": "20250624_115520_314",
+  "original_image_path": "/mnt/h/download/LISA-dataset/dataset/reason_seg/ReasonSeg/train/18019619695_8676c6bb1c_o.jpg",
+  "conversations": [
+    "<start_of_turn>user: Please segment the area that matches: On a hot, sunny day, which item in the picture could be utilized for providing shade and protecting the face)?<start_of_turn>model: It is [SEG].<end_of_turn>",
+    "<start_of_turn>user: Please segment the area that matches: In a hot sunny day, what in the picture can be used to provide shade and protect the face from direct sunlight?<start_of_turn>model: Sure, the segmentation result is [SEG].<end_of_turn>",
+    "<start_of_turn>user: Can you segment the region described as: On a hot and sunny day, what specific item in the picture might be utilized for shading and protection from direct sunlight to the face??<start_of_turn>model: Sure, the segmentation result is [SEG].<end_of_turn>"
+  ],
+  "questions": [
+    "Please segment the area that matches: On a hot, sunny day, which item in the picture could be utilized for providing shade and protecting the face)?",
+    "Please segment the area that matches: In a hot sunny day, what in the picture can be used to provide shade and protect the face from direct sunlight?",
+    "Can you segment the region described as: On a hot and sunny day, what specific item in the picture might be utilized for shading and protection from direct sunlight to the face??"
+  ],
+  "class_names": [
+    "On a hot, sunny day, which item in the picture could be utilized for providing shade and protecting the face)?",
+    "In a hot sunny day, what in the picture can be used to provide shade and protect the face from direct sunlight?",
+    "On a hot and sunny day, what specific item in the picture might be utilized for shading and protection from direct sunlight to the face?"
+  ],
+  "comparison_image": "verification_output/session_20250624_114924/reason_seg_0_20250624_115520_314_comparison.png",
+  "processing_note": "Simple resize: mask resized to match processed image size",
+  "image_size": "5760x3840",
+  "mask_size": "5760x3840"
+}

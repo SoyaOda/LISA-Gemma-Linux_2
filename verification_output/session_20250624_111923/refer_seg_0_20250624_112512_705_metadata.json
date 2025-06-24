@@ -1,0 +1,27 @@
+{
+  "dataset_name": "refer_seg",
+  "sample_idx": 0,
+  "session_timestamp": "20250624_111923",
+  "item_timestamp": "20250624_112512_705",
+  "original_image_path": "/mnt/h/download/LISA-dataset/dataset/refer_seg/images/mscoco/images/train2014/COCO_train2014_000000348966.jpg",
+  "conversations": [
+    "A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the human's questions.\n### Human: Can you identify and segment the closest drink?\n### Assistant: It is [SEG].\n### ",
+    "A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the human's questions.\n### Human: Please provide a segmentation mask for the pinkish drink.\n### Assistant: [SEG].\n### ",
+    "A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the human's questions.\n### Human: Please segment the red drink.\n### Assistant: It is [SEG].\n### "
+  ],
+  "questions": [
+    "Can you identify and segment the closest drink?",
+    "Please provide a segmentation mask for the pinkish drink.",
+    "Please segment the red drink."
+  ],
+  "class_names": [
+    "closest drink",
+    "pinkish drink",
+    "red drink"
+  ],
+  "comparison_image": "verification_output/session_20250624_111923/refer_seg_0_20250624_112512_705_comparison.png",
+  "processing_note": "SAM postprocess_masks simulation: 1024x1024 → input_size → original_size",
+  "image_size": "1024x1024",
+  "mask_size": "427x640",
+  "input_size": "1024x1024"
+}

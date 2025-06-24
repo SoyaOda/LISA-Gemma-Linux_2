@@ -1,0 +1,20 @@
+{
+  "dataset_name": "vqa",
+  "sample_idx": 0,
+  "session_timestamp": "20250624_114103",
+  "item_timestamp": "20250624_114732_898",
+  "original_image_path": "/mnt/h/download/LISA-dataset/dataset/coco/train2017/000000069308.jpg",
+  "conversations": [
+    "A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the human's questions.\n### Human: <image>\nWhat might be the purpose of the woman holding hot dogs in the cafeteria?\n### Assistant: The purpose of the woman holding hot dogs in the cafeteria could be that she is sharing or serving the hot dogs with her friends or colleagues. Alternatively, she could be enjoying a meal with multiple hot dogs for herself. Since she is in a cafeteria, which is a social setting, it is likely that she is participating in a social activity, like lunch or dinner with others. Holding two hot dogs suggests that either she shares them with someone or has a preference for eating more than the average person.\n### "
+  ],
+  "questions": [
+    "A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the human's questions.\n### Human: <image>\nWhat might be the purpose of the woman holding hot dogs in the cafeteria?\n### Assistant: The purpose of the woman holding hot dogs in the cafeteria could be that she is sharing or serving the hot dogs with her friends or colleagues. Alternatively, she could be enjoying a meal with multiple hot dogs for herself. Since she is in a cafeteria, which is a social setting, it is likely that she is participating in a social activity, like lunch or dinner with others. Holding two hot dogs suggests that either she shares them with someone or has a preference for eating more than the average person.\n### "
+  ],
+  "class_names": [
+    "A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the human's questions.\n### Human: <image>\nWhat might be the purpose of the woman holding hot dogs in the cafeteria?\n### Assistant: The purpose of the woman holding hot dogs in the cafeteria could be that she is sharing or serving the hot dogs with her friends or colleagues. Alternatively, she could be enjoying a meal with multiple hot dogs for herself. Since she is in a cafeteria, which is a social setting, it is likely that she is participating in a social activity, like lunch or dinner with others. Holding two hot dogs suggests that either she shares them with someone or has a preference for eating more than the average person.\n### "
+  ],
+  "comparison_image": "verification_output/session_20250624_114103/vqa_0_20250624_114732_898_comparison.png",
+  "processing_note": "Simple resize: mask resized to match processed image size",
+  "image_size": "640x480",
+  "mask_size": "None"
+}

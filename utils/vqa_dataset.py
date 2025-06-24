@@ -7,13 +7,11 @@ import torch
 import torch.nn.functional as F
 from PIL import Image
 
-from .constants import (
-    DEFAULT_IMAGE_TOKEN,
-    SAM_PIXEL_MEAN,
-    SAM_PIXEL_STD,
-    SAM_IMAGE_SIZE,
-    DEFAULT_IGNORE_LABEL
-)
+from model.segment_anything.utils.transforms import ResizeLongestSide
+from . import conversation as conversation_lib
+from .constants import (ANSWER_LIST, DEFAULT_IMAGE_TOKEN, LONG_QUESTION_LIST, 
+                       SHORT_QUESTION_LIST, SAM_IMAGE_SIZE, SAM_PIXEL_MEAN, 
+                       SAM_PIXEL_STD, DEFAULT_IGNORE_LABEL)
 
 # 簡単な会話クラス（LLaVAの代替）
 class SimpleConversation:
@@ -70,7 +68,7 @@ class VQADataset(torch.utils.data.Dataset):
         self,
         base_image_dir,
         tokenizer,
-        vision_tower=None,  # Gemma-3では使用しない
+        vision_tower=None,  # Original-LISA互換性のため
         samples_per_epoch=500 * 8 * 2 * 10,
         precision: str = "bf16",
         image_size: int = SAM_IMAGE_SIZE,
@@ -142,24 +140,22 @@ class VQADataset(torch.utils.data.Dataset):
         item = self.vqa_data[idx]
         image_path = os.path.join(self.vqa_image_root, item["image"])
         
-        # 画像が存在しない場合はダミーデータを返す
-        if not os.path.exists(image_path):
-            return (
-                f"missing_{idx}",
-                Image.new('RGB', (224, 224), color='gray'),
-                "This image is missing.",
-                torch.zeros(1, 224, 224),
-                torch.tensor(0)
-            )
-        
+        # オリジナルのようにエラーチェックなしで直接読み込み
         image = cv2.imread(image_path)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         ori_size = image.shape[:2]
 
-        # PIL Imageに変換（Gemma-3用）
-        pil_image = Image.fromarray(image)
+        # デュアルエンコーダ対応: Gemma用とSAM用の画像前処理
+        # Gemma用画像前処理（896x896）
+        image_for_gemma = cv2.resize(image, (896, 896))
+        image_for_gemma = torch.from_numpy(image_for_gemma).permute(2, 0, 1).float() / 255.0
+        
+        # SAM用画像前処理（1024x1024）
+        image_for_sam = cv2.resize(image, (self.img_size, self.img_size))
+        image_for_sam = torch.from_numpy(image_for_sam).permute(2, 0, 1).float() / 255.0
+        image_for_sam = self.preprocess(image_for_sam)
 
-        conv = default_conversation.copy()
+        conv = conversation_lib.default_conversation.copy()
         source = item["conversations"]
         source = preprocess_multimodal(source, mm_use_im_start_end=False)
         
@@ -176,20 +172,23 @@ class VQADataset(torch.utils.data.Dataset):
             conv.append_message(role, sentence["value"])
         conversations.append(conv.get_prompt())
 
-        # VQAデータセットではマスクは不要
-        masks = torch.zeros(1, *ori_size)
+        # VQAデータセットではマスクは不要（オリジナル準拠）
+        masks = torch.rand(0, *ori_size)  # オリジナルと同じくtorch.rand(0, ...)
         label = torch.ones(ori_size) * self.ignore_label
 
-        # Gemma-3用の形式で返す
-        if len(conversations) > 0:
-            text_prompt = conversations[0]
-        else:
-            text_prompt = "Describe this image."
+        # 質問と回答の抽出（Original-LISA-Code準拠）
+        questions = conversations  # オリジナルと同様
+        sampled_classes = conversations  # オリジナルと同様
 
+        # オリジナルLISA準拠の返り値形式（9要素）
         return (
-            image_path,
-            pil_image,  # PIL Image形式で返す
-            text_prompt,
-            masks,
-            label,
+            image_path,        # 0: 画像パス
+            image_for_sam,     # 1: SAM用前処理済み画像 (torch.Tensor)
+            image_for_gemma,   # 2: Gemma用前処理済み画像 (torch.Tensor)
+            conversations,     # 3: 会話形式のテキスト (List[str])
+            masks,             # 4: マスク (torch.Tensor)
+            label,             # 5: ラベル (torch.Tensor)
+            ori_size,          # 6: リサイズ情報 (Tuple)
+            questions,         # 7: 質問リスト (List[str])
+            sampled_classes    # 8: クラス名リスト (List[str])
         )

@@ -16,6 +16,7 @@ class SeparatorStyle(Enum):
     BAIZE = auto()
     DOLLY = auto()
     RWKV = auto()
+    GEMMA3 = auto()
 
 
 @dataclasses.dataclass
@@ -102,6 +103,14 @@ class Conversation:
                     ret += "\n\n"
                 else:
                     ret += role + ":"
+            return ret
+        elif self.sep_style == SeparatorStyle.GEMMA3:
+            ret = self.system
+            for i, (role, message) in enumerate(self.messages):
+                if message:
+                    ret += f"<start_of_turn>{role}\n{message}<end_of_turn>\n"
+                else:
+                    ret += f"<start_of_turn>{role}\n"
             return ret
         else:
             raise ValueError(f"Invalid style: {self.sep_style}")
@@ -268,6 +277,18 @@ conv_rwkv = Conversation(
     stop_str="\n\n",
 )
 
+# Gemma-3 default template
+conv_gemma3 = Conversation(
+    system="",
+    roles=("user", "model"),
+    messages=(),
+    offset=0,
+    sep_style=SeparatorStyle.GEMMA3,
+    sep="<start_of_turn>",
+    sep2="<end_of_turn>",
+    stop_str="<end_of_turn>",
+)
+
 conv_templates = {
     "baize": conv_baize,
     "conv_one_shot": conv_one_shot,
@@ -277,12 +298,15 @@ conv_templates = {
     "stablelm": conv_stablelm,
     "vicuna_v1.1": conv_vicuna_v1_1,
     "rwkv": conv_rwkv,
+    "gemma3": conv_gemma3,
 }
 
 
 def get_default_conv_template(model_name):
     model_name = model_name.lower()
-    if "vicuna" in model_name or "output" in model_name:
+    if "gemma" in model_name or "gemma-3" in model_name:
+        return conv_gemma3
+    elif "vicuna" in model_name or "output" in model_name:
         return conv_vicuna_v1_1
     elif "koala" in model_name:
         return conv_koala_v1
@@ -306,3 +330,6 @@ if __name__ == "__main__":
     conv.append_message(conv.roles[0], "How are you?")
     conv.append_message(conv.roles[1], None)
     print(conv.get_prompt())
+
+# デフォルト会話テンプレート（LISA互換）
+default_conversation = conv_gemma3

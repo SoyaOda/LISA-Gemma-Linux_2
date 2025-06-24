@@ -1,0 +1,26 @@
+{
+  "dataset_name": "refer_seg",
+  "sample_idx": 0,
+  "session_timestamp": "20250624_120516",
+  "item_timestamp": "20250624_121101_161",
+  "original_image_path": "/mnt/h/download/LISA-dataset/dataset/refer_seg/images/mscoco/images/train2014/COCO_train2014_000000304000.jpg",
+  "conversations": [
+    "<start_of_turn>user\nPlease segment the zebra in back.<end_of_turn>\n<start_of_turn>model\nSure, [SEG].<end_of_turn>\n",
+    "<start_of_turn>user\nCan you identify and segment the zebra facing us with most of body?<end_of_turn>\n<start_of_turn>model\n[SEG].<end_of_turn>\n",
+    "<start_of_turn>user\nWhere is the back zebra? Please segment it.<end_of_turn>\n<start_of_turn>model\n[SEG].<end_of_turn>\n"
+  ],
+  "questions": [
+    "Please segment the zebra in back.",
+    "Can you identify and segment the zebra facing us with most of body?",
+    "Where is the back zebra? Please segment it."
+  ],
+  "class_names": [
+    "zebra in back",
+    "zebra facing us with most of body",
+    "back zebra"
+  ],
+  "comparison_image": "verification_output/session_20250624_120516/refer_seg_0_20250624_121101_161_comparison.png",
+  "processing_note": "Simple resize: mask resized to match processed image size",
+  "image_size": "500x333",
+  "mask_size": "500x333"
+}

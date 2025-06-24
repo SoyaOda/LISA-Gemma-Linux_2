@@ -1,0 +1,21 @@
+{
+  "dataset_name": "vqa",
+  "sample_idx": 0,
+  "session_timestamp": "20250624_111923",
+  "item_timestamp": "20250624_112515_413",
+  "original_image_path": "/mnt/h/download/LISA-dataset/dataset/coco/train2017/000000054692.jpg",
+  "conversations": [
+    "A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the human's questions.\n### Human: <image>\nWhat are the key elements in this picture?\n### Assistant: The image depicts a man standing in a kitchen, cooking dinner over a stove top oven. He appears to be focused on the dish he is preparing. The kitchen is equipped with a sink, located near the edge of one counter, and an oven in the middle of another counter. There is a bowl placed on the counter next to the oven.\n\nAdditionally, next to the man is a dining table, beautifully decorated with various items. There is a clear vase filled with pink flowers at the center, making it an attractive focal point. Two wine glasses can be seen on the table, as well as a couple of cups placed nearby. \n\nThe room also features several chairs, one towards the front and another on the right side of the frame. On the countertop, there are a few bottles, three knives, and another wine glass. The overall scene presents a lovely and inviting atmosphere for a home-cooked meal.\n### "
+  ],
+  "questions": [
+    "A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the human's questions.\n### Human: <image>\nWhat are the key elements in this picture?\n### Assistant: The image depicts a man standing in a kitchen, cooking dinner over a stove top oven. He appears to be focused on the dish he is preparing. The kitchen is equipped with a sink, located near the edge of one counter, and an oven in the middle of another counter. There is a bowl placed on the counter next to the oven.\n\nAdditionally, next to the man is a dining table, beautifully decorated with various items. There is a clear vase filled with pink flowers at the center, making it an attractive focal point. Two wine glasses can be seen on the table, as well as a couple of cups placed nearby. \n\nThe room also features several chairs, one towards the front and another on the right side of the frame. On the countertop, there are a few bottles, three knives, and another wine glass. The overall scene presents a lovely and inviting atmosphere for a home-cooked meal.\n### "
+  ],
+  "class_names": [
+    "A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the human's questions.\n### Human: <image>\nWhat are the key elements in this picture?\n### Assistant: The image depicts a man standing in a kitchen, cooking dinner over a stove top oven. He appears to be focused on the dish he is preparing. The kitchen is equipped with a sink, located near the edge of one counter, and an oven in the middle of another counter. There is a bowl placed on the counter next to the oven.\n\nAdditionally, next to the man is a dining table, beautifully decorated with various items. There is a clear vase filled with pink flowers at the center, making it an attractive focal point. Two wine glasses can be seen on the table, as well as a couple of cups placed nearby. \n\nThe room also features several chairs, one towards the front and another on the right side of the frame. On the countertop, there are a few bottles, three knives, and another wine glass. The overall scene presents a lovely and inviting atmosphere for a home-cooked meal.\n### "
+  ],
+  "comparison_image": "verification_output/session_20250624_111923/vqa_0_20250624_112515_413_comparison.png",
+  "processing_note": "SAM postprocess_masks simulation: 1024x1024 → input_size → original_size",
+  "image_size": "1024x1024",
+  "mask_size": "None",
+  "input_size": "1024x1024"
+}

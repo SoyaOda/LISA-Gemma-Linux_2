@@ -1,0 +1,26 @@
+{
+  "dataset_name": "sem_seg",
+  "sample_idx": 0,
+  "session_timestamp": "20250624_112821",
+  "item_timestamp": "20250624_113226_217",
+  "original_image_path": "/mnt/h/download/LISA-dataset/dataset/coco/train2017/000000373904.jpg",
+  "conversations": [
+    "A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the human's questions.\n### Human: Where is the river? Please segment it.\n### Assistant: Sure, [SEG].\n### ",
+    "A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the human's questions.\n### Human: Where is the cage? Please segment it.\n### Assistant: It is [SEG].\n### ",
+    "A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the human's questions.\n### Human: Can you segment the bird in this image?\n### Assistant: Sure, [SEG].\n### "
+  ],
+  "questions": [
+    "Where is the river? Please segment it.",
+    "Where is the cage? Please segment it.",
+    "Can you segment the bird in this image?"
+  ],
+  "class_names": [
+    "river",
+    "cage",
+    "bird"
+  ],
+  "comparison_image": "verification_output/session_20250624_112821/sem_seg_0_20250624_113226_217_comparison.png",
+  "processing_note": "Simple resize: mask resized to match processed image size",
+  "image_size": "1024x1024",
+  "mask_size": "1024x1024"
+}

@@ -1,0 +1,26 @@
+{
+  "dataset_name": "reason_seg",
+  "sample_idx": 0,
+  "session_timestamp": "20250624_124659",
+  "item_timestamp": "20250624_125314_511",
+  "original_image_path": "/mnt/h/download/LISA-dataset/dataset/reason_seg/ReasonSeg/train/4399974706_c4f4a05ab1_o.jpg",
+  "conversations": [
+    "<start_of_turn>user\n<image>\nIn ice hockey, players need to use a specific item to control and move the puck around the ice. What object in the picture could the player be holding to accomplish this?<end_of_turn>\n<start_of_turn>model\nIn the image, the player is holding a hockey stick, which is an essential piece of equipment in ice hockey. The stick is used to control and move the puck around the ice, as well as to perform various moves and shots during the game. The player is bending over and appears to be touching his gloved hands to the ice, possibly after making a save or preparing for a play.<end_of_turn>\n",
+    "<start_of_turn>user\n<image>\nWhat item in the picture could a player be holding to control and move the puck during an ice hockey match?<end_of_turn>\n<start_of_turn>model\nIn the image, the player is holding a hockey stick, which is an essential piece of equipment in ice hockey. The stick is used to control and move the puck around the ice, as well as to perform various moves and shots during the game. The player is bending over and appears to be touching his gloved hands to the ice, possibly after making a save or preparing for a play.<end_of_turn>\n",
+    "<start_of_turn>user\n<image>\nWhat object from the scene could an ice hockey player be holding to maneuver and move the puck around the ice?<end_of_turn>\n<start_of_turn>model\nIn the image, the player is holding a hockey stick, which is an essential piece of equipment in ice hockey. The stick is used to control and move the puck around the ice, as well as to perform various moves and shots during the game. The player is bending over and appears to be touching his gloved hands to the ice, possibly after making a save or preparing for a play.<end_of_turn>\n"
+  ],
+  "questions": [
+    "<image>\nIn ice hockey, players need to use a specific item to control and move the puck around the ice. What object in the picture could the player be holding to accomplish this?",
+    "<image>\nWhat item in the picture could a player be holding to control and move the puck during an ice hockey match?",
+    "<image>\nWhat object from the scene could an ice hockey player be holding to maneuver and move the puck around the ice?"
+  ],
+  "class_names": [
+    "In ice hockey, players need to use a specific item to control and move the puck around the ice. What object in the picture could the player be holding to accomplish this?",
+    "What item in the picture could a player be holding to control and move the puck during an ice hockey match?",
+    "What object from the scene could an ice hockey player be holding to maneuver and move the puck around the ice?"
+  ],
+  "comparison_image": "verification_output/session_20250624_124659/reason_seg_0_20250624_125314_511_comparison.png",
+  "processing_note": "Simple resize: mask resized to match processed image size",
+  "image_size": "1280x1920",
+  "mask_size": "1280x1920"
+}

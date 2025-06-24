@@ -1,0 +1,26 @@
+{
+  "dataset_name": "refer_seg",
+  "sample_idx": 0,
+  "session_timestamp": "20250624_124659",
+  "item_timestamp": "20250624_125310_980",
+  "original_image_path": "/mnt/h/download/LISA-dataset/dataset/refer_seg/images/saiapr_tc-12/12/images/12602.jpg",
+  "conversations": [
+    "<start_of_turn>user\n<image>\nPlease segment the house.<end_of_turn>\n<start_of_turn>model\n[SEG].<end_of_turn>\n",
+    "<start_of_turn>user\nPlease segment the the fence.<end_of_turn>\n<start_of_turn>model\n[SEG].<end_of_turn>\n",
+    "<start_of_turn>user\nCan you identify and segment the greenest tree left?<end_of_turn>\n<start_of_turn>model\nIt is [SEG].<end_of_turn>\n"
+  ],
+  "questions": [
+    "<image>\nPlease segment the house.",
+    "Please segment the the fence.",
+    "Can you identify and segment the greenest tree left?"
+  ],
+  "class_names": [
+    "house",
+    "the fence",
+    "greenest tree left"
+  ],
+  "comparison_image": "verification_output/session_20250624_124659/refer_seg_0_20250624_125310_980_comparison.png",
+  "processing_note": "Simple resize: mask resized to match processed image size",
+  "image_size": "480x360",
+  "mask_size": "480x360"
+}

@@ -1,0 +1,26 @@
+{
+  "dataset_name": "sem_seg",
+  "sample_idx": 0,
+  "session_timestamp": "20250624_120516",
+  "item_timestamp": "20250624_120911_462",
+  "original_image_path": "/mnt/h/download/LISA-dataset/dataset/vlpart/pascal_part/VOCdevkit/VOC2010/JPEGImages/2008_003985.jpg",
+  "conversations": [
+    "<start_of_turn>user\nPlease provide a segmentation mask for the the part of the person:ear.<end_of_turn>\n<start_of_turn>model\nSure, the segmentation result is [SEG].<end_of_turn>\n",
+    "<start_of_turn>user\nWhere is the the part of the person:ear? Please segment it.<end_of_turn>\n<start_of_turn>model\nSure, it is [SEG].<end_of_turn>\n",
+    "<start_of_turn>user\nPlease provide a segmentation mask for the the part of the person:neck.<end_of_turn>\n<start_of_turn>model\nSure, it is [SEG].<end_of_turn>\n"
+  ],
+  "questions": [
+    "Please provide a segmentation mask for the the part of the person:ear.",
+    "Where is the the part of the person:ear? Please segment it.",
+    "Please provide a segmentation mask for the the part of the person:neck."
+  ],
+  "class_names": [
+    "the part of the person:ear",
+    "the part of the person:ear",
+    "the part of the person:neck"
+  ],
+  "comparison_image": "verification_output/session_20250624_120516/sem_seg_0_20250624_120911_462_comparison.png",
+  "processing_note": "Simple resize: mask resized to match processed image size",
+  "image_size": "500x375",
+  "mask_size": "500x375"
+}

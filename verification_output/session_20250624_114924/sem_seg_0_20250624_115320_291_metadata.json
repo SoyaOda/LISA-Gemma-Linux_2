@@ -1,0 +1,26 @@
+{
+  "dataset_name": "sem_seg",
+  "sample_idx": 0,
+  "session_timestamp": "20250624_114924",
+  "item_timestamp": "20250624_115320_291",
+  "original_image_path": "/mnt/h/download/LISA-dataset/dataset/mapillary/training/images/_u1p9yoSpfF6s7vp_QbbjA.jpg",
+  "conversations": [
+    "<start_of_turn>user: Can you segment the terrain in this image?<start_of_turn>model: Sure, the segmentation result is [SEG].<end_of_turn>",
+    "<start_of_turn>user: Where is the sky? Please segment it.<start_of_turn>model: It is [SEG].<end_of_turn>",
+    "<start_of_turn>user: Can you identify and segment the road?<start_of_turn>model: [SEG].<end_of_turn>"
+  ],
+  "questions": [
+    "Can you segment the terrain in this image?",
+    "Where is the sky? Please segment it.",
+    "Can you identify and segment the road?"
+  ],
+  "class_names": [
+    "terrain",
+    "sky",
+    "road"
+  ],
+  "comparison_image": "verification_output/session_20250624_114924/sem_seg_0_20250624_115320_291_comparison.png",
+  "processing_note": "Simple resize: mask resized to match processed image size",
+  "image_size": "4608x2592",
+  "mask_size": "4608x2592"
+}

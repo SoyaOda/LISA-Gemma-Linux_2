@@ -1,0 +1,20 @@
+{
+  "dataset_name": "vqa",
+  "sample_idx": 0,
+  "session_timestamp": "20250624_124659",
+  "item_timestamp": "20250624_125313_886",
+  "original_image_path": "/mnt/h/download/LISA-dataset/dataset/coco/train2017/000000417446.jpg",
+  "conversations": [
+    "<start_of_turn>user\n<image>\nExplain the visual content of the image in great detail.<end_of_turn>\n<start_of_turn>model\nThe image captures a woman and a little girl standing near a bicycle while watching boats go by underneath a bridge. The woman is on the left side, and the girl is on the right side, both of them concentrating on the passing boats. \n\nThere are multiple boats visible in various locations around the scene. One boat is beneath the bridge, and others can be seen further away in the water. \n\nAdditionally, the scene includes several small objects scattered around, such as a backpack, umbrella, handbag, apples, and an orange. There is also another person visible in the image, but they are situated further back and may not be interacting with the woman and the girl.<end_of_turn>\n"
+  ],
+  "questions": [
+    "<start_of_turn>user\n<image>\nExplain the visual content of the image in great detail.<end_of_turn>\n<start_of_turn>model\nThe image captures a woman and a little girl standing near a bicycle while watching boats go by underneath a bridge. The woman is on the left side, and the girl is on the right side, both of them concentrating on the passing boats. \n\nThere are multiple boats visible in various locations around the scene. One boat is beneath the bridge, and others can be seen further away in the water. \n\nAdditionally, the scene includes several small objects scattered around, such as a backpack, umbrella, handbag, apples, and an orange. There is also another person visible in the image, but they are situated further back and may not be interacting with the woman and the girl.<end_of_turn>\n"
+  ],
+  "class_names": [
+    "<start_of_turn>user\n<image>\nExplain the visual content of the image in great detail.<end_of_turn>\n<start_of_turn>model\nThe image captures a woman and a little girl standing near a bicycle while watching boats go by underneath a bridge. The woman is on the left side, and the girl is on the right side, both of them concentrating on the passing boats. \n\nThere are multiple boats visible in various locations around the scene. One boat is beneath the bridge, and others can be seen further away in the water. \n\nAdditionally, the scene includes several small objects scattered around, such as a backpack, umbrella, handbag, apples, and an orange. There is also another person visible in the image, but they are situated further back and may not be interacting with the woman and the girl.<end_of_turn>\n"
+  ],
+  "comparison_image": "verification_output/session_20250624_124659/vqa_0_20250624_125313_886_comparison.png",
+  "processing_note": "Simple resize: mask resized to match processed image size",
+  "image_size": "500x333",
+  "mask_size": "None"
+}

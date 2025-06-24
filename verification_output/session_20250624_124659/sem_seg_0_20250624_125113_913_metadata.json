@@ -1,0 +1,26 @@
+{
+  "dataset_name": "sem_seg",
+  "sample_idx": 0,
+  "session_timestamp": "20250624_124659",
+  "item_timestamp": "20250624_125113_913",
+  "original_image_path": "/mnt/h/download/LISA-dataset/dataset/coco/train2017/000000481828.jpg",
+  "conversations": [
+    "<start_of_turn>user\n<image>\nCan you segment the microwave_oven in this image?<end_of_turn>\n<start_of_turn>model\nSure, the segmentation result is [SEG].<end_of_turn>\n",
+    "<start_of_turn>user\nPlease segment the microwave_oven time_display.<end_of_turn>\n<start_of_turn>model\n[SEG].<end_of_turn>\n",
+    "<start_of_turn>user\nCan you segment the microwave_oven control_panel in this image?<end_of_turn>\n<start_of_turn>model\nSure, [SEG].<end_of_turn>\n"
+  ],
+  "questions": [
+    "<image>\nCan you segment the microwave_oven in this image?",
+    "Please segment the microwave_oven time_display.",
+    "Can you segment the microwave_oven control_panel in this image?"
+  ],
+  "class_names": [
+    "microwave_oven",
+    "microwave_oven time_display",
+    "microwave_oven control_panel"
+  ],
+  "comparison_image": "verification_output/session_20250624_124659/sem_seg_0_20250624_125113_913_comparison.png",
+  "processing_note": "Simple resize: mask resized to match processed image size",
+  "image_size": "427x640",
+  "mask_size": "427x640"
+}

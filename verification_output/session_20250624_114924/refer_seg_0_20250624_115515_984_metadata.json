@@ -1,0 +1,26 @@
+{
+  "dataset_name": "refer_seg",
+  "sample_idx": 0,
+  "session_timestamp": "20250624_114924",
+  "item_timestamp": "20250624_115515_984",
+  "original_image_path": "/mnt/h/download/LISA-dataset/dataset/refer_seg/images/mscoco/images/train2014/COCO_train2014_000000339816.jpg",
+  "conversations": [
+    "<start_of_turn>user: Please segment the 600.<start_of_turn>model: It is [SEG].<end_of_turn>",
+    "<start_of_turn>user: Can you segment the bunch thats totally surrounded in this image?<start_of_turn>model: It is [SEG].<end_of_turn>",
+    "<start_of_turn>user: Please segment the middle bunch.<start_of_turn>model: Sure, the segmentation result is [SEG].<end_of_turn>"
+  ],
+  "questions": [
+    "Please segment the 600.",
+    "Can you segment the bunch thats totally surrounded in this image?",
+    "Please segment the middle bunch."
+  ],
+  "class_names": [
+    "600",
+    "bunch thats totally surrounded",
+    "middle bunch"
+  ],
+  "comparison_image": "verification_output/session_20250624_114924/refer_seg_0_20250624_115515_984_comparison.png",
+  "processing_note": "Simple resize: mask resized to match processed image size",
+  "image_size": "640x479",
+  "mask_size": "640x479"
+}

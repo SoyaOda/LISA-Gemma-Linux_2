@@ -9,8 +9,14 @@ DEFAULT_IM_END_TOKEN = "<im_end>"
 DEFAULT_SEG_TOKEN = "<SEG>"
 
 # Gemma-3の特別なトークン
-GEMMA_IMAGE_TOKEN = "<start_of_image>"
-GEMMA_END_TOKEN = "<end_of_image>"
+GEMMA_IMAGE_TOKEN = "<image>"  # Gemma-3の公式画像トークン
+GEMMA_IMAGE_TOKEN_NUM = 256  # 画像は256トークンにエンコード
+
+# Gemma-3のチャットテンプレート用トークン
+GEMMA_START_OF_TURN = "<start_of_turn>"
+GEMMA_END_OF_TURN = "<end_of_turn>"
+GEMMA_BOS_TOKEN = "<bos>"
+GEMMA_EOS_TOKEN = "<eos>"
 
 # 無視すべきインデックス
 IGNORE_INDEX = -100
@@ -20,6 +26,11 @@ IMAGE_TOKEN_INDEX = -200
 SYSTEM_PROMPT = """You are a helpful assistant that can analyze images and understand visual content. You can describe what you see in images and answer questions about them."""
 
 GEMMA_SYSTEM_PROMPT = """You are a helpful assistant that can analyze images and perform segmentation tasks. When asked to segment objects, you should respond with the [SEG] token."""
+
+# Gemma-3専用システムプロンプト
+GEMMA3_SEGMENTATION_PROMPT = """You are LISA (Large-language Instructed Segmentation Assistant), a multimodal AI assistant that can understand images and perform precise object segmentation. When asked to segment objects or regions in images, respond with the [SEG] token to indicate the segmentation mask."""
+
+GEMMA3_VQA_PROMPT = """You are a helpful multimodal AI assistant that can analyze images and answer questions about visual content. Provide accurate, detailed responses based on what you observe in the images."""
 
 # 質問テンプレート
 SHORT_QUESTION_LIST = [

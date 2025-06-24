@@ -1,0 +1,27 @@
+{
+  "dataset_name": "refer_seg",
+  "sample_idx": 0,
+  "session_timestamp": "20250624_111151",
+  "item_timestamp": "20250624_111735_230",
+  "original_image_path": "/mnt/h/download/LISA-dataset/dataset/refer_seg/images/mscoco/images/train2014/COCO_train2014_000000048130.jpg",
+  "conversations": [
+    "A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the human's questions.\n### Human: Where is the man on skateboard? Please segment it.\n### Assistant: Sure, it is [SEG].\n### ",
+    "A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the human's questions.\n### Human: Please segment the white shirt front middle.\n### Assistant: It is [SEG].\n### ",
+    "A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the human's questions.\n### Human: Can you identify and segment the black outfit?\n### Assistant: It is [SEG].\n### "
+  ],
+  "questions": [
+    "Where is the man on skateboard? Please segment it.",
+    "Please segment the white shirt front middle.",
+    "Can you identify and segment the black outfit?"
+  ],
+  "class_names": [
+    "man on skateboard",
+    "white shirt front middle",
+    "black outfit"
+  ],
+  "comparison_image": "verification_output/session_20250624_111151/refer_seg_0_20250624_111735_230_comparison.png",
+  "processing_note": "SAM postprocess_masks simulation: 1024x1024 → input_size → original_size",
+  "image_size": "1024x1024",
+  "mask_size": "640x426",
+  "input_size": "1024x1024"
+}

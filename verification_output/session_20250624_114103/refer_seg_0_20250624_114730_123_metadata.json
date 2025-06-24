@@ -1,0 +1,26 @@
+{
+  "dataset_name": "refer_seg",
+  "sample_idx": 0,
+  "session_timestamp": "20250624_114103",
+  "item_timestamp": "20250624_114730_123",
+  "original_image_path": "/mnt/h/download/LISA-dataset/dataset/refer_seg/images/saiapr_tc-12/01/images/1583.jpg",
+  "conversations": [
+    "A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the human's questions.\n### Human: Can you segment the top left corner , clear sky in this image?\n### Assistant: Sure, [SEG].\n### ",
+    "A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the human's questions.\n### Human: Can you identify and segment the black area just above ice?\n### Assistant: It is [SEG].\n### ",
+    "A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the human's questions.\n### Human: Can you segment the clouds in this image?\n### Assistant: Sure, the segmentation result is [SEG].\n### "
+  ],
+  "questions": [
+    "Can you segment the top left corner , clear sky in this image?",
+    "Can you identify and segment the black area just above ice?",
+    "Can you segment the clouds in this image?"
+  ],
+  "class_names": [
+    "top left corner , clear sky",
+    "black area just above ice",
+    "clouds"
+  ],
+  "comparison_image": "verification_output/session_20250624_114103/refer_seg_0_20250624_114730_123_comparison.png",
+  "processing_note": "Simple resize: mask resized to match processed image size",
+  "image_size": "480x360",
+  "mask_size": "480x360"
+}

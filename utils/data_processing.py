@@ -4,6 +4,87 @@ import os
 
 import cv2
 import numpy as np
+import torch
+from typing import Dict, List, Any
+
+
+class DataCollatorForSupervisedDataset:
+    """
+    Gemma-3対応のデータコレーター
+    バッチ処理とパディングを担当
+    """
+    def __init__(self, tokenizer, pad_to_multiple_of=None):
+        self.tokenizer = tokenizer
+        self.pad_to_multiple_of = pad_to_multiple_of
+        
+    def __call__(self, batch: List[Dict[str, Any]]) -> Dict[str, torch.Tensor]:
+        """
+        バッチデータの処理
+        """
+        # 入力データの抽出
+        input_ids_list = []
+        attention_mask_list = []
+        labels_list = []
+        images_sam_list = []
+        images_gemma_list = []
+        masks_list = []
+        
+        for item in batch:
+            if 'input_ids' in item:
+                input_ids_list.append(item['input_ids'])
+            if 'attention_mask' in item:
+                attention_mask_list.append(item['attention_mask'])
+            if 'labels' in item:
+                labels_list.append(item['labels'])
+            if 'image_sam' in item:
+                images_sam_list.append(item['image_sam'])
+            if 'image_gemma' in item:
+                images_gemma_list.append(item['image_gemma'])
+            if 'ground_truth_mask' in item:
+                masks_list.append(item['ground_truth_mask'])
+        
+        # パディング処理
+        batch_output = {}
+        
+        # テキストのパディング
+        if input_ids_list:
+            padded = self.tokenizer.pad(
+                {'input_ids': input_ids_list},
+                padding=True,
+                pad_to_multiple_of=self.pad_to_multiple_of,
+                return_tensors='pt'
+            )
+            batch_output['input_ids'] = padded['input_ids']
+            
+            # attention_maskの処理
+            if attention_mask_list:
+                batch_output['attention_mask'] = padded.get('attention_mask')
+            
+            # labelsのパディング（IGNORE_INDEX=-100）
+            if labels_list:
+                max_len = batch_output['input_ids'].size(1)
+                padded_labels = []
+                for labels in labels_list:
+                    if len(labels) < max_len:
+                        # -100でパディング
+                        padded = torch.cat([
+                            labels,
+                            torch.full((max_len - len(labels),), -100, dtype=labels.dtype)
+                        ])
+                        padded_labels.append(padded)
+                    else:
+                        padded_labels.append(labels[:max_len])
+                batch_output['labels'] = torch.stack(padded_labels)
+        
+        # 画像のスタック
+        if images_sam_list:
+            batch_output['images_sam'] = torch.stack(images_sam_list)
+        if images_gemma_list:
+            batch_output['images_gemma'] = torch.stack(images_gemma_list)
+        if masks_list:
+            batch_output['masks'] = torch.stack(masks_list)
+        
+        return batch_output
 
 
 def get_mask_from_json(json_path, img):

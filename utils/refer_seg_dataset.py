@@ -7,35 +7,16 @@ import torch
 import torch.nn.functional as F
 from PIL import Image
 from pycocotools import mask
-from transformers import CLIPImageProcessor
 
 from model.segment_anything.utils.transforms import ResizeLongestSide
-
+from . import conversation as conversation_lib
+from .constants import (ANSWER_LIST, DEFAULT_IMAGE_TOKEN, LONG_QUESTION_LIST, 
+                       SHORT_QUESTION_LIST, SAM_IMAGE_SIZE, SYSTEM_PROMPT)
 from .grefer import G_REFER
 from .refer import REFER
-from .constants import ANSWER_LIST, SHORT_QUESTION_LIST, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN, SYSTEM_PROMPT
-
-# 簡単な会話クラス（LLaVA依存を削除）
-class SimpleConversation:
-    def __init__(self):
-        self.messages = []
-        self.roles = ["human", "gpt"]
-    
-    def copy(self):
-        new_conv = SimpleConversation()
-        new_conv.messages = self.messages.copy()
-        return new_conv
-    
-    def append_message(self, role, message):
-        self.messages.append([role, message])
-    
-    def get_prompt(self):
-        if len(self.messages) >= 2:
-            return f"<start_of_turn>user\n{self.messages[0][1]}<end_of_turn>\n<start_of_turn>model\n{self.messages[1][1]}<end_of_turn>\n"
-        return ""
 
 # デフォルト会話テンプレート
-default_conversation = SimpleConversation()
+default_conversation = conversation_lib.default_conversation.copy()
 
 
 class ReferSegDataset(torch.utils.data.Dataset):
@@ -48,30 +29,26 @@ class ReferSegDataset(torch.utils.data.Dataset):
         self,
         base_image_dir,
         tokenizer,
-        model_name=None,  # Gemma3モデル名（未使用だが互換性のため）
+        vision_tower=None,  # Original-LISA互換性のため
         samples_per_epoch=500 * 8 * 2 * 10,
         precision: str = "fp32",
         image_size: int = 224,
         num_classes_per_sample: int = 3,
         exclude_val=False,
         refer_seg_data="refclef||refcoco||refcoco+||refcocog",
-        processor=None,  # 親クラスから渡されるプロセッサ（未使用だが互換性のため）
-        image_processor=None,  # 親クラスから渡される画像プロセッサ（未使用だが互換性のため）
     ):
         """初期化
         
         Args:
             base_image_dir: ベースとなる画像ディレクトリ
             tokenizer: トークナイザ
-            model_name: Gemma3モデル名（互換性のため）
+            vision_tower: Original-LISA互換性のため
             samples_per_epoch: エポックあたりのサンプル数
             precision: 精度
             image_size: 画像サイズ
             num_classes_per_sample: サンプルあたりのクラス数
             exclude_val: 検証データを除外するか
             refer_seg_data: 参照セグメンテーションデータ
-            processor: 親クラスから渡されるプロセッサ（互換性のため）
-            image_processor: 親クラスから渡される画像プロセッサ（互換性のため）
         """
         self.exclude_val = exclude_val
         self.samples_per_epoch = samples_per_epoch
@@ -146,14 +123,7 @@ class ReferSegDataset(torch.utils.data.Dataset):
             refer_seg_ds["images"] = valid_images
             refer_seg_ds["annotations"] = refer_api.Anns
 
-            print(
-                "dataset {} (refs {}) (train split) has {} images and {} annotations.".format(
-                    ds,
-                    splitBy,
-                    len(refer_seg_ds["images"]),
-                    len(refer_seg_ds["annotations"]),
-                )
-            )
+            print(f"データセット {ds} ({splitBy}): {len(refer_seg_ds['images'])} サンプル, {len(refer_seg_ds['annotations'])} アノテーション")
 
             img2refs = {}
             for ref in refs_train:
@@ -183,30 +153,23 @@ class ReferSegDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         # データセットをランダムに選択
-        available_datasets = list(self.refer_seg_data.keys())
-        if len(available_datasets) == 0:
-            raise RuntimeError("利用可能なデータセットがありません")
-            
-        ds_idx = random.randint(0, len(available_datasets) - 1)
-        ds = available_datasets[ds_idx]
+        ds = random.randint(0, len(self.refer_seg_ds_list) - 1)
+        ds = self.refer_seg_ds_list[ds]
         refer_seg_ds = self.refer_seg_data[ds]
-        
         images = refer_seg_ds["images"]
         annotations = refer_seg_ds["annotations"]
         img2refs = refer_seg_ds["img2refs"]
         
-        if len(images) == 0:
-            return self.__getitem__(0)
-            
         idx = random.randint(0, len(images) - 1)
         image_info = images[idx]
         image_path = image_info["file_name"]
         image_id = image_info["id"]
-        refs = img2refs.get(image_id, [])
+        refs = img2refs[image_id]
         
         if len(refs) == 0:
             return self.__getitem__(0)
 
+        # 文章とアノテーションIDの収集
         sents = []
         ann_ids = []
         for ref in refs:
@@ -214,66 +177,63 @@ class ReferSegDataset(torch.utils.data.Dataset):
                 text = sent["sent"]
                 sents.append(text)
                 ann_ids.append(ref["ann_id"])
-                
+
         if len(sents) >= self.num_classes_per_sample:
-            sampled_inds = np.random.choice(
-                list(range(len(sents))), size=self.num_classes_per_sample, replace=False
-            )
+            sampled_inds = np.random.choice(list(range(len(sents))), size=self.num_classes_per_sample, replace=False)
         else:
             sampled_inds = list(range(len(sents)))
-            
+
         sampled_sents = np.vectorize(sents.__getitem__)(sampled_inds).tolist()
         sampled_ann_ids = [ann_ids[ind] for ind in sampled_inds]
         sampled_classes = sampled_sents
-        
-        # 画像の読み込み
-        try:
-            image = cv2.imread(image_path)
-            if image is None:
-                print(f"画像の読み込みに失敗: {image_path}")
-                return self.__getitem__(0)
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        except Exception as e:
-            print(f"画像処理エラー: {e}")
-            return self.__getitem__(0)
 
-        # PIL Imageとして返すためのコピーを保存
-        pil_image = Image.fromarray(image)
+        # 画像の読み込み（オリジナルのようにエラーチェック最小限）
+        image = cv2.imread(image_path)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+        # デュアルエンコーダ対応: Gemma用とSAM用の画像前処理
+        # Gemma用画像前処理（896x896）
+        image_for_gemma = cv2.resize(image, (896, 896))
+        image_for_gemma = torch.from_numpy(image_for_gemma).permute(2, 0, 1).float() / 255.0
 
         # SAM用の前処理
-        image = self.transform.apply_image(image)
-        resize = image.shape[:2]
+        image_for_sam = self.transform.apply_image(image)
+        resize = image_for_sam.shape[:2]
+        
+        # テンソル前処理
+        image_for_sam = self.preprocess(torch.from_numpy(image_for_sam).permute(2, 0, 1).contiguous())
 
         # 質問と回答の生成
         questions = []
         answers = []
-        for text in sampled_classes:
+        for i, text in enumerate(sampled_classes):
             text = text.strip()
             assert len(text.split("||")) == 1
             question_template = random.choice(self.short_question_list)
-            questions.append(question_template.format(class_name=text.lower()))
+            # 最初の質問にのみ画像トークンを含める
+            if i == 0 and DEFAULT_IMAGE_TOKEN not in question_template:
+                question = DEFAULT_IMAGE_TOKEN + "\n" + question_template.format(class_name=text.lower())
+            else:
+                question = question_template.format(class_name=text.lower())
+            questions.append(question)
             answers.append(random.choice(self.answer_list))
 
-        # 会話の生成
+        # 会話形式の生成（オリジナルLISA準拠）
         conversations = []
+        conv = conversation_lib.default_conversation.copy()
+
         i = 0
         while i < len(questions):
-            conv = default_conversation.copy()
             conv.messages = []
             conv.append_message(conv.roles[0], questions[i])
             conv.append_message(conv.roles[1], answers[i])
             conversations.append(conv.get_prompt())
             i += 1
 
-        # テンソル前処理
-        image = self.preprocess(torch.from_numpy(image).permute(2, 0, 1).contiguous())
-
-        # マスクの処理
+        # マスクの生成（オリジナルLISA準拠）
         masks = []
-        flag = False
         for ann_id in sampled_ann_ids:
             if isinstance(ann_id, list):
-                flag = True
                 if -1 in ann_id:
                     assert len(ann_id) == 1
                     m = np.zeros((image_info["height"], image_info["width"])).astype(np.uint8)
@@ -285,9 +245,7 @@ class ReferSegDataset(torch.utils.data.Dataset):
                             m = np.zeros((image_info["height"], image_info["width"])).astype(np.uint8)
                         else:
                             if type(ann["segmentation"][0]) == list:  # polygon
-                                rle = mask.frPyObjects(
-                                    ann["segmentation"], image_info["height"], image_info["width"]
-                                )
+                                rle = mask.frPyObjects(ann["segmentation"], image_info["height"], image_info["width"])
                             else:
                                 rle = ann["segmentation"]
                                 for i in range(len(rle)):
@@ -304,32 +262,34 @@ class ReferSegDataset(torch.utils.data.Dataset):
             ann = annotations[ann_id]
             if len(ann["segmentation"]) == 0:
                 m = np.zeros((image_info["height"], image_info["width"])).astype(np.uint8)
+                masks.append(m)
+                continue
+
+            if type(ann["segmentation"][0]) == list:  # polygon
+                rle = mask.frPyObjects(ann["segmentation"], image_info["height"], image_info["width"])
             else:
-                if type(ann["segmentation"][0]) == list:  # polygon
-                    rle = mask.frPyObjects(
-                        ann["segmentation"], image_info["height"], image_info["width"]
-                    )
-                else:
-                    rle = ann["segmentation"]
-                    for i in range(len(rle)):
-                        if not isinstance(rle[i]["counts"], bytes):
-                            rle[i]["counts"] = rle[i]["counts"].encode()
-                m = mask.decode(rle)
-                m = np.sum(m, axis=2)
-                m = m.astype(np.uint8)
+                rle = ann["segmentation"]
+                for i in range(len(rle)):
+                    if not isinstance(rle[i]["counts"], bytes):
+                        rle[i]["counts"] = rle[i]["counts"].encode()
+            m = mask.decode(rle)
+            m = np.sum(m, axis=2)
+            m = m.astype(np.uint8)
             masks.append(m)
 
         masks = np.stack(masks, axis=0)
         masks = torch.from_numpy(masks)
         label = torch.ones(masks.shape[1], masks.shape[2]) * self.ignore_label
 
-        # 戻り値の形式を統一（PIL Image、テキストプロンプト、マスク、ラベルを返す）
-        text_prompt = conversations[0] if conversations else questions[0] if questions else ""
-        
+        # オリジナルLISA準拠の返り値形式（9要素）
         return (
-            image_path,  # 画像パス
-            pil_image,   # PIL Image
-            text_prompt, # テキストプロンプト
-            masks,       # マスク
-            label        # ラベル
+            image_path,        # 0: 画像パス
+            image_for_sam,     # 1: SAM用前処理済み画像 (torch.Tensor)
+            image_for_gemma,   # 2: Gemma用前処理済み画像 (torch.Tensor)
+            conversations,     # 3: 会話形式のテキスト (List[str])
+            masks,             # 4: マスク (torch.Tensor)
+            label,             # 5: ラベル (torch.Tensor)
+            resize,            # 6: リサイズ情報 (Tuple)
+            questions,         # 7: 質問リスト (List[str])
+            sampled_classes    # 8: クラス名リスト (List[str])
         )

@@ -1,0 +1,27 @@
+{
+  "dataset_name": "sem_seg",
+  "sample_idx": 0,
+  "session_timestamp": "20250624_111923",
+  "item_timestamp": "20250624_112315_241",
+  "original_image_path": "/mnt/h/download/LISA-dataset/dataset/coco/train2017/000000568132.jpg",
+  "conversations": [
+    "A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the human's questions.\n### Human: Please segment the baseball glove.\n### Assistant: [SEG].\n### ",
+    "A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the human's questions.\n### Human: Can you identify and segment the clothes?\n### Assistant: Sure, the segmentation result is [SEG].\n### ",
+    "A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the human's questions.\n### Human: Please provide a segmentation mask for the person.\n### Assistant: Sure, [SEG].\n### "
+  ],
+  "questions": [
+    "Please segment the baseball glove.",
+    "Can you identify and segment the clothes?",
+    "Please provide a segmentation mask for the person."
+  ],
+  "class_names": [
+    "baseball glove",
+    "clothes",
+    "person"
+  ],
+  "comparison_image": "verification_output/session_20250624_111923/sem_seg_0_20250624_112315_241_comparison.png",
+  "processing_note": "SAM postprocess_masks simulation: 1024x1024 → input_size → original_size",
+  "image_size": "1024x1024",
+  "mask_size": "640x480",
+  "input_size": "1024x1024"
+}

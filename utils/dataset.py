@@ -72,6 +72,7 @@ config = get_config()
 
 # デフォルト設定
 DEFAULT_IMAGE_TOKEN = "<image>"
+IMAGE_TOKEN_INDEX = -200
 DEFAULT_SEG_TOKEN = getattr(config, 'SEG_TOKEN', "[SEG]")
 IGNORE_INDEX = -100
 
@@ -148,6 +149,34 @@ def preprocess_gemma_image(image: Image.Image, processor: AutoProcessor, target_
             transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
         ])
         return transform(image_resized)
+
+def apply_gemma3_chat_template(text: str, tokenizer) -> str:
+    """
+    Gemma-3の正式なチャットテンプレートを適用
+    """
+    # すでにテンプレートが適用されているかチェック
+    if "<start_of_turn>" in text:
+        return text
+    
+    # Gemma-3チャットテンプレート適用
+    messages = [
+        {"role": "user", "content": text}
+    ]
+    
+    # tokenizerのapply_chat_templateメソッドを使用
+    if hasattr(tokenizer, 'apply_chat_template'):
+        try:
+            templated_text = tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True
+            )
+            return templated_text
+        except Exception as e:
+            print(f"チャットテンプレート適用エラー: {e}")
+    
+    # フォールバック: 手動でテンプレート適用
+    return f"<start_of_turn>user\n{text}<end_of_turn>\n<start_of_turn>model\n"
 
 def preprocess_mask(mask: np.ndarray, target_size: Optional[int] = None) -> torch.Tensor:
     """
@@ -455,17 +484,25 @@ class HybridDataset(torch.utils.data.Dataset):
         if self.seg_token not in text_prompt:
             text_prompt += f" {self.seg_token}"
 
-        # テキストのトークン化
+        # Gemma-3チャットテンプレートを適用
+        text_prompt = apply_gemma3_chat_template(text_prompt, self.gemma_processor.tokenizer)
+
+        # テキストのトークン化（画像トークンを考慮）
         try:
-            tokenized = self.gemma_processor.tokenizer(
+            # utilsからtokenizer_image_token関数をインポート
+            from .utils import tokenizer_image_token
+            
+            # 画像トークンを含むテキストをトークン化
+            input_ids = tokenizer_image_token(
                 text_prompt,
-                return_tensors="pt",
-                padding=False,
-                truncation=True,
-                max_length=self.max_length,
+                self.gemma_processor.tokenizer,
+                image_token_index=IMAGE_TOKEN_INDEX,
+                return_tensors="pt"
             )
-            input_ids = tokenized.input_ids.squeeze(0)
-            attention_mask = tokenized.attention_mask.squeeze(0)
+            
+            # attention_maskの生成
+            attention_mask = torch.ones_like(input_ids)
+            
         except Exception as e:
             print(f"トークン化エラー: {e}")
             # フォールバック
@@ -512,18 +549,17 @@ class HybridDataset(torch.utils.data.Dataset):
         else:
             ground_truth_mask = torch.zeros(1, self.sam_image_size, self.sam_image_size)
 
+        # 返り値の構築（仕様書準拠）
         return {
-            "images_for_gemma": image_gemma,      # (3, 896, 896)
-            "images_for_sam": image_sam,          # (3, 1024, 1024)
-            "input_ids": input_ids,
-            "attention_mask": attention_mask,
-            "labels": labels,  # 言語生成用のトークンレベルラベル
-            "seg_token_mask": seg_token_mask,
-            "ground_truth_mask": ground_truth_mask,    # (1, 1024, 1024)
-            "has_mask": has_mask,
-            "image_path": image_path,
-            "text_prompt": text_prompt,
-            "spatial_label": label,  # 元のspatial label（必要に応じて使用）
+            'input_ids': input_ids,
+            'labels': labels,
+            'attention_mask': attention_mask,
+            'image_sam': image_sam,  # SAM用画像 (C, 1024, 1024)
+            'image_gemma': image_gemma,  # Gemma用画像 (C, 896, 896)
+            'ground_truth_mask': ground_truth_mask if has_mask else None,
+            'has_mask': has_mask,
+            'seg_token_mask': seg_token_mask,
+            'image_path': image_path if 'image_path' in locals() else None,
         }
 
 def collate_fn(batch: List[Dict]) -> Dict[str, Any]:

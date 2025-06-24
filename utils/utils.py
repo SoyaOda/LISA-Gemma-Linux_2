@@ -3,6 +3,10 @@ from enum import Enum
 import numpy as np
 import torch
 import torch.distributed as dist
+import re
+from typing import Union, List
+
+from transformers import PreTrainedTokenizer
 
 IGNORE_INDEX = -100
 IMAGE_TOKEN_INDEX = -200
@@ -161,3 +165,39 @@ def dict_to_cuda(input_dict):
         ):
             input_dict[k] = [ele.cuda(non_blocking=True) for ele in v]
     return input_dict
+
+
+def tokenizer_image_token(
+    text: str, 
+    tokenizer: PreTrainedTokenizer, 
+    image_token_index: int = IMAGE_TOKEN_INDEX,
+    return_tensors: str = None
+) -> Union[List[int], torch.Tensor]:
+    """
+    Gemma-3対応の画像トークン処理関数
+    画像トークンを含むテキストをトークン化し、画像トークンの位置に特別なインデックスを挿入
+    """
+    # 画像トークンで分割
+    text_chunks = text.split(DEFAULT_IMAGE_TOKEN)
+    
+    if len(text_chunks) == 1:
+        # 画像トークンがない場合
+        tokens = tokenizer.encode(text, add_special_tokens=True)
+    else:
+        # 画像トークンがある場合
+        tokens = []
+        for i, chunk in enumerate(text_chunks):
+            if i > 0:
+                # 画像トークンの位置に特別なインデックスを挿入
+                # Gemma-3では画像は256トークンにエンコードされる
+                tokens.extend([image_token_index] * 256)
+            
+            if chunk:
+                # チャンクが空でない場合のみトークン化
+                chunk_tokens = tokenizer.encode(chunk, add_special_tokens=(i == 0))
+                tokens.extend(chunk_tokens)
+    
+    if return_tensors == "pt":
+        return torch.tensor(tokens, dtype=torch.long)
+    
+    return tokens
