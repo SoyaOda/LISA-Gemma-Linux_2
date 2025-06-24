@@ -129,20 +129,48 @@ class LisaGemmaForCausalLM(PreTrainedModel):
         
         # トークナイザーにSEGトークンを追加
         if self.seg_token not in self.gemma_processor.tokenizer.get_vocab():
-            self.gemma_processor.tokenizer.add_tokens([self.seg_token], special_tokens=True)
+            # トークンを追加
+            num_added_tokens = self.gemma_processor.tokenizer.add_tokens([self.seg_token], special_tokens=True)
+            print(f"✅ {num_added_tokens}個のトークンが追加されました")
+            
+            # resize_token_embeddingsを強制的に実行
+            new_vocab_size = len(self.gemma_processor.tokenizer)
+            
+            # Gemma-3モデルの語彙サイズを取得（モデルタイプに応じて適切に処理）
+            if hasattr(self.gemma_model.config, 'vocab_size'):
+                current_vocab_size = self.gemma_model.config.vocab_size
+            elif hasattr(self.gemma_model.config, 'text_config') and hasattr(self.gemma_model.config.text_config, 'vocab_size'):
+                current_vocab_size = self.gemma_model.config.text_config.vocab_size
+            else:
+                # 埋め込み層のサイズから直接取得
+                current_vocab_size = self.gemma_model.get_input_embeddings().weight.shape[0]
+            
+            print(f"語彙サイズを拡張中: {current_vocab_size} -> {new_vocab_size}")
+            
             # DeepSpeed互換: resize_token_embeddingsを条件付きで実行
             try:
-                self.gemma_model.resize_token_embeddings(len(self.gemma_processor.tokenizer))
-                print(f"✅ {self.seg_token}トークンが追加されました")
+                self.gemma_model.resize_token_embeddings(new_vocab_size)
+                print(f"✅ 埋め込み層が正常にリサイズされました（新サイズ: {new_vocab_size}）")
             except RuntimeError as e:
                 if "DTensor" in str(e):
-                    print(f"✅ {self.seg_token}トークンが追加されました（DeepSpeed用延期）")
-                    # DeepSpeedでは後で手動で拡張する
+                    print(f"⚠️ DeepSpeed環境での実行を検出。埋め込み層のリサイズを延期します")
+                    # DeepSpeedでは後で手動で拡張する必要がある
                 else:
+                    # その他のエラーは再スロー
                     raise e
+            
+            # リサイズ後のサイズを確認
+            actual_embed_size = self.gemma_model.get_input_embeddings().weight.shape[0]
+            print(f"実際の埋め込み層サイズ: {actual_embed_size}")
+            
+            if actual_embed_size < new_vocab_size:
+                print(f"⚠️ 警告: 埋め込み層のサイズ({actual_embed_size})が語彙サイズ({new_vocab_size})より小さいです")
+        else:
+            print(f"✅ {self.seg_token}は既に語彙に存在します")
         
         # SEGトークンのIDを取得
         self.seg_token_id = self.gemma_processor.tokenizer.convert_tokens_to_ids(self.seg_token)
+        print(f"SEGトークンID: {self.seg_token_id}")
         
         # 設定情報を保存
         self.gemma_image_size = config.gemma_image_size
