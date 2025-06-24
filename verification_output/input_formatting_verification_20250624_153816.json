@@ -1,0 +1,30 @@
+{
+  "session_info": {
+    "timestamp": "20250624_153816",
+    "model_id": 4368,
+    "batch_size": 2,
+    "num_samples_checked": 2
+  },
+  "tokenizer_info": {
+    "vocab_size": 262144,
+    "special_tokens": {
+      "bos": "<bos>",
+      "eos": "<eos>",
+      "pad": "<pad>",
+      "has_seg_token": true
+    }
+  },
+  "batch_statistics": {
+    "total_samples": 2,
+    "avg_sequence_length": 28.0,
+    "avg_labeled_tokens": 13.5,
+    "samples_with_seg_token": 2
+  },
+  "format_compliance": {
+    "gemma3_chat_template": true,
+    "proper_label_masking": false,
+    "masking_issues": [
+      "サンプル1: userターンに3個の予測対象トークン"
+    ]
+  }
+}

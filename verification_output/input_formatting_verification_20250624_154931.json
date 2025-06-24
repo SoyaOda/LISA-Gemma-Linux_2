@@ -1,0 +1,15 @@
+{
+  "timestamp": "2025-06-24T15:49:31.422877",
+  "config_file": "config_small_test.py",
+  "model_path": "google/gemma-3-4b-it",
+  "num_samples_checked": 2,
+  "correct_samples": 2,
+  "success_rate": 1.0,
+  "special_tokens": {
+    "start_of_turn": 105,
+    "end_of_turn": 106,
+    "user": 2364,
+    "model": 4368,
+    "seg_token": 262145
+  }
+}

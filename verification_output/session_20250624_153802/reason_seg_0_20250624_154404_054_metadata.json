@@ -1,0 +1,26 @@
+{
+  "dataset_name": "reason_seg",
+  "sample_idx": 0,
+  "session_timestamp": "20250624_153802",
+  "item_timestamp": "20250624_154404_054",
+  "original_image_path": "/mnt/h/download/LISA-dataset/dataset/reason_seg/ReasonSeg/train/11177263126_21730b960e_o.jpg",
+  "conversations": [
+    "<start_of_turn>user\nPlease segment the area that matches: When it comes to baking, many varieties of delicious treats exist. Which type of baked goods are frequently served in individual portions and are made with sweet fillings such as chocolate or fruit?<end_of_turn>\n<start_of_turn>model\nSure, the segmentation result is [SEG].<end_of_turn>\n",
+    "<start_of_turn>user\nCan you identify and segment the area described as: Regarding baked goods, what type of treats are made in individual portions and usually consist of sweet fillings like fruit or chocolate??<end_of_turn>\n<start_of_turn>model\nSure, [SEG].<end_of_turn>\n",
+    "<start_of_turn>user\nCan you segment the region described as: When it comes to baking, there are many different types of delicious treats to explore. Please identify the type of baked good that is made with sweet fillings like fruit or chocolate, and is typically served in individual portions.?<end_of_turn>\n<start_of_turn>model\n[SEG].<end_of_turn>\n"
+  ],
+  "questions": [
+    "Please segment the area that matches: When it comes to baking, many varieties of delicious treats exist. Which type of baked goods are frequently served in individual portions and are made with sweet fillings such as chocolate or fruit?",
+    "Can you identify and segment the area described as: Regarding baked goods, what type of treats are made in individual portions and usually consist of sweet fillings like fruit or chocolate??",
+    "Can you segment the region described as: When it comes to baking, there are many different types of delicious treats to explore. Please identify the type of baked good that is made with sweet fillings like fruit or chocolate, and is typically served in individual portions.?"
+  ],
+  "class_names": [
+    "When it comes to baking, many varieties of delicious treats exist. Which type of baked goods are frequently served in individual portions and are made with sweet fillings such as chocolate or fruit?",
+    "Regarding baked goods, what type of treats are made in individual portions and usually consist of sweet fillings like fruit or chocolate?",
+    "When it comes to baking, there are many different types of delicious treats to explore. Please identify the type of baked good that is made with sweet fillings like fruit or chocolate, and is typically served in individual portions."
+  ],
+  "comparison_image": "verification_output/session_20250624_153802/reason_seg_0_20250624_154404_054_comparison.png",
+  "processing_note": "Simple resize: mask resized to match processed image size",
+  "image_size": "4320x3240",
+  "mask_size": "4320x3240"
+}

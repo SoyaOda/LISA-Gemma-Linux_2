@@ -178,6 +178,84 @@ def apply_gemma3_chat_template(text: str, tokenizer) -> str:
     # フォールバック: 手動でテンプレート適用
     return f"<start_of_turn>user\n{text}<end_of_turn>\n<start_of_turn>model\n"
 
+def build_correct_labels_for_gemma3(input_ids: torch.Tensor, tokenizer) -> torch.Tensor:
+    """
+    Gemma3チャットテンプレートに準拠した正確なラベルマスキング
+    
+    Args:
+        input_ids: トークンID列 [seq_len]
+        tokenizer: Gemma3用トークナイザー
+    
+    Returns:
+        正確にマスクされたラベル [seq_len]
+    """
+    labels = input_ids.clone()
+    input_ids_list = input_ids.tolist()
+    
+    # 特殊トークンIDを取得
+    user_turn_start = None
+    model_turn_start = None
+    turn_end = None
+    
+    # トークナイザーから特殊トークンIDを取得
+    for token_str, token_id in tokenizer.get_vocab().items():
+        if token_str == "<start_of_turn>":
+            user_turn_start = model_turn_start = token_id
+        elif token_str == "<end_of_turn>":
+            turn_end = token_id
+    
+    # フォールバック: ハードコーディングされた値
+    if user_turn_start is None:
+        user_turn_start = model_turn_start = getattr(tokenizer, 'convert_tokens_to_ids', lambda x: None)("<start_of_turn>")
+    if turn_end is None:
+        turn_end = getattr(tokenizer, 'convert_tokens_to_ids', lambda x: None)("<end_of_turn>")
+    
+    # user/modelトークンのID
+    user_token_id = getattr(tokenizer, 'convert_tokens_to_ids', lambda x: None)("user")
+    model_token_id = getattr(tokenizer, 'convert_tokens_to_ids', lambda x: None)("model")
+    
+    # シーケンス全体を-100で初期化（デフォルトでマスク）
+    labels.fill_(-100)
+    
+    i = 0
+    while i < len(input_ids_list):
+        # <start_of_turn>を探す
+        if input_ids_list[i] == user_turn_start:  # <start_of_turn>
+            if i + 1 < len(input_ids_list):
+                next_token = input_ids_list[i + 1]
+                
+                if next_token == model_token_id:
+                    # modelターンの場合: <start_of_turn>model から <end_of_turn> まで
+                    # modelトークンの直後から予測開始
+                    start_pred = i + 2  # <start_of_turn>model の次から
+                    
+                    # 対応する<end_of_turn>を探す
+                    j = start_pred
+                    while j < len(input_ids_list) and input_ids_list[j] != turn_end:
+                        j += 1
+                    
+                    # modelの応答部分（start_pred から end_of_turn の直前まで）を予測対象に
+                    if j < len(input_ids_list):  # <end_of_turn>が見つかった場合
+                        labels[start_pred:j] = input_ids[start_pred:j]
+                    
+                    i = j + 1  # <end_of_turn>の次へ
+                    
+                elif next_token == user_token_id:
+                    # userターンの場合: 完全にマスク（何もしない、既に-100）
+                    # 対応する<end_of_turn>を探して飛ばす
+                    j = i + 2  # <start_of_turn>user の次から
+                    while j < len(input_ids_list) and input_ids_list[j] != turn_end:
+                        j += 1
+                    i = j + 1  # <end_of_turn>の次へ
+                else:
+                    i += 1
+            else:
+                i += 1
+        else:
+            i += 1
+    
+    return labels
+
 def preprocess_mask(mask: np.ndarray, target_size: Optional[int] = None) -> torch.Tensor:
     """
     マスクの前処理
@@ -433,6 +511,11 @@ class HybridDataset(torch.utils.data.Dataset):
             else:
                 text_prompt = "Segment the object in this image. [SEG]"
             
+            # resize と questions, sampled_classes を保持（オリジナルLISAとの互換性）
+            resize = resize if 'resize' in locals() else None
+            questions = questions if 'questions' in locals() else None
+            sampled_classes = sampled_classes if 'sampled_classes' in locals() else None
+            
         elif len(sample) == 5:
             # 古い5要素形式（VQADataset, ReasonSegDataset）
             image_path, image_data, text_prompt, masks, label = sample
@@ -461,6 +544,11 @@ class HybridDataset(torch.utils.data.Dataset):
             # デュアル前処理
             image_gemma = preprocess_gemma_image(image_pil, self.gemma_processor, self.gemma_image_size)
             image_sam = preprocess_sam_image(image_pil, self.sam_image_size)
+            
+            # オリジナルLISAとの互換性のために初期化
+            resize = None
+            questions = None
+            sampled_classes = None
             
         else:
             raise ValueError(f"不明なサンプル形式: {len(sample)} 要素")
@@ -513,11 +601,8 @@ class HybridDataset(torch.utils.data.Dataset):
         seg_token_mask = (input_ids == self.seg_token_idx)
 
         # ラベルの処理（言語生成用）
-        # 仕様書準拠: input_idsからlabelsを生成
-        labels = input_ids.clone()
-        # 簡単な例: 前半をマスク、後半を学習対象とする
-        mask_length = len(labels) // 2
-        labels[:mask_length] = -100  # 前半をマスク
+        # Gemma3チャットテンプレートに準拠した正確なラベルマスキング
+        labels = build_correct_labels_for_gemma3(input_ids, self.gemma_processor.tokenizer)
 
         # マスクの処理
         has_mask = masks is not None
@@ -549,17 +634,23 @@ class HybridDataset(torch.utils.data.Dataset):
         else:
             ground_truth_mask = torch.zeros(1, self.sam_image_size, self.sam_image_size)
 
-        # 返り値の構築（仕様書準拠）
+        # 返り値の構築（仕様書準拠、オリジナルLISAとの互換性を保持）
+        # collate_fnが期待するキー名に統一
         return {
             'input_ids': input_ids,
             'labels': labels,
             'attention_mask': attention_mask,
-            'image_sam': image_sam,  # SAM用画像 (C, 1024, 1024)
-            'image_gemma': image_gemma,  # Gemma用画像 (C, 896, 896)
+            'images_for_sam': image_sam,      # SAM用画像 (C, 1024, 1024)
+            'images_for_gemma': image_gemma,  # Gemma用画像 (C, 896, 896)
             'ground_truth_mask': ground_truth_mask if has_mask else None,
             'has_mask': has_mask,
             'seg_token_mask': seg_token_mask,
             'image_path': image_path if 'image_path' in locals() else None,
+            'text_prompt': text_prompt,  # 追加: collate_fn用
+            # オリジナルLISAとの互換性のための追加フィールド
+            'resize': resize if 'resize' in locals() else None,
+            'questions': questions if 'questions' in locals() else None,
+            'sampled_classes': sampled_classes if 'sampled_classes' in locals() else None,
         }
 
 def collate_fn(batch: List[Dict]) -> Dict[str, Any]:
@@ -572,6 +663,9 @@ def collate_fn(batch: List[Dict]) -> Dict[str, Any]:
     - config_linux.py のみの場合: 2048 (通常設定)
     - 設定ファイルなしの場合: 2048 (デフォルト)
     """
+    # 設定の取得
+    config = get_config()
+    sam_image_size = getattr(config, 'SAM_IMAGE_SIZE', 1024)
     # 各キーごとにデータを収集
     images_for_gemma = []
     images_for_sam = []
@@ -583,6 +677,9 @@ def collate_fn(batch: List[Dict]) -> Dict[str, Any]:
     has_masks = []
     image_paths = []
     text_prompts = []
+    resize_list = []  # オリジナルLISA互換
+    questions_list = []  # オリジナルLISA互換
+    sampled_classes_list = []  # オリジナルLISA互換
     
     for item in batch:
         images_for_gemma.append(item["images_for_gemma"])
@@ -590,12 +687,12 @@ def collate_fn(batch: List[Dict]) -> Dict[str, Any]:
         input_ids.append(item["input_ids"])
         attention_masks.append(item["attention_mask"])
         
-        # labelsの処理（言語生成用トークンレベルラベル）
+        # labelsの処理（正確なラベルマスキング適用済み）
         label = item["labels"]
         if isinstance(label, torch.Tensor):
             # トークンレベルのラベル（言語生成）の場合
             if label.dim() == 1 and len(label) == item["input_ids"].size(0):
-                labels.append(label)  # そのまま使用
+                labels.append(label)  # build_correct_labels_for_gemma3で処理済み
             elif label.dim() == 0:  # スカラーテンソル
                 # スカラーラベルの場合は全シーケンスに同じラベルを適用（通常はしない）
                 labels.append(torch.full_like(item["input_ids"], label.item()))
@@ -607,11 +704,16 @@ def collate_fn(batch: List[Dict]) -> Dict[str, Any]:
             labels.append(torch.full_like(item["input_ids"], -100))
         
         seg_token_masks.append(item["seg_token_mask"])
-        if item["has_mask"]:
+        if item.get("has_mask", False):
             ground_truth_masks.append(item["ground_truth_mask"])
-        has_masks.append(item["has_mask"])
-        image_paths.append(item["image_path"])
-        text_prompts.append(item["text_prompt"])
+        has_masks.append(item.get("has_mask", False))
+        image_paths.append(item.get("image_path"))
+        text_prompts.append(item.get("text_prompt"))
+        
+        # オリジナルLISA互換フィールド
+        resize_list.append(item.get("resize"))
+        questions_list.append(item.get("questions"))
+        sampled_classes_list.append(item.get("sampled_classes"))
     
     # テンソルのスタック
     images_for_gemma = torch.stack(images_for_gemma)  # (B, 3, 896, 896)
@@ -640,21 +742,40 @@ def collate_fn(batch: List[Dict]) -> Dict[str, Any]:
     
     # マスクが存在するサンプルのみをスタック
     if ground_truth_masks:
-        ground_truth_masks = torch.stack(ground_truth_masks)
+        ground_truth_masks_stacked = torch.stack(ground_truth_masks)
     else:
-        ground_truth_masks = None
+        ground_truth_masks_stacked = None
+
+    # オリジナルLISA互換のlabel_listを生成（セグメンテーション用）
+    label_list = []
+    for has_mask in has_masks:
+        if has_mask:
+            # マスクがある場合、ignore_label=255のラベルマップを作成
+            label_list.append(torch.ones(1, sam_image_size, sam_image_size) * 255)
+        else:
+            label_list.append(None)
 
     return {
+        # Gemma-3デュアルストリーム用
         "images_for_gemma": images_for_gemma,           # (B, 3, 896, 896)
         "images_for_sam": images_for_sam,               # (B, 3, 1024, 1024)
-        "input_ids": input_ids_padded,     # (B, unified_max_length)
-        "attention_mask": attention_masks_padded,  # (B, unified_max_length)
-        "labels": labels_padded,    # (B, unified_max_length) - 必ずlong型に変換
-        "seg_token_mask": seg_token_masks_padded,  # (B, unified_max_length)
-        "ground_truth_mask": ground_truth_masks,        # (num_masks, 1, 1024, 1024) or None
+        "input_ids": input_ids_padded,                  # (B, unified_max_length)
+        "attention_masks": attention_masks_padded,      # (B, unified_max_length) - オリジナルLISA準拠の命名
+        "labels": labels_padded,                        # (B, unified_max_length) - 正確にマスク済み
+        "seg_token_mask": seg_token_masks_padded,      # (B, unified_max_length)
+        "ground_truth_mask": ground_truth_masks_stacked,# (num_masks, 1, 1024, 1024) or None
         "has_mask": has_masks,                          # List[bool]
         "image_paths": image_paths,                     # List[str]
         "text_prompts": text_prompts,                   # List[str]
+        # オリジナルLISA互換フィールド
+        "masks_list": ground_truth_masks,               # List[Tensor] - オリジナルLISA形式
+        "label_list": label_list,                       # List[Tensor] - オリジナルLISA形式
+        "resize_list": resize_list,                     # List[Optional[Any]]
+        "questions_list": questions_list,               # List[Optional[Any]]
+        "sampled_classes_list": sampled_classes_list,   # List[Optional[Any]]
+        # 追加の互換性フィールド
+        "images": images_for_sam,                       # エイリアス: オリジナルLISAでの名前
+        "images_clip": images_for_gemma,                # エイリアス: オリジナルLISAでCLIP画像として使用
     }
 
 # エイリアスは削除 - 明確な命名を使用

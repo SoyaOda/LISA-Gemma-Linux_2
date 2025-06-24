@@ -1,0 +1,26 @@
+{
+  "dataset_name": "refer_seg",
+  "sample_idx": 0,
+  "session_timestamp": "20250624_153802",
+  "item_timestamp": "20250624_154359_711",
+  "original_image_path": "/mnt/h/download/LISA-dataset/dataset/refer_seg/images/mscoco/images/train2014/COCO_train2014_000000335503.jpg",
+  "conversations": [
+    "<start_of_turn>user\n<image>\nCan you identify and segment the cake with chocolate?<end_of_turn>\n<start_of_turn>model\nIt is [SEG].<end_of_turn>\n",
+    "<start_of_turn>user\nCan you identify and segment the slice of pie on the cake?<end_of_turn>\n<start_of_turn>model\nIt is [SEG].<end_of_turn>\n",
+    "<start_of_turn>user\nPlease segment the strawberry pie.<end_of_turn>\n<start_of_turn>model\nSure, [SEG].<end_of_turn>\n"
+  ],
+  "questions": [
+    "<image>\nCan you identify and segment the cake with chocolate?",
+    "Can you identify and segment the slice of pie on the cake?",
+    "Please segment the strawberry pie."
+  ],
+  "class_names": [
+    "cake with chocolate",
+    "slice of pie on the cake",
+    "strawberry pie"
+  ],
+  "comparison_image": "verification_output/session_20250624_153802/refer_seg_0_20250624_154359_711_comparison.png",
+  "processing_note": "Simple resize: mask resized to match processed image size",
+  "image_size": "427x640",
+  "mask_size": "427x640"
+}

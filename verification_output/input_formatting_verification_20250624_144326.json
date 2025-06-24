@@ -1,0 +1,27 @@
+{
+  "session_info": {
+    "timestamp": "20250624_144326",
+    "model_id": "google/gemma-3-4b-it",
+    "batch_size": 2,
+    "num_samples_checked": 2
+  },
+  "tokenizer_info": {
+    "vocab_size": 262144,
+    "special_tokens": {
+      "bos": "<bos>",
+      "eos": "<eos>",
+      "pad": "<pad>",
+      "has_seg_token": true
+    }
+  },
+  "batch_statistics": {
+    "total_samples": 2,
+    "avg_sequence_length": 27.0,
+    "avg_labeled_tokens": 11.5,
+    "samples_with_seg_token": 0
+  },
+  "format_compliance": {
+    "gemma3_chat_template": true,
+    "proper_label_masking": false
+  }
+}
