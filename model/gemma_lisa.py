@@ -11,8 +11,8 @@ from typing import Optional, List, Tuple, Dict, Any
 import numpy as np
 
 from transformers import AutoProcessor, Gemma3ForConditionalGeneration, PreTrainedModel, PretrainedConfig
-from segment_anything import sam_model_registry
-from segment_anything.modeling import MaskDecoder, PromptEncoder, TwoWayTransformer
+from model.segment_anything import sam_model_registry
+from model.segment_anything.modeling import MaskDecoder, PromptEncoder, TwoWayTransformer
 
 # LISA-Gemmaモデルのカスタム設定クラス
 class LisaGemmaConfig(PretrainedConfig):

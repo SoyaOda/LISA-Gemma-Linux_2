@@ -174,17 +174,46 @@
 
 ---
 
-## 第3節：視覚-言語アライメントのためのアーキテクチャ監査 ⏳ **実装待機中**
+## 第3節: 視覚-言語アライメントのためのアーキテクチャ監査 (2025-01-06)
 
-### 実装準備状況
-- **ステータス**: ⏳ 実装待機中（第2節完了により準備完了）
-- **必要スクリプト**: `verify_model_architecture.py`
-- **検証対象**: LISA-Gemmaモデル全体構造
-- **重点項目**:
-  - Vision Tower (SAM) ↔ Projector ↔ Gemma-3-4b-it次元整合性
-  - 学習可能パラメータ設定（Vision Tower凍結、Projector学習可能等）
-  - デュアルエンコーダー統合状況
-  - モデル構成要素の健全性
+### 検証結果 ✅ **完了**
+
+#### 初回実行時の問題
+verify_model_architecture.pyを実行したところ、SAMのPromptEncoder呼び出しでエラーが発生：
+```
+PromptEncoder.forward() got an unexpected keyword argument 'text_embeds'
+```
+
+#### 問題の原因
+- `gemma_lisa.py`が外部パッケージのSAMをインポートしていた
+- 正しくはプロジェクト内のカスタマイズされたSAMを使用すべき
+
+#### 修正内容
+1. **model/gemma_lisa.py** (行13-14)
+   - 変更前：
+     ```python
+     from segment_anything import sam_model_registry
+     from segment_anything.modeling import MaskDecoder, PromptEncoder, TwoWayTransformer
+     ```
+   - 変更後：
+     ```python
+     from model.segment_anything import sam_model_registry
+     from model.segment_anything.modeling import MaskDecoder, PromptEncoder, TwoWayTransformer
+     ```
+
+#### 修正後の検証結果
+- **モデルアーキテクチャ**: すべてのコンポーネントが正しく初期化
+- **次元整合性**: MLP Projector (2560→256) がSAM prompt_embed_dimと一致
+- **学習可能パラメータ**: 
+  - 総パラメータ: 4948.22M
+  - 学習可能: 682.36M (13.79%)
+  - 設定: SAM Encoders凍結、SAM Decoder/MLP Projector/Gemma埋め込み層が学習可能
+- **メモリ使用量**: 11.24GB
+
+### 根拠
+- オリジナルLISAは独自に拡張したSAMを使用（text_embedsパラメータを追加）
+- プロジェクト内のSAMは正しくtext_embedsパラメータを持っている
+- 外部のsegment_anythingパッケージのSAMにはこのパラメータがない
 
 ---
 
