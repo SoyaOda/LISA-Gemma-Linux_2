@@ -41,18 +41,20 @@ from model.losses import CompositeLoss
 from utils.dataset import HybridDataset
 
 def get_config():
-    """動的設定読み込み"""
-    config_candidates = ['config_linux', 'config_small_test']
-    
-    for config_name in config_candidates:
-        try:
-            config_module = __import__(config_name)
-            print(f"✓ 設定ファイルを使用: {config_name}")
-            return config_module
-        except ImportError:
-            continue
-    
-    raise ImportError("利用可能な設定ファイルが見つかりません")
+    """
+    config_linux.pyを必須として読み込む
+    読み込めない場合はエラーで停止
+    """
+    try:
+        import config_linux as config
+        print(f"設定: config_linux.py を使用")
+        return config
+    except ImportError as e:
+        print(f"❌ ERROR: config_linux.pyが見つかりません")
+        print(f"   詳細: {e}")
+        print(f"   現在のディレクトリ: {os.getcwd()}")
+        print(f"   ファイル存在確認: {os.path.exists('config_linux.py')}")
+        raise SystemExit("config_linux.pyが必須です。ファイルが存在することを確認してください。")
 
 def parse_args():
     parser = argparse.ArgumentParser(description="エンドツーエンド推論パイプライン検証")
@@ -67,53 +69,7 @@ def parse_args():
                        help="過学習テストで学習したモデル状態を使用")
     return parser.parse_args()
 
-def _fallback_simple_training(model, lisa_config, args, device, config):
-    """
-    チェックポイントが利用できない場合のフォールバック簡易学習
-    """
-    print("🔄 フォールバック簡易学習を実行中...")
-    model.train()
-    
-    # プロセッサーと小規模データセットの準備
-    processor = AutoProcessor.from_pretrained(lisa_config.gemma_model_id)
-    dataset = HybridDataset(
-        base_image_dir=getattr(config, 'DATASET_BASE_DIR', './dataset'),
-        gemma_processor=processor,
-        dataset=args.dataset_type,
-        samples_per_epoch=2
-    )
-    
-    # 簡単な学習ステップで重みを更新（推論テスト用）
-    sample = dataset[0]
-    batch = {
-        'input_ids': sample['input_ids'].unsqueeze(0).to(device),
-        'attention_mask': sample['attention_mask'].unsqueeze(0).to(device),
-        'labels': sample['labels'].unsqueeze(0).to(device),
-        'images_for_gemma': sample['images_for_gemma'].unsqueeze(0).to(device),
-        'images_for_sam': sample['images_for_sam'].unsqueeze(0).to(device),
-        'ground_truth_mask': sample['ground_truth_mask'].unsqueeze(0).to(device),
-    }
-    
-    # 短時間の学習でモデル状態を変更
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-5)
-    loss_fn = CompositeLoss()
-    
-    for _ in range(3):  # 3ステップだけ学習
-        optimizer.zero_grad()
-        outputs = model(
-            input_ids=batch['input_ids'],
-            attention_mask=batch['attention_mask'],
-            labels=batch['labels'],
-            images_for_gemma=batch['images_for_gemma'],
-            images_for_sam=batch['images_for_sam'],
-            generate_mask=True
-        )
-        losses = loss_fn(outputs, batch)
-        losses['total_loss'].backward()
-        optimizer.step()
-    
-    print("✅ フォールバック簡易学習完了")
-    return model
+# フォールバック機能は削除
 
 def load_model_with_training_state(config, device, args):
     """
@@ -135,6 +91,54 @@ def load_model_with_training_state(config, device, args):
     model = LisaGemmaForCausalLM(lisa_config)
     model = model.to(device)
     
+    # LoRA設定を適用（最適化後の設定で検証するため）
+    print("\n🔧 LoRA設定を適用中...")
+    try:
+        from peft import LoraConfig, get_peft_model
+        
+        lora_config = LoraConfig(
+            r=config.LORA_R,
+            lora_alpha=config.LORA_ALPHA,
+            target_modules=config.LORA_TARGET_MODULES,
+            lora_dropout=config.LORA_DROPOUT,
+            bias="none",
+            task_type="FEATURE_EXTRACTION"
+        )
+        
+        # LoRAをGemmaモデルに適用
+        if not hasattr(model, 'gemma_model'):
+            print(f"❌ ERROR: モデルにgemma_modelが見つかりません")
+            print(f"   モデル属性: {list(model.__dict__.keys())}")
+            raise SystemExit("モデル構造エラー: gemma_modelが見つかりません")
+        
+        model.gemma_model = get_peft_model(model.gemma_model, lora_config)
+        print("✅ LoRA設定が正常に適用されました")
+        
+        # 学習可能パラメータの確認
+        param_info = model.get_trainable_parameters_info()
+        print(f"✅ LoRA適用後のパラメータ情報:")
+        print(f"  - 総パラメータ数: {param_info['total_parameters']:,}")
+        print(f"  - 学習可能パラメータ数: {param_info['trainable_parameters']:,}")
+        print(f"  - 学習可能率: {param_info['trainable_percentage']:.2f}%")
+        
+        # 仕様書準拠性チェック
+        spec_compliant = param_info['trainable_percentage'] < 1.0
+        print(f"  - 📋 仕様書準拠性: {'✅ 準拠' if spec_compliant else '❌ 違反'} (要求: <1%)")
+        
+        if not spec_compliant:
+            print(f"❌ ERROR: 学習可能パラメータ率が仕様書要求を超過: {param_info['trainable_percentage']:.2f}% > 1%")
+            raise SystemExit("仕様書準拠性違反: 学習可能パラメータ率が1%を超えています")
+        
+    except ImportError as e:
+        print(f"❌ ERROR: peftライブラリが見つかりません: {e}")
+        print("   必須: pip install peft でインストールしてください")
+        raise SystemExit("peftライブラリが必須です")
+    except Exception as e:
+        print(f"❌ ERROR: LoRA設定中にエラーが発生: {e}")
+        import traceback
+        traceback.print_exc()
+        raise SystemExit(f"LoRA設定エラー: {e}")
+    
     if args.pretrained_from_overfit:
         print("📚 過学習テストで学習したモデル状態をロード...")
         
@@ -142,32 +146,33 @@ def load_model_with_training_state(config, device, args):
         output_dir = "verification_output"
         latest_checkpoint_path = os.path.join(output_dir, "latest_overfit_checkpoint.pth")
         
-        if os.path.exists(latest_checkpoint_path):
-            print(f"✓ 最新チェックポイントを発見: {latest_checkpoint_path}")
+        if not os.path.exists(latest_checkpoint_path):
+            print(f"❌ ERROR: 過学習チェックポイントが見つかりません: {latest_checkpoint_path}")
+            print(f"📌 必須: 先に `python overfit_single_batch.py` を実行してチェックポイントを作成してください")
+            raise SystemExit("過学習チェックポイントが必要です。overfit_single_batch.pyを先に実行してください。")
+        
+        print(f"✓ 最新チェックポイントを発見: {latest_checkpoint_path}")
+        
+        try:
+            checkpoint = torch.load(latest_checkpoint_path, map_location=device)
+            model.load_state_dict(checkpoint['model_state_dict'])
             
-            try:
-                checkpoint = torch.load(latest_checkpoint_path, map_location=device)
-                model.load_state_dict(checkpoint['model_state_dict'])
-                
-                # チェックポイント情報を表示
-                config_info = checkpoint.get('config', {})
-                print(f"✅ 過学習チェックポイントをロード成功:")
-                print(f"  - セッション: {checkpoint.get('session_timestamp', 'unknown')}")
-                print(f"  - 学習イテレーション: {config_info.get('iterations', 'unknown')}")
-                print(f"  - 最終損失: {config_info.get('final_loss', 'unknown'):.6f}")
-                print(f"  - 損失減少率: {config_info.get('reduction_ratio', 0)*100:.1f}%")
-                
-            except Exception as e:
-                print(f"❌ チェックポイントロードエラー: {e}")
-                print(f"⚠️ 代替として簡易学習を実行します...")
-                # フォールバック: 簡易学習
-                model = _fallback_simple_training(model, lisa_config, args, device, config)
-        else:
-            print(f"⚠️ 過学習チェックポイントが見つかりません: {latest_checkpoint_path}")
-            print(f"📌 まず `python overfit_single_batch.py` を実行してください")
-            print(f"⚠️ 代替として簡易学習を実行します...")
-            # フォールバック: 簡易学習
-            model = _fallback_simple_training(model, lisa_config, args, device, config)
+            # チェックポイント情報を表示
+            config_info = checkpoint.get('config', {})
+            print(f"✅ 過学習チェックポイントをロード成功:")
+            print(f"  - セッション: {checkpoint.get('session_timestamp', 'unknown')}")
+            print(f"  - 学習イテレーション: {config_info.get('iterations', 'unknown')}")
+            print(f"  - 最終損失: {config_info.get('final_loss', 'unknown'):.6f}")
+            print(f"  - 損失減少率: {config_info.get('reduction_ratio', 0)*100:.1f}%")
+            
+        except Exception as e:
+            print(f"❌ ERROR: チェックポイントロード失敗: {e}")
+            print(f"   ファイルパス: {latest_checkpoint_path}")
+            print(f"   ファイル存在確認: {os.path.exists(latest_checkpoint_path)}")
+            raise SystemExit(f"チェックポイントロードエラー: {e}")
+    else:
+        print("📚 新しいモデル状態で推論テスト (--pretrained_from_overfit未指定)")
+        print("   注意: 学習前の初期重みでの推論のため、出力品質は期待できません")
     
     # 推論モードに切り替え
     model.eval()
@@ -320,17 +325,13 @@ def run_inference_pipeline(model, sample, device, max_new_tokens=100):
         
     except Exception as e:
         inference_time = time.time() - start_time
-        print(f"\n❌ 推論中にエラーが発生しました: {e}")
+        print(f"\n❌ ERROR: 推論中にエラーが発生しました: {e}")
         import traceback
         traceback.print_exc()
-        
-        return {
-            'batch_outputs': None,
-            'generation_outputs': None,
-            'inference_time': inference_time,
-            'success': False,
-            'error': str(e)
-        }
+        print(f"   推論時間: {inference_time:.2f}秒")
+        print(f"   デバイス: {device}")
+        print(f"   モデルモード: {'train' if model.training else 'eval'}")
+        raise SystemExit(f"推論エラー: {e}")
 
 def visualize_inference_result(original_data, pred_mask, image_path, sample_idx, session_timestamp):
     """推論結果を可視化して保存（第1節の手法を適用）"""
@@ -575,19 +576,12 @@ def main():
                 print(f"  - 推論時間: {inference_results['inference_time']:.2f}秒")
                 
             except Exception as e:
-                print(f"\n❌ サンプル {sample_idx + 1} でエラーが発生: {e}")
-                sample_result = {
-                    "sample_idx": sample_idx,
-                    "dataset_type": args.dataset_type,
-                    "success": False,
-                    "inference_time": 0,
-                    "error": str(e),
-                    "visualization_path": None,
-                    "has_predicted_mask": False,
-                    "has_generated_text": False
-                }
-                results_summary["results"].append(sample_result)
-                results_summary["overall_success"] = False
+                print(f"\n❌ ERROR: サンプル {sample_idx + 1} でエラーが発生: {e}")
+                import traceback
+                traceback.print_exc()
+                print(f"   サンプルインデックス: {sample_idx}")
+                print(f"   データセットタイプ: {args.dataset_type}")
+                raise SystemExit(f"サンプル {sample_idx + 1} 推論エラー: {e}")
         
         # 3. 総合結果の分析
         print(f"\n" + "="*80)
@@ -617,20 +611,22 @@ def main():
         print("🎯 最終判定")
         print("="*80)
         
-        if results_summary["overall_success"]:
-            print("✅ サニティチェック2: エンドツーエンドの推論パイプライン - 成功")
-            print("   推論パイプラインは正常に動作しています。")
-            print("   学習時から推論時への移行に問題はありません。")
-            print("   デプロイメント準備が整っています。")
-        else:
-            print("❌ サニティチェック2: エンドツーエンドの推論パイプライン - 失敗")
+        # 成功率100%以外はエラーで停止
+        if not results_summary["overall_success"] or success_rate < 100.0:
+            print("❌ ERROR: サニティチェック2 失敗")
             print("   以下の問題が検出されました:")
             
             for i, result in enumerate(results_summary["results"]):
                 if not result["success"]:
-                    print(f"   - サンプル {i+1}: {result['error']}")
+                    print(f"   - サンプル {i+1}: {result.get('error', 'Unknown error')}")
             
-            print("   推奨: モデルの推論メソッドとデータ処理パイプラインを再確認してください")
+            print(f"   成功率: {success_rate:.1f}% < 100%")
+            raise SystemExit("推論パイプライン検証失敗: 全サンプルが成功する必要があります")
+        
+        print("✅ サニティチェック2: エンドツーエンドの推論パイプライン - 成功")
+        print("   推論パイプラインは正常に動作しています。")
+        print("   学習時から推論時への移行に問題はありません。")
+        print("   デプロイメント準備が整っています。")
         
         print("="*80)
         

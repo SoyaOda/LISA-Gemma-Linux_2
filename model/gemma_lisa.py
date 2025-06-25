@@ -55,20 +55,15 @@ class LisaGemmaForCausalLM(PreTrainedModel):
             device_map="auto"
         )
         
-        # 1.1 仕様書第2章: Gemmaモデル本体のパラメータを凍結
-        print("Gemmaモデルのパラメータを仕様書に従って凍結中...")
+        # 1.1 仕様書第2章: Gemmaモデル本体のパラメータを完全凍結（最適化後の設定）
+        print("Gemmaモデルのパラメータを仕様書最適化設定に従って完全凍結中...")
         for param in self.gemma_model.parameters():
             param.requires_grad = False
         
-        # 1.2 例外: 埋め込み層とLMヘッドは訓練可能に（新しいSEGトークン対応）
-        if hasattr(self.gemma_model, 'get_input_embeddings'):
-            for param in self.gemma_model.get_input_embeddings().parameters():
-                param.requires_grad = True
-        if hasattr(self.gemma_model, 'get_output_embeddings'):
-            for param in self.gemma_model.get_output_embeddings().parameters():
-                param.requires_grad = True
+        # 注意: 埋め込み層とLMヘッドも凍結（LoRAによる効率的学習のため）
+        # 新しいSEGトークンへの対応は、LoRA適用後に必要に応じて行う
         
-        print("✅ Gemmaパラメータ凍結が完了（埋め込み層とLMヘッドは訓練可能）")
+        print("✅ Gemmaパラメータの完全凍結が完了（LoRA適用で効率的学習を実現）")
         
         # 2. Gemma-3用プロセッサーの初期化
         print(f"Gemma-3プロセッサーをロード中... ({config.gemma_model_id})")
@@ -380,11 +375,21 @@ class LisaGemmaForCausalLM(PreTrainedModel):
             raise ValueError("pixel_valuesが空です。マルチモーダル処理には画像が必要です。")
         
         # 1. Gemmaモデルでのフォワードパス（画像あり）
-        print(f"🔍 Gemmaモデル入力情報:")
-        print(f"  - input_ids: {input_ids.shape}")
-        print(f"  - attention_mask: {attention_mask.shape}")
-        print(f"  - pixel_values: {pixel_values.shape}")
-        print(f"  - labels: {labels.shape if labels is not None else 'None'}")
+        # デバッグ情報（冗長なログを抑制）
+        if hasattr(self, '_debug_counter'):
+            self._debug_counter += 1
+        else:
+            self._debug_counter = 1
+            
+        # 最初の5回のみデバッグ情報を表示
+        if self._debug_counter <= 5:
+            print(f"🔍 Gemmaモデル入力情報 (#{self._debug_counter}):")
+            print(f"  - input_ids: {input_ids.shape}")
+            print(f"  - attention_mask: {attention_mask.shape}")
+            print(f"  - pixel_values: {pixel_values.shape}")
+            print(f"  - labels: {labels.shape if labels is not None else 'None'}")
+        elif self._debug_counter == 6:
+            print(f"🔇 デバッグ情報の表示を抑制（以降は省略）")
         
         gemma_outputs = self.gemma_model(
             input_ids=input_ids,
@@ -504,7 +509,16 @@ class LisaGemmaForCausalLM(PreTrainedModel):
         # ======================================================================
         sam_features_list = []
         if generate_mask and self.sam_image_encoder is not None and images_for_sam is not None:
-            print(f"SAM画像エンコーディング開始: {images_for_sam.shape}")
+            # SAMエンコーディング情報（最初の2回のみ表示）
+            if hasattr(self, '_sam_debug_counter'):
+                self._sam_debug_counter += 1
+            else:
+                self._sam_debug_counter = 1
+                
+            if self._sam_debug_counter <= 2:
+                print(f"SAM画像エンコーディング開始 (#{self._sam_debug_counter}): {images_for_sam.shape}")
+            elif self._sam_debug_counter == 3:
+                print(f"🔇 SAMエンコーディング ログ表示を抑制（以降は省略）")
             
             # SAMの画像エンコーダは凍結されているため、勾配計算は不要
             with torch.no_grad():
@@ -517,11 +531,21 @@ class LisaGemmaForCausalLM(PreTrainedModel):
         # ======================================================================
         # パスウェイ 2: Gemmaの推論 (意図理解用)
         # ======================================================================
-        print(f"🔍 Gemmaモデル入力情報 (デュアルストリーム):")
-        print(f"  - input_ids: {input_ids.shape}")
-        print(f"  - attention_mask: {attention_mask.shape}")
-        print(f"  - images_for_gemma: {images_for_gemma.shape}")
-        print(f"  - labels: {labels.shape if labels is not None else 'None'}")
+        # デバッグ情報（冗長なログを抑制）
+        if hasattr(self, '_dual_debug_counter'):
+            self._dual_debug_counter += 1
+        else:
+            self._dual_debug_counter = 1
+            
+        # 最初の3回のみデバッグ情報を表示
+        if self._dual_debug_counter <= 3:
+            print(f"🔍 Gemmaモデル入力情報 (デュアルストリーム #{self._dual_debug_counter}):")
+            print(f"  - input_ids: {input_ids.shape}")
+            print(f"  - attention_mask: {attention_mask.shape}")
+            print(f"  - images_for_gemma: {images_for_gemma.shape}")
+            print(f"  - labels: {labels.shape if labels is not None else 'None'}")
+        elif self._dual_debug_counter == 4:
+            print(f"🔇 デュアルストリーム デバッグ情報の表示を抑制（以降は省略）")
         
         # Gemmaモデルに画像とテキストを入力し、出力を得る
         gemma_outputs = self.gemma_model(
@@ -550,7 +574,16 @@ class LisaGemmaForCausalLM(PreTrainedModel):
             seg_positions = (input_ids == self.seg_token_id).nonzero(as_tuple=True)
             
             if len(seg_positions[0]) > 0:
-                print(f"バッチ内でSEGトークンが{len(seg_positions[0])}個検出されました")
+                # SEGトークン検出情報（最初の2回のみ表示）
+                if hasattr(self, '_seg_debug_counter'):
+                    self._seg_debug_counter += 1
+                else:
+                    self._seg_debug_counter = 1
+                    
+                if self._seg_debug_counter <= 2:
+                    print(f"バッチ内でSEGトークンが{len(seg_positions[0])}個検出されました (#{self._seg_debug_counter})")
+                elif self._seg_debug_counter == 3:
+                    print(f"🔇 SEGトークン検出 ログ表示を抑制（以降は省略）")
                 
                 # SEGトークンからマスクを生成
                 masks = self._generate_masks_from_seg_tokens_dual_stream(
@@ -565,7 +598,16 @@ class LisaGemmaForCausalLM(PreTrainedModel):
             seg_positions = (input_ids == self.seg_token_id).nonzero(as_tuple=True)
             
             if len(seg_positions[0]) > 0:
-                print(f"SEGトークン{len(seg_positions[0])}個でMLPプロジェクタの勾配フローを確保")
+                # MLPプロジェクタ勾配フロー確保（最初の2回のみ表示）
+                if hasattr(self, '_mlp_debug_counter'):
+                    self._mlp_debug_counter += 1
+                else:
+                    self._mlp_debug_counter = 1
+                    
+                if self._mlp_debug_counter <= 2:
+                    print(f"SEGトークン{len(seg_positions[0])}個でMLPプロジェクタの勾配フローを確保 (#{self._mlp_debug_counter})")
+                elif self._mlp_debug_counter == 3:
+                    print(f"🔇 MLPプロジェクタ ログ表示を抑制（以降は省略）")
                 
                 # MLPプロジェクタの勾配フローを確保するため
                 mlp_loss = torch.tensor(0.0, device=device, requires_grad=True)
@@ -692,17 +734,17 @@ class LisaGemmaForCausalLM(PreTrainedModel):
         """
         from peft import get_peft_model
         
-        print("\\n=== 仕様書準拠LoRA設定適用中 ===")
+        print("\n=== 仕様書準拠LoRA設定適用中 ===")
         print(f"LoRA設定: r={lora_config.r}, alpha={lora_config.lora_alpha}")
         print(f"対象モジュール: {lora_config.target_modules}")
-        print("\\n🎯 目標: 学習可能パラメータ < 1%")
+        print("\n🎯 目標: 学習可能パラメータ < 1%")
         
         # LoRAを適用
         self.gemma_model = get_peft_model(self.gemma_model, lora_config)
         print("✅ LoRAが正常に適用されました")
         
         # 🚨 重要: 埋め込み層を明示的に凍結（業界標準に準拠）
-        print("\\n=== 業界標準準拠: 埋め込み層の凍結 ===")
+        print("\n=== 業界標準準拠: 埋め込み層の凍結 ===")
         
         # 入力埋め込み層を凍結
         input_embeddings = None
@@ -732,7 +774,7 @@ class LisaGemmaForCausalLM(PreTrainedModel):
         if output_embeddings is not None:
             print(f"🔒 出力埋め込み凍結確認: requires_grad={output_embeddings.weight.requires_grad}")
         
-        print("\\n=== 最終パラメータ統計 ===")
+        print("\n=== 最終パラメータ統計 ===")
         total_params = sum(p.numel() for p in self.parameters())
         trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
         trainable_ratio = trainable_params / total_params * 100
@@ -748,7 +790,7 @@ class LisaGemmaForCausalLM(PreTrainedModel):
             print(f"⚠️  仕様書違反: {trainable_ratio:.3f}% >= 1.0%")
         
         # 詳細な学習可能パラメータ分析
-        print("\\n=== 学習可能パラメータ詳細 ===")
+        print("\n=== 学習可能パラメータ詳細 ===")
         categories = {
             'LoRA': 0,
             'MLP Projector': 0,
@@ -773,5 +815,5 @@ class LisaGemmaForCausalLM(PreTrainedModel):
                 ratio = count / total_params * 100
                 print(f"  {category}: {count:,} ({ratio:.3f}%)")
         
-        print("\\n🎯 業界標準達成: 埋め込み層凍結によるパラメータ効率化完了")
+        print("\n🎯 業界標準達成: 埋め込み層凍結によるパラメータ効率化完了")
         return self 

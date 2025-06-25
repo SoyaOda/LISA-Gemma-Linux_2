@@ -250,9 +250,17 @@ class CompositeLoss(nn.Module):
         ground_truth_mask = batch.get("ground_truth_mask")
         
         if predicted_masks is not None and ground_truth_mask is not None:
-            # デバッグ: テンソルサイズを出力
-            print(f"  predicted_masks shape: {predicted_masks.shape}")
-            print(f"  ground_truth_mask shape: {ground_truth_mask.shape}")
+            # デバッグ: テンソルサイズを出力（最初の3回のみ）
+            if hasattr(self, '_mask_debug_counter'):
+                self._mask_debug_counter += 1
+            else:
+                self._mask_debug_counter = 1
+                
+            if self._mask_debug_counter <= 3:
+                print(f"  predicted_masks shape: {predicted_masks.shape}")
+                print(f"  ground_truth_mask shape: {ground_truth_mask.shape}")
+            elif self._mask_debug_counter == 4:
+                print(f"🔇 マスク形状 ログ表示を抑制（以降は省略）")
             
             # DICE損失
             dice_loss = self.dice_loss(predicted_masks, ground_truth_mask)

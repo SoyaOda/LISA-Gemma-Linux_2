@@ -30,18 +30,20 @@ from model.losses import CompositeLoss
 from utils.dataset import HybridDataset, collate_fn
 
 def get_config():
-    """動的設定読み込み"""
-    config_candidates = ['config_linux', 'config_small_test']
-    
-    for config_name in config_candidates:
-        try:
-            config_module = __import__(config_name)
-            print(f"✓ 設定ファイルを使用: {config_name}")
-            return config_module
-        except ImportError:
-            continue
-    
-    raise ImportError("利用可能な設定ファイルが見つかりません")
+    """
+    config_linux.pyを必須として読み込む
+    読み込めない場合はエラーで停止
+    """
+    try:
+        import config_linux as config
+        print(f"設定: config_linux.py を使用")
+        return config
+    except ImportError as e:
+        print(f"❌ ERROR: config_linux.pyが見つかりません")
+        print(f"   詳細: {e}")
+        print(f"   現在のディレクトリ: {os.getcwd()}")
+        print(f"   ファイル存在確認: {os.path.exists('config_linux.py')}")
+        raise SystemExit("config_linux.pyが必須です。ファイルが存在することを確認してください。")
 
 def parse_args():
     parser = argparse.ArgumentParser(description="損失計算と勾配伝播の検証")
@@ -118,8 +120,30 @@ def main():
         
         model = LisaGemmaForCausalLM(lisa_config)
         model = model.to(device)
-        model.train()  # 学習モードに設定
         
+        # LoRA設定を適用（最適化後の設定で検証するため）
+        print("\n🔧 LoRA設定を適用中...")
+        try:
+            from peft import LoraConfig, get_peft_model
+            
+            lora_config = LoraConfig(
+                r=config.LORA_R,
+                lora_alpha=config.LORA_ALPHA,
+                target_modules=config.LORA_TARGET_MODULES,
+                lora_dropout=config.LORA_DROPOUT,
+                bias="none",
+                task_type="CAUSAL_LM"
+            )
+            
+            # LoRAをGemmaモデルに適用
+            model.gemma_model = get_peft_model(model.gemma_model, lora_config)
+            print("✅ LoRA設定が正常に適用されました")
+            
+        except Exception as e:
+            print(f"⚠️  LoRA適用に失敗: {e}")
+            print("   LoRAなしで検証を続行します")
+        
+        model.train()  # 学習モードに設定
         print("✅ モデル初期化完了")
         
         # デバッグ情報の出力
@@ -149,6 +173,15 @@ def main():
         print(f"\n  - 総パラメータ数: {param_info['total_parameters']:,}")
         print(f"  - 学習可能パラメータ数: {param_info['trainable_parameters']:,}")
         print(f"  - 学習可能率: {param_info['trainable_percentage']:.2f}%")
+        
+        # 仕様書準拠性チェック
+        trainable_ratio = param_info['trainable_percentage']
+        spec_compliant = trainable_ratio < 1.0
+        print(f"  - 📋 仕様書準拠性: {'✅ 準拠' if spec_compliant else '❌ 違反'} (要求: <1%)")
+        
+        if not spec_compliant:
+            print(f"    ⚠️  学習可能パラメータ率が仕様書要求を超過: {trainable_ratio:.2f}% > 1%")
+            print("    → 埋め込み層とLMヘッドの凍結、LoRA適用を確認してください")
         
         # 2. プロセッサーとデータセットの準備
         print("\n📦 データセットを準備中...")
@@ -246,39 +279,50 @@ def main():
         # 8. 勾配の検査
         print("\n[パラメータグループごとの勾配検査]:")
         
-        # 各モジュールのキーワード定義（Gemma-3モデル用に更新）
+        # 各モジュールのキーワード定義（最適化後の設定に対応）
         param_groups = {
-            'gemma_embeddings': ['gemma_model.model.embed_tokens', 'gemma_model.get_input_embeddings'],
+            'lora_adapters': ['lora_A', 'lora_B', 'lora_embedding_A', 'lora_embedding_B'],
             'mlp_projector': ['mlp_projector'],
             'sam_image_encoder': ['sam_image_encoder'],
             'sam_prompt_encoder': ['sam_prompt_encoder'],
             'sam_mask_decoder': ['sam_mask_decoder'],
-            'gemma_lm_head': ['gemma_model.lm_head', 'gemma_model.get_output_embeddings']
+            'gemma_embeddings': ['gemma_model.model.embed_tokens', 'embed_tokens'],
+            'gemma_lm_head': ['gemma_model.lm_head', 'lm_head']
         }
         
         # 勾配を分析
         grad_results = analyze_gradients(model, param_groups)
         
-        # 結果の表示
+        # 結果の表示（最適化後の期待値に合わせて）
         all_grads_ok = True
+        expected_trainable = ['lora_adapters', 'mlp_projector', 'sam_mask_decoder']
+        expected_frozen = ['sam_image_encoder', 'sam_prompt_encoder', 'gemma_embeddings', 'gemma_lm_head']
+        
         for module_name, result in grad_results.items():
             if result['total_params'] == 0:
                 print(f"  - {module_name}: パラメータなし")
                 continue
             
             if result['has_grad']:
-                print(f"  - {module_name}: ✅ 勾配あり")
+                if module_name in expected_trainable:
+                    print(f"  - {module_name}: ✅ 勾配あり（期待通り）")
+                else:
+                    print(f"  - {module_name}: ⚠️  勾配あり（期待: 凍結）")
+                    if module_name in expected_frozen:
+                        print(f"    → パラメータ効率のため凍結を推奨")
+                
                 print(f"    - パラメータ数: {result['total_params']}")
                 print(f"    - 勾配ありパラメータ: {result['params_with_grad']}")
                 print(f"    - 平均勾配ノルム: {result['avg_grad_norm']:.2e}")
                 print(f"    - 平均勾配絶対値: {result['avg_grad_mean']:.2e}")
             else:
-                if module_name in ['sam_image_encoder', 'sam_prompt_encoder']:
-                    # これらは凍結されているので勾配がないのが正常
-                    print(f"  - {module_name}: ✅ 勾配なし（凍結モジュール）")
-                else:
+                if module_name in expected_frozen:
+                    print(f"  - {module_name}: ✅ 勾配なし（凍結モジュール - 期待通り）")
+                elif module_name in expected_trainable:
                     print(f"  - {module_name}: ❌ 勾配なし - 計算グラフが切断されている可能性")
                     all_grads_ok = False
+                else:
+                    print(f"  - {module_name}: ✅ 勾配なし（凍結モジュール）")
         
         # 総合判定
         print("\n" + "="*60)

@@ -28,18 +28,23 @@ from typing import Dict, Any, List, Tuple
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 def get_config():
-    """動的設定読み込み"""
-    config_candidates = ['config_linux', 'config_small_test']
+    """
+    config_linux.pyを必須として読み込む
+    読み込めない場合はエラーで停止
     
-    for config_name in config_candidates:
-        try:
-            config_module = __import__(config_name)
-            print(f"✓ 設定ファイルを使用: {config_name}")
-            return config_module, config_name
-        except ImportError:
-            continue
-    
-    raise ImportError("利用可能な設定ファイルが見つかりません")
+    仕様書準拠: 他の検証スクリプト（第1-4節）と完全に一致する厳密な設定読み込み
+    フォールバック機能は排除し、設定ファイルの不整合を早期発見
+    """
+    try:
+        import config_linux as config
+        print(f"設定: config_linux.py を使用")
+        return config, 'config_linux'
+    except ImportError as e:
+        print(f"❌ ERROR: config_linux.pyが見つかりません")
+        print(f"   詳細: {e}")
+        print(f"   現在のディレクトリ: {os.getcwd()}")
+        print(f"   ファイル存在確認: {os.path.exists('config_linux.py')}")
+        raise SystemExit("config_linux.pyが必須です。ファイルが存在することを確認してください。")
 
 def extract_config_dict(config_module) -> Dict[str, Any]:
     """設定モジュールから辞書形式で設定を抽出"""
@@ -102,11 +107,17 @@ def validate_paths(config_dict: Dict[str, Any]) -> Tuple[List[str], List[str]]:
                         warnings.append(f"{path_key}: {path_value} (Hugging Face modelの場合は正常)")
                     else:
                         errors.append(f"{path_key}: {path_value} が見つかりません")
+        else:
+            # パスが設定に含まれていない場合の処理
+            if path_key == 'GEMMA_MODEL_PATH':
+                warnings.append(f"{path_key}: 未設定 (GEMMA_MODEL_IDを使用している場合は正常)")
+            else:
+                warnings.append(f"{path_key}: 設定項目が見つかりません")
     
     return errors, warnings
 
 def validate_hyperparameters(config_dict: Dict[str, Any]) -> List[str]:
-    """ハイパーパラメータの妥当性チェック"""
+    """ハイパーパラメータの妥当性チェック（LISA-Gemma仕様書準拠）"""
     warnings = []
     
     # 学習率の妥当性チェック
@@ -114,16 +125,16 @@ def validate_hyperparameters(config_dict: Dict[str, Any]) -> List[str]:
         lr = config_dict['training_config']['LEARNING_RATE']
         if isinstance(lr, (int, float)):
             if lr > 1e-2:
-                warnings.append(f"学習率が高すぎる可能性があります: {lr} (推奨: 1e-3～1e-5)")
+                warnings.append(f"学習率が高すぎる可能性があります: {lr} (推奨: 1e-4～1e-5)")
             elif lr < 1e-6:
-                warnings.append(f"学習率が低すぎる可能性があります: {lr} (推奨: 1e-3～1e-5)")
+                warnings.append(f"学習率が低すぎる可能性があります: {lr} (推奨: 1e-4～1e-5)")
     
     # バッチサイズの妥当性チェック
     if 'training_config' in config_dict and 'BATCH_SIZE' in config_dict['training_config']:
         batch_size = config_dict['training_config']['BATCH_SIZE']
         if isinstance(batch_size, int):
             if batch_size > 32:
-                warnings.append(f"バッチサイズが大きすぎる可能性があります: {batch_size} (メモリ不足の可能性)")
+                warnings.append(f"バッチサイズが大きすぎる可能性があります: {batch_size} (LISA-Gemmaでは4-8推奨)")
             elif batch_size < 1:
                 warnings.append(f"バッチサイズが無効です: {batch_size}")
     
@@ -133,6 +144,29 @@ def validate_hyperparameters(config_dict: Dict[str, Any]) -> List[str]:
         if isinstance(wd, (int, float)):
             if wd > 0.1:
                 warnings.append(f"重み減衰が大きすぎる可能性があります: {wd} (推奨: 0.01～0.05)")
+    
+    # LISA-Gemma固有パラメータのチェック
+    if 'other_config' in config_dict:
+        other_config = config_dict['other_config']
+        
+        # 画像サイズのチェック
+        if 'GEMMA_IMAGE_SIZE' in other_config:
+            gemma_size = other_config['GEMMA_IMAGE_SIZE']
+            if isinstance(gemma_size, int) and gemma_size != 896:
+                warnings.append(f"Gemma画像サイズが標準と異なります: {gemma_size} (推奨: 896)")
+        
+        if 'SAM_IMAGE_SIZE' in other_config:
+            sam_size = other_config['SAM_IMAGE_SIZE']
+            if isinstance(sam_size, int) and sam_size != 1024:
+                warnings.append(f"SAM画像サイズが標準と異なります: {sam_size} (推奨: 1024)")
+        
+        # LoRAパラメータのチェック
+        if 'LORA_R' in other_config and 'LORA_ALPHA' in other_config:
+            lora_r = other_config['LORA_R']
+            lora_alpha = other_config['LORA_ALPHA']
+            if isinstance(lora_r, int) and isinstance(lora_alpha, int):
+                if lora_alpha < lora_r:
+                    warnings.append(f"LoRA ALPHA({lora_alpha})がR({lora_r})より小さいです (推奨: ALPHA ≥ R)")
     
     return warnings
 
@@ -173,7 +207,7 @@ def create_hyperparameter_table(config_dict: Dict[str, Any]) -> str:
     table.append(f"{'Parameter':<30} | {'Value':<25} | {'Status':<20}")
     table.append("-" * 80)
     
-    # 重要なパラメータを定義
+    # 重要なパラメータを定義（仕様書準拠 + LISA-Gemma固有設定）
     important_params = [
         ('LEARNING_RATE', 'training_config', '学習率'),
         ('BATCH_SIZE', 'training_config', 'バッチサイズ'),
@@ -182,6 +216,10 @@ def create_hyperparameter_table(config_dict: Dict[str, Any]) -> str:
         ('STEPS_PER_EPOCH', 'training_config', 'エポック当たりステップ数'),
         ('GRADIENT_ACCUMULATION_STEPS', 'training_config', '勾配蓄積ステップ'),
         ('GEMMA_IMAGE_SIZE', 'model_config', 'Gemma画像サイズ'),
+        ('SAM_IMAGE_SIZE', 'other_config', 'SAM画像サイズ'),
+        ('MODEL_MAX_LENGTH', 'other_config', 'モデル最大長'),
+        ('LORA_R', 'other_config', 'LoRA-R値'),
+        ('LORA_ALPHA', 'other_config', 'LoRA-Alpha値'),
         ('MIXED_PRECISION', 'system_config', '混合精度'),
         ('GRADIENT_CHECKPOINTING', 'system_config', '勾配チェックポイント'),
     ]
@@ -190,7 +228,7 @@ def create_hyperparameter_table(config_dict: Dict[str, Any]) -> str:
         if category in config_dict and param_key in config_dict[category]:
             value = config_dict[category][param_key]
             
-            # ステータスを判定
+            # ステータスを判定（LISA-Gemma仕様書準拠）
             status = "✓ OK"
             if param_key == 'LEARNING_RATE' and isinstance(value, (int, float)):
                 if value > 1e-2 or value < 1e-6:
@@ -200,6 +238,21 @@ def create_hyperparameter_table(config_dict: Dict[str, Any]) -> str:
                     status = "⚠ 要確認"
             elif param_key == 'WEIGHT_DECAY' and isinstance(value, (int, float)):
                 if value > 0.1:
+                    status = "⚠ 要確認"
+            elif param_key == 'GEMMA_IMAGE_SIZE' and isinstance(value, int):
+                if value != 896:
+                    status = "⚠ 要確認"
+            elif param_key == 'SAM_IMAGE_SIZE' and isinstance(value, int):
+                if value != 1024:
+                    status = "⚠ 要確認"
+            elif param_key == 'MODEL_MAX_LENGTH' and isinstance(value, int):
+                if value < 1024 or value > 4096:
+                    status = "⚠ 要確認"
+            elif param_key == 'LORA_R' and isinstance(value, int):
+                if value < 4 or value > 64:
+                    status = "⚠ 要確認"
+            elif param_key == 'LORA_ALPHA' and isinstance(value, int):
+                if value < 8 or value > 128:
                     status = "⚠ 要確認"
             
             table.append(f"{description:<30} | {str(value):<25} | {status:<20}")

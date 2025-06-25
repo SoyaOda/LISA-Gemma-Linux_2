@@ -25,18 +25,20 @@ import torch.nn as nn
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 def get_config():
-    """動的設定読み込み"""
-    config_candidates = ['config_linux', 'config_small_test']
-    
-    for config_name in config_candidates:
-        try:
-            config_module = __import__(config_name)
-            print(f"✓ 設定ファイルを使用: {config_name}")
-            return config_module
-        except ImportError:
-            continue
-    
-    raise ImportError("利用可能な設定ファイルが見つかりません")
+    """
+    config_linux.pyを必須として読み込む
+    読み込めない場合はエラーで停止
+    """
+    try:
+        import config_linux as config
+        print(f"✅ 設定ファイルを読み込み: config_linux.py")
+        return config
+    except ImportError as e:
+        print(f"❌ ERROR: config_linux.pyが見つかりません")
+        print(f"   詳細: {e}")
+        print(f"   現在のディレクトリ: {os.getcwd()}")
+        print(f"   ファイル存在確認: {os.path.exists('config_linux.py')}")
+        raise SystemExit("config_linux.pyが必須です。ファイルが存在することを確認してください。")
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Verify model architecture and parameters")
@@ -87,6 +89,28 @@ def main():
         # モデルの初期化
         model = LisaGemmaForCausalLM(lisa_config)
         model = model.to(device)
+        
+        # LoRA設定を適用（最適化後の設定で検証するため）
+        print("\n🔧 LoRA設定を適用中...")
+        try:
+            from peft import LoraConfig, get_peft_model
+            
+            lora_config = LoraConfig(
+                r=config.LORA_R,
+                lora_alpha=config.LORA_ALPHA,
+                target_modules=config.LORA_TARGET_MODULES,
+                lora_dropout=config.LORA_DROPOUT,
+                bias="none",
+                task_type="CAUSAL_LM"
+            )
+            
+            # LoRAをGemmaモデルに適用
+            model.gemma_model = get_peft_model(model.gemma_model, lora_config)
+            print("✅ LoRA設定が正常に適用されました")
+            
+        except Exception as e:
+            print(f"⚠️  LoRA適用に失敗: {e}")
+            print("   LoRAなしで検証を続行します")
         
         print("✅ モデル初期化完了")
         print("-" * 80)
@@ -183,6 +207,7 @@ def main():
         trainable_modules = {
             'gemma_embeddings': [],
             'gemma_lm_head': [],
+            'lora_adapters': [],
             'sam_image_encoder': [],
             'sam_prompt_encoder': [],
             'sam_mask_decoder': [],
@@ -201,6 +226,8 @@ def main():
                     trainable_modules['gemma_embeddings'].append(name)
                 elif 'gemma_model' in name and ('lm_head' in name or 'output_embeddings' in name):
                     trainable_modules['gemma_lm_head'].append(name)
+                elif any(lora_key in name for lora_key in ['lora_A', 'lora_B', 'lora_embedding_A', 'lora_embedding_B']):
+                    trainable_modules['lora_adapters'].append(name)
                 elif 'sam_image_encoder' in name:
                     trainable_modules['sam_image_encoder'].append(name)
                 elif 'sam_prompt_encoder' in name:
@@ -217,6 +244,11 @@ def main():
         print(f"学習可能パラメータ数: {trainable_params / 1e6:.2f}M")
         print(f"学習可能率: {100 * trainable_params / total_params:.2f}%")
         
+        # 仕様書準拠性チェック
+        trainable_ratio = 100 * trainable_params / total_params
+        spec_compliant = trainable_ratio < 1.0
+        print(f"\n📋 仕様書準拠性: {'✅ 準拠' if spec_compliant else '❌ 違反'} (要求: <1%, 現在: {trainable_ratio:.2f}%)")
+        
         print("\n\n学習可能パラメータグループ:")
         for module_name, params in trainable_modules.items():
             if params:
@@ -227,7 +259,7 @@ def main():
                 if len(params) > 5:
                     print(f"  ... 他 {len(params) - 5} 個")
         
-        # 期待される学習設定の確認
+        # 期待される学習設定の確認（最適化後の設定）
         print("\n\n[学習設定の検証]:")
         
         # SAM Image Encoderの凍結確認
@@ -264,23 +296,31 @@ def main():
         
         # Gemmaモデルの状態確認
         gemma_main_frozen = True
-        gemma_embeddings_trainable = False
+        gemma_embeddings_frozen = True
+        gemma_lm_head_frozen = True
+        lora_adapters_trainable = False
+        
         if has_gemma:
-            # 埋め込み層以外のパラメータをチェック
             for name, param in model.gemma_model.named_parameters():
                 if param.requires_grad:
-                    if 'embed_tokens' in name or 'lm_head' in name:
-                        gemma_embeddings_trainable = True
+                    if 'embed_tokens' in name:
+                        gemma_embeddings_frozen = False
+                    elif 'lm_head' in name:
+                        gemma_lm_head_frozen = False
+                    elif any(lora_key in name for lora_key in ['lora_A', 'lora_B']):
+                        lora_adapters_trainable = True
                     else:
                         gemma_main_frozen = False
         
-        print("\n期待される設定との比較:")
+        print("\n最適化後の期待設定との比較:")
         print(f"  SAM Image Encoder: {'✅ 凍結' if sam_encoder_frozen else '❌ 学習可能（期待: 凍結）'}")
         print(f"  SAM Prompt Encoder: {'✅ 凍結' if sam_prompt_frozen else '❌ 学習可能（期待: 凍結）'}")
         print(f"  SAM Mask Decoder: {'✅ 学習可能' if sam_decoder_trainable else '❌ 凍結（期待: 学習可能）'}")
         print(f"  MLP Projector: {'✅ 学習可能' if projector_trainable else '❌ 凍結（期待: 学習可能）'}")
         print(f"  Gemma本体: {'✅ 凍結' if gemma_main_frozen else '❌ 学習可能（期待: 凍結）'}")
-        print(f"  Gemma埋め込み層: {'✅ 学習可能' if gemma_embeddings_trainable else '❌ 凍結（期待: 学習可能）'}")
+        print(f"  Gemma埋め込み層: {'✅ 凍結' if gemma_embeddings_frozen else '❌ 学習可能（期待: 凍結）'}")
+        print(f"  Gemma LMヘッド: {'✅ 凍結' if gemma_lm_head_frozen else '❌ 学習可能（期待: 凍結）'}")
+        print(f"  LoRAアダプタ: {'✅ 学習可能' if lora_adapters_trainable else '❌ 凍結（期待: 学習可能）'}")
         
         # 5. 追加の診断情報
         print("\n\n[追加診断情報]:")
@@ -300,6 +340,20 @@ def main():
         # メモリ使用量の推定
         if torch.cuda.is_available():
             print(f"\nGPUメモリ使用量: {torch.cuda.memory_allocated(device) / 1e9:.2f} GB")
+        
+        # 警告とエラーの表示
+        print("\n[重要な警告]:")
+        if not spec_compliant:
+            print(f"⚠️  学習可能パラメータ率が仕様書要求を超過: {trainable_ratio:.2f}% > 1%")
+            print("   → 埋め込み層とLMヘッドの凍結を検討してください")
+        
+        if not gemma_embeddings_frozen:
+            print("⚠️  Gemma埋め込み層が学習可能になっています")
+            print("   → パラメータ効率のため凍結を推奨")
+        
+        if not lora_adapters_trainable:
+            print("⚠️  LoRAアダプタが検出されません")
+            print("   → LoRAによる効率的学習の設定を確認してください")
         
         print("\n" + "="*80)
         print("🎉 第3節検証完了: 視覚-言語アライメントのためのアーキテクチャ監査")

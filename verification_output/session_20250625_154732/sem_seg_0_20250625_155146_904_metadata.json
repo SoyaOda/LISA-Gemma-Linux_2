@@ -1,0 +1,26 @@
+{
+  "dataset_name": "sem_seg",
+  "sample_idx": 0,
+  "session_timestamp": "20250625_154732",
+  "item_timestamp": "20250625_155146_904",
+  "original_image_path": "/mnt/h/download/LISA-dataset/dataset/coco/train2017/000000263767.jpg",
+  "conversations": [
+    "<start_of_turn>user\n<image>\nPlease segment the scissors.<end_of_turn>\n<start_of_turn>model\n[SEG].<end_of_turn>\n",
+    "<start_of_turn>user\nPlease provide a segmentation mask for the scissors handle.<end_of_turn>\n<start_of_turn>model\nIt is [SEG].<end_of_turn>\n",
+    "<start_of_turn>user\nCan you segment the the blade of the scissors in this image?<end_of_turn>\n<start_of_turn>model\nIt is [SEG].<end_of_turn>\n"
+  ],
+  "questions": [
+    "<image>\nPlease segment the scissors.",
+    "Please provide a segmentation mask for the scissors handle.",
+    "Can you segment the the blade of the scissors in this image?"
+  ],
+  "class_names": [
+    "scissors",
+    "scissors handle",
+    "the blade of the scissors"
+  ],
+  "comparison_image": "verification_output/session_20250625_154732/sem_seg_0_20250625_155146_904_comparison.png",
+  "processing_note": "Simple resize: mask resized to match processed image size",
+  "image_size": "500x375",
+  "mask_size": "500x375"
+}

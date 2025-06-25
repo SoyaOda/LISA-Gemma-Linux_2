@@ -1,0 +1,167 @@
+{
+  "session_timestamp": "20250625_170929",
+  "test_config": {
+    "iterations": 20,
+    "learning_rate": 0.0001,
+    "dataset_type": "reason_seg",
+    "batch_size": 2
+  },
+  "model_info": {
+    "total_parameters": 4965272736,
+    "trainable_parameters": 27664356,
+    "trainable_percentage": 0.5571568264402385
+  },
+  "analysis": {
+    "success": true,
+    "initial_loss": 5.860361576080322,
+    "final_loss": 0.7460866570472717,
+    "reduction_ratio": 0.8726893132170372,
+    "seg_reduction_ratio": 0.6023500689821425,
+    "text_reduction_ratio": 0.9383915767018253,
+    "stability_ratio": 0.3312116977607326,
+    "iterations": 20
+  },
+  "loss_history": [
+    {
+      "iteration": 0,
+      "total_loss": 5.860361576080322,
+      "text_loss": 4.188178062438965,
+      "dice_loss": 0.8447818160057068,
+      "bce_loss": 0.624896228313446
+    },
+    {
+      "iteration": 1,
+      "total_loss": 5.750898838043213,
+      "text_loss": 3.782010316848755,
+      "dice_loss": 0.9911284446716309,
+      "bce_loss": 0.7366621494293213
+    },
+    {
+      "iteration": 2,
+      "total_loss": 4.1374640464782715,
+      "text_loss": 3.0566470623016357,
+      "dice_loss": 0.8453174233436584,
+      "bce_loss": 0.32907918095588684
+    },
+    {
+      "iteration": 3,
+      "total_loss": 3.431912422180176,
+      "text_loss": 2.404978036880493,
+      "dice_loss": 0.8423706293106079,
+      "bce_loss": 0.3028746247291565
+    },
+    {
+      "iteration": 4,
+      "total_loss": 3.2468276023864746,
+      "text_loss": 2.0612618923187256,
+      "dice_loss": 0.9251478910446167,
+      "bce_loss": 0.36149585247039795
+    },
+    {
+      "iteration": 5,
+      "total_loss": 2.8612096309661865,
+      "text_loss": 1.8559244871139526,
+      "dice_loss": 0.8535128831863403,
+      "bce_loss": 0.28926435112953186
+    },
+    {
+      "iteration": 6,
+      "total_loss": 2.6386873722076416,
+      "text_loss": 1.6557387113571167,
+      "dice_loss": 0.8342982530593872,
+      "bce_loss": 0.2828997075557709
+    },
+    {
+      "iteration": 7,
+      "total_loss": 2.395430564880371,
+      "text_loss": 1.435335397720337,
+      "dice_loss": 0.8357338905334473,
+      "bce_loss": 0.27111417055130005
+    },
+    {
+      "iteration": 8,
+      "total_loss": 2.1367380619049072,
+      "text_loss": 1.2077940702438354,
+      "dice_loss": 0.823887825012207,
+      "bce_loss": 0.25850003957748413
+    },
+    {
+      "iteration": 9,
+      "total_loss": 1.9024882316589355,
+      "text_loss": 1.0145412683486938,
+      "dice_loss": 0.7831251621246338,
+      "bce_loss": 0.2481922209262848
+    },
+    {
+      "iteration": 10,
+      "total_loss": 1.6654465198516846,
+      "text_loss": 0.8171031475067139,
+      "dice_loss": 0.7661185264587402,
+      "bce_loss": 0.2326420545578003
+    },
+    {
+      "iteration": 11,
+      "total_loss": 1.466991901397705,
+      "text_loss": 0.6707056164741516,
+      "dice_loss": 0.7075859308242798,
+      "bce_loss": 0.22124667465686798
+    },
+    {
+      "iteration": 12,
+      "total_loss": 1.277814507484436,
+      "text_loss": 0.5658226013183594,
+      "dice_loss": 0.6662693023681641,
+      "bce_loss": 0.18942862749099731
+    },
+    {
+      "iteration": 13,
+      "total_loss": 1.0987176895141602,
+      "text_loss": 0.45623779296875,
+      "dice_loss": 0.6097452640533447,
+      "bce_loss": 0.1688036322593689
+    },
+    {
+      "iteration": 14,
+      "total_loss": 1.004589319229126,
+      "text_loss": 0.39538323879241943,
+      "dice_loss": 0.5682342052459717,
+      "bce_loss": 0.16254448890686035
+    },
+    {
+      "iteration": 15,
+      "total_loss": 0.8770285248756409,
+      "text_loss": 0.35382401943206787,
+      "dice_loss": 0.5201942324638367,
+      "bce_loss": 0.13155367970466614
+    },
+    {
+      "iteration": 16,
+      "total_loss": 0.7679830193519592,
+      "text_loss": 0.3102915287017822,
+      "dice_loss": 0.46304312348365784,
+      "bce_loss": 0.11308497190475464
+    },
+    {
+      "iteration": 17,
+      "total_loss": 0.7549875974655151,
+      "text_loss": 0.284170925617218,
+      "dice_loss": 0.44919294118881226,
+      "bce_loss": 0.12311012297868729
+    },
+    {
+      "iteration": 18,
+      "total_loss": 0.6550108790397644,
+      "text_loss": 0.2694155275821686,
+      "dice_loss": 0.4126327633857727,
+      "bce_loss": 0.08963949233293533
+    },
+    {
+      "iteration": 19,
+      "total_loss": 0.7460866570472717,
+      "text_loss": 0.258027046918869,
+      "dice_loss": 0.4538500905036926,
+      "bce_loss": 0.1305672824382782
+    }
+  ],
+  "final_status": "success"
+}
