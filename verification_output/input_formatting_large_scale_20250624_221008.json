@@ -1,0 +1,5218 @@
+{
+  "session_id": "20250624_221008",
+  "verification_type": "input_formatting_large_scale",
+  "timestamp": "2025-06-24T22:10:50.671122",
+  "processing_time_seconds": 38.607950925827026,
+  "total_samples": 100,
+  "correct_samples": 100,
+  "success_rate": 100.0,
+  "statistics": {
+    "avg_sequence_length": 424.48,
+    "avg_labeled_tokens": 52.54,
+    "seg_token_samples": 100,
+    "seg_token_rate": 100.0
+  },
+  "error_analysis": {},
+  "sample_details": [
+    {
+      "sample_idx": 0,
+      "sequence_length": 415,
+      "non_padding_tokens": 333,
+      "labeled_tokens": 9,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          325
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          317,
+          330
+        ],
+        "end_of_turn": [
+          315,
+          327,
+          328
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 315,
+          "length": 315,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 317,
+          "end": 327,
+          "length": 11,
+          "prediction_tokens": 8,
+          "has_predictions": true
+        },
+        {
+          "start": 330,
+          "end": 415,
+          "length": 86,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 1,
+      "sequence_length": 415,
+      "non_padding_tokens": 316,
+      "labeled_tokens": 9,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          308
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          300,
+          313
+        ],
+        "end_of_turn": [
+          298,
+          310,
+          311
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 298,
+          "length": 298,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 300,
+          "end": 310,
+          "length": 11,
+          "prediction_tokens": 8,
+          "has_predictions": true
+        },
+        {
+          "start": 313,
+          "end": 415,
+          "length": 103,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 2,
+      "sequence_length": 415,
+      "non_padding_tokens": 415,
+      "labeled_tokens": 102,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          409
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          303,
+          412
+        ],
+        "end_of_turn": [
+          301,
+          406,
+          410
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 301,
+          "length": 301,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 303,
+          "end": 406,
+          "length": 104,
+          "prediction_tokens": 101,
+          "has_predictions": true
+        },
+        {
+          "start": 412,
+          "end": 415,
+          "length": 4,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 3,
+      "sequence_length": 415,
+      "non_padding_tokens": 323,
+      "labeled_tokens": 11,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          315
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          305,
+          320
+        ],
+        "end_of_turn": [
+          303,
+          317,
+          318
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 303,
+          "length": 303,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 305,
+          "end": 317,
+          "length": 13,
+          "prediction_tokens": 10,
+          "has_predictions": true
+        },
+        {
+          "start": 320,
+          "end": 415,
+          "length": 96,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 4,
+      "sequence_length": 415,
+      "non_padding_tokens": 323,
+      "labeled_tokens": 7,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          315
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          309,
+          320
+        ],
+        "end_of_turn": [
+          307,
+          317,
+          318
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 307,
+          "length": 307,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 309,
+          "end": 317,
+          "length": 9,
+          "prediction_tokens": 6,
+          "has_predictions": true
+        },
+        {
+          "start": 320,
+          "end": 415,
+          "length": 96,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 5,
+      "sequence_length": 415,
+      "non_padding_tokens": 313,
+      "labeled_tokens": 4,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          305
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          302,
+          310
+        ],
+        "end_of_turn": [
+          300,
+          307,
+          308
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 300,
+          "length": 300,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 302,
+          "end": 307,
+          "length": 6,
+          "prediction_tokens": 3,
+          "has_predictions": true
+        },
+        {
+          "start": 310,
+          "end": 415,
+          "length": 106,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 6,
+      "sequence_length": 415,
+      "non_padding_tokens": 397,
+      "labeled_tokens": 83,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          313
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          307,
+          394
+        ],
+        "end_of_turn": [
+          305,
+          391,
+          392
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 305,
+          "length": 305,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 307,
+          "end": 391,
+          "length": 85,
+          "prediction_tokens": 82,
+          "has_predictions": true
+        },
+        {
+          "start": 394,
+          "end": 415,
+          "length": 22,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 7,
+      "sequence_length": 415,
+      "non_padding_tokens": 411,
+      "labeled_tokens": 87,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          325
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          317,
+          408
+        ],
+        "end_of_turn": [
+          315,
+          405,
+          406
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 315,
+          "length": 315,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 317,
+          "end": 405,
+          "length": 89,
+          "prediction_tokens": 86,
+          "has_predictions": true
+        },
+        {
+          "start": 408,
+          "end": 415,
+          "length": 8,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 8,
+      "sequence_length": 426,
+      "non_padding_tokens": 317,
+      "labeled_tokens": 9,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          309
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          301,
+          314
+        ],
+        "end_of_turn": [
+          299,
+          311,
+          312
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 299,
+          "length": 299,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 301,
+          "end": 311,
+          "length": 11,
+          "prediction_tokens": 8,
+          "has_predictions": true
+        },
+        {
+          "start": 314,
+          "end": 426,
+          "length": 113,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 9,
+      "sequence_length": 426,
+      "non_padding_tokens": 397,
+      "labeled_tokens": 89,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          304
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          301,
+          394
+        ],
+        "end_of_turn": [
+          299,
+          391,
+          392
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 299,
+          "length": 299,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 301,
+          "end": 391,
+          "length": 91,
+          "prediction_tokens": 88,
+          "has_predictions": true
+        },
+        {
+          "start": 394,
+          "end": 426,
+          "length": 33,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 10,
+      "sequence_length": 426,
+      "non_padding_tokens": 403,
+      "labeled_tokens": 88,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          311
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          308,
+          400
+        ],
+        "end_of_turn": [
+          306,
+          397,
+          398
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 306,
+          "length": 306,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 308,
+          "end": 397,
+          "length": 90,
+          "prediction_tokens": 87,
+          "has_predictions": true
+        },
+        {
+          "start": 400,
+          "end": 426,
+          "length": 27,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 11,
+      "sequence_length": 426,
+      "non_padding_tokens": 318,
+      "labeled_tokens": 7,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          310
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          304,
+          315
+        ],
+        "end_of_turn": [
+          302,
+          312,
+          313
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 302,
+          "length": 302,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 304,
+          "end": 312,
+          "length": 9,
+          "prediction_tokens": 6,
+          "has_predictions": true
+        },
+        {
+          "start": 315,
+          "end": 426,
+          "length": 112,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 12,
+      "sequence_length": 426,
+      "non_padding_tokens": 388,
+      "labeled_tokens": 82,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          305
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          299,
+          385
+        ],
+        "end_of_turn": [
+          297,
+          382,
+          383
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 297,
+          "length": 297,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 299,
+          "end": 382,
+          "length": 84,
+          "prediction_tokens": 81,
+          "has_predictions": true
+        },
+        {
+          "start": 385,
+          "end": 426,
+          "length": 42,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 13,
+      "sequence_length": 426,
+      "non_padding_tokens": 404,
+      "labeled_tokens": 98,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          398
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          296,
+          401
+        ],
+        "end_of_turn": [
+          294,
+          395,
+          399
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 294,
+          "length": 294,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 296,
+          "end": 395,
+          "length": 100,
+          "prediction_tokens": 97,
+          "has_predictions": true
+        },
+        {
+          "start": 401,
+          "end": 426,
+          "length": 26,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 14,
+      "sequence_length": 426,
+      "non_padding_tokens": 317,
+      "labeled_tokens": 4,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          309
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          306,
+          314
+        ],
+        "end_of_turn": [
+          304,
+          311,
+          312
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 304,
+          "length": 304,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 306,
+          "end": 311,
+          "length": 6,
+          "prediction_tokens": 3,
+          "has_predictions": true
+        },
+        {
+          "start": 314,
+          "end": 426,
+          "length": 113,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 15,
+      "sequence_length": 426,
+      "non_padding_tokens": 426,
+      "labeled_tokens": 114,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          308
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          305,
+          423
+        ],
+        "end_of_turn": [
+          303,
+          420,
+          421
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 303,
+          "length": 303,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 305,
+          "end": 420,
+          "length": 116,
+          "prediction_tokens": 113,
+          "has_predictions": true
+        },
+        {
+          "start": 423,
+          "end": 426,
+          "length": 4,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 16,
+      "sequence_length": 450,
+      "non_padding_tokens": 328,
+      "labeled_tokens": 4,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          320
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          317,
+          325
+        ],
+        "end_of_turn": [
+          315,
+          322,
+          323
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 315,
+          "length": 315,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 317,
+          "end": 322,
+          "length": 6,
+          "prediction_tokens": 3,
+          "has_predictions": true
+        },
+        {
+          "start": 325,
+          "end": 450,
+          "length": 126,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 17,
+      "sequence_length": 450,
+      "non_padding_tokens": 393,
+      "labeled_tokens": 77,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          315
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          309,
+          390
+        ],
+        "end_of_turn": [
+          307,
+          387,
+          388
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 307,
+          "length": 307,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 309,
+          "end": 387,
+          "length": 79,
+          "prediction_tokens": 76,
+          "has_predictions": true
+        },
+        {
+          "start": 390,
+          "end": 450,
+          "length": 61,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 18,
+      "sequence_length": 450,
+      "non_padding_tokens": 423,
+      "labeled_tokens": 107,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          319
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          309,
+          420
+        ],
+        "end_of_turn": [
+          307,
+          417,
+          418
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 307,
+          "length": 307,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 309,
+          "end": 417,
+          "length": 109,
+          "prediction_tokens": 106,
+          "has_predictions": true
+        },
+        {
+          "start": 420,
+          "end": 450,
+          "length": 31,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 19,
+      "sequence_length": 450,
+      "non_padding_tokens": 410,
+      "labeled_tokens": 81,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          332
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          322,
+          407
+        ],
+        "end_of_turn": [
+          320,
+          404,
+          405
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 320,
+          "length": 320,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 322,
+          "end": 404,
+          "length": 83,
+          "prediction_tokens": 80,
+          "has_predictions": true
+        },
+        {
+          "start": 407,
+          "end": 450,
+          "length": 44,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 20,
+      "sequence_length": 450,
+      "non_padding_tokens": 400,
+      "labeled_tokens": 86,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          310
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          307,
+          397
+        ],
+        "end_of_turn": [
+          305,
+          394,
+          395
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 305,
+          "length": 305,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 307,
+          "end": 394,
+          "length": 88,
+          "prediction_tokens": 85,
+          "has_predictions": true
+        },
+        {
+          "start": 397,
+          "end": 450,
+          "length": 54,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 21,
+      "sequence_length": 450,
+      "non_padding_tokens": 407,
+      "labeled_tokens": 102,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          308
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          298,
+          404
+        ],
+        "end_of_turn": [
+          296,
+          401,
+          402
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 296,
+          "length": 296,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 298,
+          "end": 401,
+          "length": 104,
+          "prediction_tokens": 101,
+          "has_predictions": true
+        },
+        {
+          "start": 404,
+          "end": 450,
+          "length": 47,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 22,
+      "sequence_length": 450,
+      "non_padding_tokens": 431,
+      "labeled_tokens": 119,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          315
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          305,
+          428
+        ],
+        "end_of_turn": [
+          303,
+          425,
+          426
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 303,
+          "length": 303,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 305,
+          "end": 425,
+          "length": 121,
+          "prediction_tokens": 118,
+          "has_predictions": true
+        },
+        {
+          "start": 428,
+          "end": 450,
+          "length": 23,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 23,
+      "sequence_length": 450,
+      "non_padding_tokens": 450,
+      "labeled_tokens": 140,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          309
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          303,
+          447
+        ],
+        "end_of_turn": [
+          301,
+          444,
+          445
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 301,
+          "length": 301,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 303,
+          "end": 444,
+          "length": 142,
+          "prediction_tokens": 139,
+          "has_predictions": true
+        },
+        {
+          "start": 447,
+          "end": 450,
+          "length": 4,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 24,
+      "sequence_length": 472,
+      "non_padding_tokens": 317,
+      "labeled_tokens": 11,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          309
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          299,
+          314
+        ],
+        "end_of_turn": [
+          297,
+          311,
+          312
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 297,
+          "length": 297,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 299,
+          "end": 311,
+          "length": 13,
+          "prediction_tokens": 10,
+          "has_predictions": true
+        },
+        {
+          "start": 314,
+          "end": 472,
+          "length": 159,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 25,
+      "sequence_length": 472,
+      "non_padding_tokens": 310,
+      "labeled_tokens": 9,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          302
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          294,
+          307
+        ],
+        "end_of_turn": [
+          292,
+          304,
+          305
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 292,
+          "length": 292,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 294,
+          "end": 304,
+          "length": 11,
+          "prediction_tokens": 8,
+          "has_predictions": true
+        },
+        {
+          "start": 307,
+          "end": 472,
+          "length": 166,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 26,
+      "sequence_length": 472,
+      "non_padding_tokens": 472,
+      "labeled_tokens": 161,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          312
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          304,
+          469
+        ],
+        "end_of_turn": [
+          302,
+          466,
+          467
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 302,
+          "length": 302,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 304,
+          "end": 466,
+          "length": 163,
+          "prediction_tokens": 160,
+          "has_predictions": true
+        },
+        {
+          "start": 469,
+          "end": 472,
+          "length": 4,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 27,
+      "sequence_length": 472,
+      "non_padding_tokens": 377,
+      "labeled_tokens": 71,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          371
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          296,
+          374
+        ],
+        "end_of_turn": [
+          294,
+          368,
+          372
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 294,
+          "length": 294,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 296,
+          "end": 368,
+          "length": 73,
+          "prediction_tokens": 70,
+          "has_predictions": true
+        },
+        {
+          "start": 374,
+          "end": 472,
+          "length": 99,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 28,
+      "sequence_length": 472,
+      "non_padding_tokens": 439,
+      "labeled_tokens": 128,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          310
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          304,
+          436
+        ],
+        "end_of_turn": [
+          302,
+          433,
+          434
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 302,
+          "length": 302,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 304,
+          "end": 433,
+          "length": 130,
+          "prediction_tokens": 127,
+          "has_predictions": true
+        },
+        {
+          "start": 436,
+          "end": 472,
+          "length": 37,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 29,
+      "sequence_length": 472,
+      "non_padding_tokens": 320,
+      "labeled_tokens": 11,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          312
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          302,
+          317
+        ],
+        "end_of_turn": [
+          300,
+          314,
+          315
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 300,
+          "length": 300,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 302,
+          "end": 314,
+          "length": 13,
+          "prediction_tokens": 10,
+          "has_predictions": true
+        },
+        {
+          "start": 317,
+          "end": 472,
+          "length": 156,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 30,
+      "sequence_length": 472,
+      "non_padding_tokens": 320,
+      "labeled_tokens": 11,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          312
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          302,
+          317
+        ],
+        "end_of_turn": [
+          300,
+          314,
+          315
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 300,
+          "length": 300,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 302,
+          "end": 314,
+          "length": 13,
+          "prediction_tokens": 10,
+          "has_predictions": true
+        },
+        {
+          "start": 317,
+          "end": 472,
+          "length": 156,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 31,
+      "sequence_length": 472,
+      "non_padding_tokens": 438,
+      "labeled_tokens": 128,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          311
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          303,
+          435
+        ],
+        "end_of_turn": [
+          301,
+          432,
+          433
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 301,
+          "length": 301,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 303,
+          "end": 432,
+          "length": 130,
+          "prediction_tokens": 127,
+          "has_predictions": true
+        },
+        {
+          "start": 435,
+          "end": 472,
+          "length": 38,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 32,
+      "sequence_length": 448,
+      "non_padding_tokens": 389,
+      "labeled_tokens": 78,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          307
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          304,
+          386
+        ],
+        "end_of_turn": [
+          302,
+          383,
+          384
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 302,
+          "length": 302,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 304,
+          "end": 383,
+          "length": 80,
+          "prediction_tokens": 77,
+          "has_predictions": true
+        },
+        {
+          "start": 386,
+          "end": 448,
+          "length": 63,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 33,
+      "sequence_length": 448,
+      "non_padding_tokens": 399,
+      "labeled_tokens": 90,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          308
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          302,
+          396
+        ],
+        "end_of_turn": [
+          300,
+          393,
+          394
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 300,
+          "length": 300,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 302,
+          "end": 393,
+          "length": 92,
+          "prediction_tokens": 89,
+          "has_predictions": true
+        },
+        {
+          "start": 396,
+          "end": 448,
+          "length": 53,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 34,
+      "sequence_length": 448,
+      "non_padding_tokens": 416,
+      "labeled_tokens": 99,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          318
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          310,
+          413
+        ],
+        "end_of_turn": [
+          308,
+          410,
+          411
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 308,
+          "length": 308,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 310,
+          "end": 410,
+          "length": 101,
+          "prediction_tokens": 98,
+          "has_predictions": true
+        },
+        {
+          "start": 413,
+          "end": 448,
+          "length": 36,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 35,
+      "sequence_length": 448,
+      "non_padding_tokens": 314,
+      "labeled_tokens": 7,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          306
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          300,
+          311
+        ],
+        "end_of_turn": [
+          298,
+          308,
+          309
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 298,
+          "length": 298,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 300,
+          "end": 308,
+          "length": 9,
+          "prediction_tokens": 6,
+          "has_predictions": true
+        },
+        {
+          "start": 311,
+          "end": 448,
+          "length": 138,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 36,
+      "sequence_length": 448,
+      "non_padding_tokens": 324,
+      "labeled_tokens": 24,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          318
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          290,
+          321
+        ],
+        "end_of_turn": [
+          288,
+          315,
+          319
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 288,
+          "length": 288,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 290,
+          "end": 315,
+          "length": 26,
+          "prediction_tokens": 23,
+          "has_predictions": true
+        },
+        {
+          "start": 321,
+          "end": 448,
+          "length": 128,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 37,
+      "sequence_length": 448,
+      "non_padding_tokens": 314,
+      "labeled_tokens": 9,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          306
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          298,
+          311
+        ],
+        "end_of_turn": [
+          296,
+          308,
+          309
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 296,
+          "length": 296,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 298,
+          "end": 308,
+          "length": 11,
+          "prediction_tokens": 8,
+          "has_predictions": true
+        },
+        {
+          "start": 311,
+          "end": 448,
+          "length": 138,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 38,
+      "sequence_length": 448,
+      "non_padding_tokens": 354,
+      "labeled_tokens": 37,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          318
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          310,
+          351
+        ],
+        "end_of_turn": [
+          308,
+          348,
+          349
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 308,
+          "length": 308,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 310,
+          "end": 348,
+          "length": 39,
+          "prediction_tokens": 36,
+          "has_predictions": true
+        },
+        {
+          "start": 351,
+          "end": 448,
+          "length": 98,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 39,
+      "sequence_length": 448,
+      "non_padding_tokens": 448,
+      "labeled_tokens": 120,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          329
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          321,
+          445
+        ],
+        "end_of_turn": [
+          319,
+          442,
+          443
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 319,
+          "length": 319,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 321,
+          "end": 442,
+          "length": 122,
+          "prediction_tokens": 119,
+          "has_predictions": true
+        },
+        {
+          "start": 445,
+          "end": 448,
+          "length": 4,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 40,
+      "sequence_length": 435,
+      "non_padding_tokens": 390,
+      "labeled_tokens": 83,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          306
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          300,
+          387
+        ],
+        "end_of_turn": [
+          298,
+          384,
+          385
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 298,
+          "length": 298,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 300,
+          "end": 384,
+          "length": 85,
+          "prediction_tokens": 82,
+          "has_predictions": true
+        },
+        {
+          "start": 387,
+          "end": 435,
+          "length": 49,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 41,
+      "sequence_length": 435,
+      "non_padding_tokens": 329,
+      "labeled_tokens": 21,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          307
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          301,
+          326
+        ],
+        "end_of_turn": [
+          299,
+          323,
+          324
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 299,
+          "length": 299,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 301,
+          "end": 323,
+          "length": 23,
+          "prediction_tokens": 20,
+          "has_predictions": true
+        },
+        {
+          "start": 326,
+          "end": 435,
+          "length": 110,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 42,
+      "sequence_length": 435,
+      "non_padding_tokens": 310,
+      "labeled_tokens": 4,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          302
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          299,
+          307
+        ],
+        "end_of_turn": [
+          297,
+          304,
+          305
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 297,
+          "length": 297,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 299,
+          "end": 304,
+          "length": 6,
+          "prediction_tokens": 3,
+          "has_predictions": true
+        },
+        {
+          "start": 307,
+          "end": 435,
+          "length": 129,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 43,
+      "sequence_length": 435,
+      "non_padding_tokens": 405,
+      "labeled_tokens": 80,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          324
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          318,
+          402
+        ],
+        "end_of_turn": [
+          316,
+          399,
+          400
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 316,
+          "length": 316,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 318,
+          "end": 399,
+          "length": 82,
+          "prediction_tokens": 79,
+          "has_predictions": true
+        },
+        {
+          "start": 402,
+          "end": 435,
+          "length": 34,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 44,
+      "sequence_length": 435,
+      "non_padding_tokens": 435,
+      "labeled_tokens": 118,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          316
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          310,
+          432
+        ],
+        "end_of_turn": [
+          308,
+          429,
+          430
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 308,
+          "length": 308,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 310,
+          "end": 429,
+          "length": 120,
+          "prediction_tokens": 117,
+          "has_predictions": true
+        },
+        {
+          "start": 432,
+          "end": 435,
+          "length": 4,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 45,
+      "sequence_length": 435,
+      "non_padding_tokens": 406,
+      "labeled_tokens": 87,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          315
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          312,
+          403
+        ],
+        "end_of_turn": [
+          310,
+          400,
+          401
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 310,
+          "length": 310,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 312,
+          "end": 400,
+          "length": 89,
+          "prediction_tokens": 86,
+          "has_predictions": true
+        },
+        {
+          "start": 403,
+          "end": 435,
+          "length": 33,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 46,
+      "sequence_length": 435,
+      "non_padding_tokens": 430,
+      "labeled_tokens": 114,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          315
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          309,
+          427
+        ],
+        "end_of_turn": [
+          307,
+          424,
+          425
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 307,
+          "length": 307,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 309,
+          "end": 424,
+          "length": 116,
+          "prediction_tokens": 113,
+          "has_predictions": true
+        },
+        {
+          "start": 427,
+          "end": 435,
+          "length": 9,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 47,
+      "sequence_length": 435,
+      "non_padding_tokens": 400,
+      "labeled_tokens": 88,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          313
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          305,
+          397
+        ],
+        "end_of_turn": [
+          303,
+          394,
+          395
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 303,
+          "length": 303,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 305,
+          "end": 394,
+          "length": 90,
+          "prediction_tokens": 87,
+          "has_predictions": true
+        },
+        {
+          "start": 397,
+          "end": 435,
+          "length": 39,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 48,
+      "sequence_length": 395,
+      "non_padding_tokens": 322,
+      "labeled_tokens": 7,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          314
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          308,
+          319
+        ],
+        "end_of_turn": [
+          306,
+          316,
+          317
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 306,
+          "length": 306,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 308,
+          "end": 316,
+          "length": 9,
+          "prediction_tokens": 6,
+          "has_predictions": true
+        },
+        {
+          "start": 319,
+          "end": 395,
+          "length": 77,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 49,
+      "sequence_length": 395,
+      "non_padding_tokens": 332,
+      "labeled_tokens": 22,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          306
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          303,
+          329
+        ],
+        "end_of_turn": [
+          301,
+          326,
+          327
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 301,
+          "length": 301,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 303,
+          "end": 326,
+          "length": 24,
+          "prediction_tokens": 21,
+          "has_predictions": true
+        },
+        {
+          "start": 329,
+          "end": 395,
+          "length": 67,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 50,
+      "sequence_length": 395,
+      "non_padding_tokens": 312,
+      "labeled_tokens": 7,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          304
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          298,
+          309
+        ],
+        "end_of_turn": [
+          296,
+          306,
+          307
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 296,
+          "length": 296,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 298,
+          "end": 306,
+          "length": 9,
+          "prediction_tokens": 6,
+          "has_predictions": true
+        },
+        {
+          "start": 309,
+          "end": 395,
+          "length": 87,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 51,
+      "sequence_length": 395,
+      "non_padding_tokens": 384,
+      "labeled_tokens": 75,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          305
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          302,
+          381
+        ],
+        "end_of_turn": [
+          300,
+          378,
+          379
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 300,
+          "length": 300,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 302,
+          "end": 378,
+          "length": 77,
+          "prediction_tokens": 74,
+          "has_predictions": true
+        },
+        {
+          "start": 381,
+          "end": 395,
+          "length": 15,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 52,
+      "sequence_length": 395,
+      "non_padding_tokens": 395,
+      "labeled_tokens": 84,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          314
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          304,
+          392
+        ],
+        "end_of_turn": [
+          302,
+          389,
+          390
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 302,
+          "length": 302,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 304,
+          "end": 389,
+          "length": 86,
+          "prediction_tokens": 83,
+          "has_predictions": true
+        },
+        {
+          "start": 392,
+          "end": 395,
+          "length": 4,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 53,
+      "sequence_length": 395,
+      "non_padding_tokens": 314,
+      "labeled_tokens": 7,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          306
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          300,
+          311
+        ],
+        "end_of_turn": [
+          298,
+          308,
+          309
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 298,
+          "length": 298,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 300,
+          "end": 308,
+          "length": 9,
+          "prediction_tokens": 6,
+          "has_predictions": true
+        },
+        {
+          "start": 311,
+          "end": 395,
+          "length": 85,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 54,
+      "sequence_length": 395,
+      "non_padding_tokens": 317,
+      "labeled_tokens": 7,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          309
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          303,
+          314
+        ],
+        "end_of_turn": [
+          301,
+          311,
+          312
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 301,
+          "length": 301,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 303,
+          "end": 311,
+          "length": 9,
+          "prediction_tokens": 6,
+          "has_predictions": true
+        },
+        {
+          "start": 314,
+          "end": 395,
+          "length": 82,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 55,
+      "sequence_length": 395,
+      "non_padding_tokens": 326,
+      "labeled_tokens": 21,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          304
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          298,
+          323
+        ],
+        "end_of_turn": [
+          296,
+          320,
+          321
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 296,
+          "length": 296,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 298,
+          "end": 320,
+          "length": 23,
+          "prediction_tokens": 20,
+          "has_predictions": true
+        },
+        {
+          "start": 323,
+          "end": 395,
+          "length": 73,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 56,
+      "sequence_length": 393,
+      "non_padding_tokens": 314,
+      "labeled_tokens": 7,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          306
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          300,
+          311
+        ],
+        "end_of_turn": [
+          298,
+          308,
+          309
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 298,
+          "length": 298,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 300,
+          "end": 308,
+          "length": 9,
+          "prediction_tokens": 6,
+          "has_predictions": true
+        },
+        {
+          "start": 311,
+          "end": 393,
+          "length": 83,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 57,
+      "sequence_length": 393,
+      "non_padding_tokens": 315,
+      "labeled_tokens": 9,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          307
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          299,
+          312
+        ],
+        "end_of_turn": [
+          297,
+          309,
+          310
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 297,
+          "length": 297,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 299,
+          "end": 309,
+          "length": 11,
+          "prediction_tokens": 8,
+          "has_predictions": true
+        },
+        {
+          "start": 312,
+          "end": 393,
+          "length": 82,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 58,
+      "sequence_length": 393,
+      "non_padding_tokens": 380,
+      "labeled_tokens": 66,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          315
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          307,
+          377
+        ],
+        "end_of_turn": [
+          305,
+          374,
+          375
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 305,
+          "length": 305,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 307,
+          "end": 374,
+          "length": 68,
+          "prediction_tokens": 65,
+          "has_predictions": true
+        },
+        {
+          "start": 377,
+          "end": 393,
+          "length": 17,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 59,
+      "sequence_length": 393,
+      "non_padding_tokens": 321,
+      "labeled_tokens": 9,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          313
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          305,
+          318
+        ],
+        "end_of_turn": [
+          303,
+          315,
+          316
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 303,
+          "length": 303,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 305,
+          "end": 315,
+          "length": 11,
+          "prediction_tokens": 8,
+          "has_predictions": true
+        },
+        {
+          "start": 318,
+          "end": 393,
+          "length": 76,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 60,
+      "sequence_length": 393,
+      "non_padding_tokens": 323,
+      "labeled_tokens": 4,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          315
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          312,
+          320
+        ],
+        "end_of_turn": [
+          310,
+          317,
+          318
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 310,
+          "length": 310,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 312,
+          "end": 317,
+          "length": 6,
+          "prediction_tokens": 3,
+          "has_predictions": true
+        },
+        {
+          "start": 320,
+          "end": 393,
+          "length": 74,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 61,
+      "sequence_length": 393,
+      "non_padding_tokens": 393,
+      "labeled_tokens": 86,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          310
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          300,
+          390
+        ],
+        "end_of_turn": [
+          298,
+          387,
+          388
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 298,
+          "length": 298,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 300,
+          "end": 387,
+          "length": 88,
+          "prediction_tokens": 85,
+          "has_predictions": true
+        },
+        {
+          "start": 390,
+          "end": 393,
+          "length": 4,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 62,
+      "sequence_length": 393,
+      "non_padding_tokens": 393,
+      "labeled_tokens": 82,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          314
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          304,
+          390
+        ],
+        "end_of_turn": [
+          302,
+          387,
+          388
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 302,
+          "length": 302,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 304,
+          "end": 387,
+          "length": 84,
+          "prediction_tokens": 81,
+          "has_predictions": true
+        },
+        {
+          "start": 390,
+          "end": 393,
+          "length": 4,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 63,
+      "sequence_length": 393,
+      "non_padding_tokens": 315,
+      "labeled_tokens": 9,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          307
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          299,
+          312
+        ],
+        "end_of_turn": [
+          297,
+          309,
+          310
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 297,
+          "length": 297,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 299,
+          "end": 309,
+          "length": 11,
+          "prediction_tokens": 8,
+          "has_predictions": true
+        },
+        {
+          "start": 312,
+          "end": 393,
+          "length": 82,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 64,
+      "sequence_length": 406,
+      "non_padding_tokens": 322,
+      "labeled_tokens": 9,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          314
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          306,
+          319
+        ],
+        "end_of_turn": [
+          304,
+          316,
+          317
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 304,
+          "length": 304,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 306,
+          "end": 316,
+          "length": 11,
+          "prediction_tokens": 8,
+          "has_predictions": true
+        },
+        {
+          "start": 319,
+          "end": 406,
+          "length": 88,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 65,
+      "sequence_length": 406,
+      "non_padding_tokens": 398,
+      "labeled_tokens": 88,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          309
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          303,
+          395
+        ],
+        "end_of_turn": [
+          301,
+          392,
+          393
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 301,
+          "length": 301,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 303,
+          "end": 392,
+          "length": 90,
+          "prediction_tokens": 87,
+          "has_predictions": true
+        },
+        {
+          "start": 395,
+          "end": 406,
+          "length": 12,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 66,
+      "sequence_length": 406,
+      "non_padding_tokens": 406,
+      "labeled_tokens": 94,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          311
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          305,
+          403
+        ],
+        "end_of_turn": [
+          303,
+          400,
+          401
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 303,
+          "length": 303,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 305,
+          "end": 400,
+          "length": 96,
+          "prediction_tokens": 93,
+          "has_predictions": true
+        },
+        {
+          "start": 403,
+          "end": 406,
+          "length": 4,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 67,
+      "sequence_length": 406,
+      "non_padding_tokens": 310,
+      "labeled_tokens": 7,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          302
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          296,
+          307
+        ],
+        "end_of_turn": [
+          294,
+          304,
+          305
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 294,
+          "length": 294,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 296,
+          "end": 304,
+          "length": 9,
+          "prediction_tokens": 6,
+          "has_predictions": true
+        },
+        {
+          "start": 307,
+          "end": 406,
+          "length": 100,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 68,
+      "sequence_length": 406,
+      "non_padding_tokens": 388,
+      "labeled_tokens": 79,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          308
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          302,
+          385
+        ],
+        "end_of_turn": [
+          300,
+          382,
+          383
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 300,
+          "length": 300,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 302,
+          "end": 382,
+          "length": 81,
+          "prediction_tokens": 78,
+          "has_predictions": true
+        },
+        {
+          "start": 385,
+          "end": 406,
+          "length": 22,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 69,
+      "sequence_length": 406,
+      "non_padding_tokens": 319,
+      "labeled_tokens": 9,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          311
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          303,
+          316
+        ],
+        "end_of_turn": [
+          301,
+          313,
+          314
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 301,
+          "length": 301,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 303,
+          "end": 313,
+          "length": 11,
+          "prediction_tokens": 8,
+          "has_predictions": true
+        },
+        {
+          "start": 316,
+          "end": 406,
+          "length": 91,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 70,
+      "sequence_length": 406,
+      "non_padding_tokens": 400,
+      "labeled_tokens": 80,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          394
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          310,
+          397
+        ],
+        "end_of_turn": [
+          308,
+          391,
+          395
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 308,
+          "length": 308,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 310,
+          "end": 391,
+          "length": 82,
+          "prediction_tokens": 79,
+          "has_predictions": true
+        },
+        {
+          "start": 397,
+          "end": 406,
+          "length": 10,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 71,
+      "sequence_length": 406,
+      "non_padding_tokens": 318,
+      "labeled_tokens": 4,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          310
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          307,
+          315
+        ],
+        "end_of_turn": [
+          305,
+          312,
+          313
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 305,
+          "length": 305,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 307,
+          "end": 312,
+          "length": 6,
+          "prediction_tokens": 3,
+          "has_predictions": true
+        },
+        {
+          "start": 315,
+          "end": 406,
+          "length": 92,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 72,
+      "sequence_length": 446,
+      "non_padding_tokens": 397,
+      "labeled_tokens": 83,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          313
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          307,
+          394
+        ],
+        "end_of_turn": [
+          305,
+          391,
+          392
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 305,
+          "length": 305,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 307,
+          "end": 391,
+          "length": 85,
+          "prediction_tokens": 82,
+          "has_predictions": true
+        },
+        {
+          "start": 394,
+          "end": 446,
+          "length": 53,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 73,
+      "sequence_length": 446,
+      "non_padding_tokens": 316,
+      "labeled_tokens": 4,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          308
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          305,
+          313
+        ],
+        "end_of_turn": [
+          303,
+          310,
+          311
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 303,
+          "length": 303,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 305,
+          "end": 310,
+          "length": 6,
+          "prediction_tokens": 3,
+          "has_predictions": true
+        },
+        {
+          "start": 313,
+          "end": 446,
+          "length": 134,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 74,
+      "sequence_length": 446,
+      "non_padding_tokens": 393,
+      "labeled_tokens": 85,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          309
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          301,
+          390
+        ],
+        "end_of_turn": [
+          299,
+          387,
+          388
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 299,
+          "length": 299,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 301,
+          "end": 387,
+          "length": 87,
+          "prediction_tokens": 84,
+          "has_predictions": true
+        },
+        {
+          "start": 390,
+          "end": 446,
+          "length": 57,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 75,
+      "sequence_length": 446,
+      "non_padding_tokens": 400,
+      "labeled_tokens": 87,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          316
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          306,
+          397
+        ],
+        "end_of_turn": [
+          304,
+          394,
+          395
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 304,
+          "length": 304,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 306,
+          "end": 394,
+          "length": 89,
+          "prediction_tokens": 86,
+          "has_predictions": true
+        },
+        {
+          "start": 397,
+          "end": 446,
+          "length": 50,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 76,
+      "sequence_length": 446,
+      "non_padding_tokens": 436,
+      "labeled_tokens": 117,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          318
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          312,
+          433
+        ],
+        "end_of_turn": [
+          310,
+          430,
+          431
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 310,
+          "length": 310,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 312,
+          "end": 430,
+          "length": 119,
+          "prediction_tokens": 116,
+          "has_predictions": true
+        },
+        {
+          "start": 433,
+          "end": 446,
+          "length": 14,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 77,
+      "sequence_length": 446,
+      "non_padding_tokens": 446,
+      "labeled_tokens": 126,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          440
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          310,
+          443
+        ],
+        "end_of_turn": [
+          308,
+          437,
+          441
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 308,
+          "length": 308,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 310,
+          "end": 437,
+          "length": 128,
+          "prediction_tokens": 125,
+          "has_predictions": true
+        },
+        {
+          "start": 443,
+          "end": 446,
+          "length": 4,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 78,
+      "sequence_length": 446,
+      "non_padding_tokens": 327,
+      "labeled_tokens": 11,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          319
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          309,
+          324
+        ],
+        "end_of_turn": [
+          307,
+          321,
+          322
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 307,
+          "length": 307,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 309,
+          "end": 321,
+          "length": 13,
+          "prediction_tokens": 10,
+          "has_predictions": true
+        },
+        {
+          "start": 324,
+          "end": 446,
+          "length": 123,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 79,
+      "sequence_length": 446,
+      "non_padding_tokens": 388,
+      "labeled_tokens": 82,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          307
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          299,
+          385
+        ],
+        "end_of_turn": [
+          297,
+          382,
+          383
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 297,
+          "length": 297,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 299,
+          "end": 382,
+          "length": 84,
+          "prediction_tokens": 81,
+          "has_predictions": true
+        },
+        {
+          "start": 385,
+          "end": 446,
+          "length": 62,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 80,
+      "sequence_length": 398,
+      "non_padding_tokens": 328,
+      "labeled_tokens": 9,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          320
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          312,
+          325
+        ],
+        "end_of_turn": [
+          310,
+          322,
+          323
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 310,
+          "length": 310,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 312,
+          "end": 322,
+          "length": 11,
+          "prediction_tokens": 8,
+          "has_predictions": true
+        },
+        {
+          "start": 325,
+          "end": 398,
+          "length": 74,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 81,
+      "sequence_length": 398,
+      "non_padding_tokens": 323,
+      "labeled_tokens": 7,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          315
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          309,
+          320
+        ],
+        "end_of_turn": [
+          307,
+          317,
+          318
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 307,
+          "length": 307,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 309,
+          "end": 317,
+          "length": 9,
+          "prediction_tokens": 6,
+          "has_predictions": true
+        },
+        {
+          "start": 320,
+          "end": 398,
+          "length": 79,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 82,
+      "sequence_length": 398,
+      "non_padding_tokens": 398,
+      "labeled_tokens": 78,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          323
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          313,
+          395
+        ],
+        "end_of_turn": [
+          311,
+          392,
+          393
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 311,
+          "length": 311,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 313,
+          "end": 392,
+          "length": 80,
+          "prediction_tokens": 77,
+          "has_predictions": true
+        },
+        {
+          "start": 395,
+          "end": 398,
+          "length": 4,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 83,
+      "sequence_length": 398,
+      "non_padding_tokens": 317,
+      "labeled_tokens": 7,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          309
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          303,
+          314
+        ],
+        "end_of_turn": [
+          301,
+          311,
+          312
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 301,
+          "length": 301,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 303,
+          "end": 311,
+          "length": 9,
+          "prediction_tokens": 6,
+          "has_predictions": true
+        },
+        {
+          "start": 314,
+          "end": 398,
+          "length": 85,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 84,
+      "sequence_length": 398,
+      "non_padding_tokens": 318,
+      "labeled_tokens": 9,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          310
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          302,
+          315
+        ],
+        "end_of_turn": [
+          300,
+          312,
+          313
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 300,
+          "length": 300,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 302,
+          "end": 312,
+          "length": 11,
+          "prediction_tokens": 8,
+          "has_predictions": true
+        },
+        {
+          "start": 315,
+          "end": 398,
+          "length": 84,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 85,
+      "sequence_length": 398,
+      "non_padding_tokens": 396,
+      "labeled_tokens": 92,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          300
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          297,
+          393
+        ],
+        "end_of_turn": [
+          295,
+          390,
+          391
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 295,
+          "length": 295,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 297,
+          "end": 390,
+          "length": 94,
+          "prediction_tokens": 91,
+          "has_predictions": true
+        },
+        {
+          "start": 393,
+          "end": 398,
+          "length": 6,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 86,
+      "sequence_length": 398,
+      "non_padding_tokens": 314,
+      "labeled_tokens": 7,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          306
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          300,
+          311
+        ],
+        "end_of_turn": [
+          298,
+          308,
+          309
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 298,
+          "length": 298,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 300,
+          "end": 308,
+          "length": 9,
+          "prediction_tokens": 6,
+          "has_predictions": true
+        },
+        {
+          "start": 311,
+          "end": 398,
+          "length": 88,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 87,
+      "sequence_length": 398,
+      "non_padding_tokens": 319,
+      "labeled_tokens": 9,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          311
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          303,
+          316
+        ],
+        "end_of_turn": [
+          301,
+          313,
+          314
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 301,
+          "length": 301,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 303,
+          "end": 313,
+          "length": 11,
+          "prediction_tokens": 8,
+          "has_predictions": true
+        },
+        {
+          "start": 316,
+          "end": 398,
+          "length": 83,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 88,
+      "sequence_length": 420,
+      "non_padding_tokens": 333,
+      "labeled_tokens": 11,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          325
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          315,
+          330
+        ],
+        "end_of_turn": [
+          313,
+          327,
+          328
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 313,
+          "length": 313,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 315,
+          "end": 327,
+          "length": 13,
+          "prediction_tokens": 10,
+          "has_predictions": true
+        },
+        {
+          "start": 330,
+          "end": 420,
+          "length": 91,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 89,
+      "sequence_length": 420,
+      "non_padding_tokens": 324,
+      "labeled_tokens": 9,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          316
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          308,
+          321
+        ],
+        "end_of_turn": [
+          306,
+          318,
+          319
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 306,
+          "length": 306,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 308,
+          "end": 318,
+          "length": 11,
+          "prediction_tokens": 8,
+          "has_predictions": true
+        },
+        {
+          "start": 321,
+          "end": 420,
+          "length": 100,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 90,
+      "sequence_length": 420,
+      "non_padding_tokens": 420,
+      "labeled_tokens": 103,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          316
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          310,
+          417
+        ],
+        "end_of_turn": [
+          308,
+          414,
+          415
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 308,
+          "length": 308,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 310,
+          "end": 414,
+          "length": 105,
+          "prediction_tokens": 102,
+          "has_predictions": true
+        },
+        {
+          "start": 417,
+          "end": 420,
+          "length": 4,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 91,
+      "sequence_length": 420,
+      "non_padding_tokens": 381,
+      "labeled_tokens": 63,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          375
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          308,
+          378
+        ],
+        "end_of_turn": [
+          306,
+          372,
+          376
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 306,
+          "length": 306,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 308,
+          "end": 372,
+          "length": 65,
+          "prediction_tokens": 62,
+          "has_predictions": true
+        },
+        {
+          "start": 378,
+          "end": 420,
+          "length": 43,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 92,
+      "sequence_length": 420,
+      "non_padding_tokens": 321,
+      "labeled_tokens": 4,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          313
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          310,
+          318
+        ],
+        "end_of_turn": [
+          308,
+          315,
+          316
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 308,
+          "length": 308,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 310,
+          "end": 315,
+          "length": 6,
+          "prediction_tokens": 3,
+          "has_predictions": true
+        },
+        {
+          "start": 318,
+          "end": 420,
+          "length": 103,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 93,
+      "sequence_length": 420,
+      "non_padding_tokens": 318,
+      "labeled_tokens": 4,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          310
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          307,
+          315
+        ],
+        "end_of_turn": [
+          305,
+          312,
+          313
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 305,
+          "length": 305,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 307,
+          "end": 312,
+          "length": 6,
+          "prediction_tokens": 3,
+          "has_predictions": true
+        },
+        {
+          "start": 315,
+          "end": 420,
+          "length": 106,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 94,
+      "sequence_length": 420,
+      "non_padding_tokens": 329,
+      "labeled_tokens": 9,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          321
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          313,
+          326
+        ],
+        "end_of_turn": [
+          311,
+          323,
+          324
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 311,
+          "length": 311,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 313,
+          "end": 323,
+          "length": 11,
+          "prediction_tokens": 8,
+          "has_predictions": true
+        },
+        {
+          "start": 326,
+          "end": 420,
+          "length": 95,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 95,
+      "sequence_length": 420,
+      "non_padding_tokens": 387,
+      "labeled_tokens": 79,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          307
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          301,
+          384
+        ],
+        "end_of_turn": [
+          299,
+          381,
+          382
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 299,
+          "length": 299,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 301,
+          "end": 381,
+          "length": 81,
+          "prediction_tokens": 78,
+          "has_predictions": true
+        },
+        {
+          "start": 384,
+          "end": 420,
+          "length": 37,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 96,
+      "sequence_length": 404,
+      "non_padding_tokens": 318,
+      "labeled_tokens": 4,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          310
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          307,
+          315
+        ],
+        "end_of_turn": [
+          305,
+          312,
+          313
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 305,
+          "length": 305,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 307,
+          "end": 312,
+          "length": 6,
+          "prediction_tokens": 3,
+          "has_predictions": true
+        },
+        {
+          "start": 315,
+          "end": 404,
+          "length": 90,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 97,
+      "sequence_length": 404,
+      "non_padding_tokens": 404,
+      "labeled_tokens": 98,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          398
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          296,
+          401
+        ],
+        "end_of_turn": [
+          294,
+          395,
+          399
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 294,
+          "length": 294,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 296,
+          "end": 395,
+          "length": 100,
+          "prediction_tokens": 97,
+          "has_predictions": true
+        },
+        {
+          "start": 401,
+          "end": 404,
+          "length": 4,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 98,
+      "sequence_length": 404,
+      "non_padding_tokens": 391,
+      "labeled_tokens": 70,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          317
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          314,
+          388
+        ],
+        "end_of_turn": [
+          312,
+          385,
+          386
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 312,
+          "length": 312,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 314,
+          "end": 385,
+          "length": 72,
+          "prediction_tokens": 69,
+          "has_predictions": true
+        },
+        {
+          "start": 388,
+          "end": 404,
+          "length": 17,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    },
+    {
+      "sample_idx": 99,
+      "sequence_length": 404,
+      "non_padding_tokens": 319,
+      "labeled_tokens": 7,
+      "special_tokens": {
+        "BOS": [
+          0
+        ],
+        "SEG": [
+          311
+        ],
+        "start_of_turn": [
+          1,
+          263,
+          305,
+          316
+        ],
+        "end_of_turn": [
+          303,
+          313,
+          314
+        ]
+      },
+      "user_turns": [
+        {
+          "start": 1,
+          "end": 303,
+          "length": 303,
+          "all_masked": true
+        }
+      ],
+      "model_turns": [
+        {
+          "start": 305,
+          "end": 313,
+          "length": 9,
+          "prediction_tokens": 6,
+          "has_predictions": true
+        },
+        {
+          "start": 316,
+          "end": 404,
+          "length": 89,
+          "prediction_tokens": 1,
+          "has_predictions": true
+        }
+      ],
+      "masking_correct": true,
+      "masking_errors": [],
+      "has_seg_token": true
+    }
+  ]
+}

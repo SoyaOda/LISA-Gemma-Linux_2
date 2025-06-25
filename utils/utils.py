@@ -9,7 +9,8 @@ from typing import Union, List
 from transformers import PreTrainedTokenizer
 
 IGNORE_INDEX = -100
-IMAGE_TOKEN_INDEX = -200
+# utils/constants.pyから統一されたIMAGE_TOKEN_INDEXを使用
+from .constants import IMAGE_TOKEN_INDEX
 DEFAULT_IMAGE_TOKEN = "<image>"
 DEFAULT_IMAGE_PATCH_TOKEN = "<im_patch>"
 DEFAULT_IM_START_TOKEN = "<im_start>"

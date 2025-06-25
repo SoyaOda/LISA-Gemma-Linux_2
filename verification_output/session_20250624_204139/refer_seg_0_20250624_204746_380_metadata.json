@@ -1,0 +1,26 @@
+{
+  "dataset_name": "refer_seg",
+  "sample_idx": 0,
+  "session_timestamp": "20250624_204139",
+  "item_timestamp": "20250624_204746_380",
+  "original_image_path": "/mnt/h/download/LISA-dataset/dataset/refer_seg/images/saiapr_tc-12/35/images/35990.jpg",
+  "conversations": [
+    "<start_of_turn>user\n<image>\nPlease segment the both people.<end_of_turn>\n<start_of_turn>model\nIt is [SEG].<end_of_turn>\n",
+    "<start_of_turn>user\nPlease provide a segmentation mask for the hut.<end_of_turn>\n<start_of_turn>model\nSure, [SEG].<end_of_turn>\n",
+    "<start_of_turn>user\nPlease provide a segmentation mask for the bottom left corner.<end_of_turn>\n<start_of_turn>model\nSure, [SEG].<end_of_turn>\n"
+  ],
+  "questions": [
+    "<image>\nPlease segment the both people.",
+    "Please provide a segmentation mask for the hut.",
+    "Please provide a segmentation mask for the bottom left corner."
+  ],
+  "class_names": [
+    "both people",
+    "hut",
+    "bottom left corner"
+  ],
+  "comparison_image": "verification_output/session_20250624_204139/refer_seg_0_20250624_204746_380_comparison.png",
+  "processing_note": "Simple resize: mask resized to match processed image size",
+  "image_size": "360x480",
+  "mask_size": "360x480"
+}

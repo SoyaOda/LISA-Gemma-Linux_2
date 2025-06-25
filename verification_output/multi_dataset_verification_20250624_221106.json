@@ -1,0 +1,6021 @@
+{
+  "session_id": "20250624_221106",
+  "verification_type": "multi_dataset_input_formatting",
+  "timestamp": "2025-06-24T22:12:43.716350",
+  "total_samples": 100,
+  "total_correct": 100,
+  "overall_success_rate": 100.0,
+  "dataset_results": {
+    "sem_seg": {
+      "dataset_name": "sem_seg",
+      "description": "Semantic Segmentation (ADE20K)",
+      "expected_features": [
+        "segmentation_mask",
+        "class_labels"
+      ],
+      "processing_time_seconds": 6.991016626358032,
+      "total_samples": 25,
+      "correct_samples": 25,
+      "success_rate": 100.0,
+      "statistics": {
+        "avg_sequence_length": 294.44,
+        "avg_labeled_tokens": 8.72,
+        "seg_token_samples": 25,
+        "seg_token_rate": 100.0
+      },
+      "error_analysis": {},
+      "sample_details": [
+        {
+          "sample_idx": 0,
+          "sequence_length": 295,
+          "non_padding_tokens": 295,
+          "labeled_tokens": 11,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              287
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              277,
+              292
+            ],
+            "end_of_turn": [
+              275,
+              289,
+              290
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 275,
+              "length": 275,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 277,
+              "end": 289,
+              "length": 13,
+              "prediction_tokens": 10,
+              "has_predictions": true
+            },
+            {
+              "start": 292,
+              "end": 295,
+              "length": 4,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "sem_seg",
+          "dataset_description": "Semantic Segmentation (ADE20K)"
+        },
+        {
+          "sample_idx": 1,
+          "sequence_length": 295,
+          "non_padding_tokens": 287,
+          "labeled_tokens": 4,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              279
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              276,
+              284
+            ],
+            "end_of_turn": [
+              274,
+              281,
+              282
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 274,
+              "length": 274,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 276,
+              "end": 281,
+              "length": 6,
+              "prediction_tokens": 3,
+              "has_predictions": true
+            },
+            {
+              "start": 284,
+              "end": 295,
+              "length": 12,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "sem_seg",
+          "dataset_description": "Semantic Segmentation (ADE20K)"
+        },
+        {
+          "sample_idx": 2,
+          "sequence_length": 295,
+          "non_padding_tokens": 291,
+          "labeled_tokens": 7,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              283
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              277,
+              288
+            ],
+            "end_of_turn": [
+              275,
+              285,
+              286
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 275,
+              "length": 275,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 277,
+              "end": 285,
+              "length": 9,
+              "prediction_tokens": 6,
+              "has_predictions": true
+            },
+            {
+              "start": 288,
+              "end": 295,
+              "length": 8,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "sem_seg",
+          "dataset_description": "Semantic Segmentation (ADE20K)"
+        },
+        {
+          "sample_idx": 3,
+          "sequence_length": 295,
+          "non_padding_tokens": 290,
+          "labeled_tokens": 7,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              282
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              276,
+              287
+            ],
+            "end_of_turn": [
+              274,
+              284,
+              285
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 274,
+              "length": 274,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 276,
+              "end": 284,
+              "length": 9,
+              "prediction_tokens": 6,
+              "has_predictions": true
+            },
+            {
+              "start": 287,
+              "end": 295,
+              "length": 9,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "sem_seg",
+          "dataset_description": "Semantic Segmentation (ADE20K)"
+        },
+        {
+          "sample_idx": 4,
+          "sequence_length": 295,
+          "non_padding_tokens": 295,
+          "labeled_tokens": 11,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              287
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              277,
+              292
+            ],
+            "end_of_turn": [
+              275,
+              289,
+              290
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 275,
+              "length": 275,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 277,
+              "end": 289,
+              "length": 13,
+              "prediction_tokens": 10,
+              "has_predictions": true
+            },
+            {
+              "start": 292,
+              "end": 295,
+              "length": 4,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "sem_seg",
+          "dataset_description": "Semantic Segmentation (ADE20K)"
+        },
+        {
+          "sample_idx": 5,
+          "sequence_length": 295,
+          "non_padding_tokens": 293,
+          "labeled_tokens": 9,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              285
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              277,
+              290
+            ],
+            "end_of_turn": [
+              275,
+              287,
+              288
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 275,
+              "length": 275,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 277,
+              "end": 287,
+              "length": 11,
+              "prediction_tokens": 8,
+              "has_predictions": true
+            },
+            {
+              "start": 290,
+              "end": 295,
+              "length": 6,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "sem_seg",
+          "dataset_description": "Semantic Segmentation (ADE20K)"
+        },
+        {
+          "sample_idx": 6,
+          "sequence_length": 295,
+          "non_padding_tokens": 294,
+          "labeled_tokens": 11,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              286
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              276,
+              291
+            ],
+            "end_of_turn": [
+              274,
+              288,
+              289
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 274,
+              "length": 274,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 276,
+              "end": 288,
+              "length": 13,
+              "prediction_tokens": 10,
+              "has_predictions": true
+            },
+            {
+              "start": 291,
+              "end": 295,
+              "length": 5,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "sem_seg",
+          "dataset_description": "Semantic Segmentation (ADE20K)"
+        },
+        {
+          "sample_idx": 7,
+          "sequence_length": 295,
+          "non_padding_tokens": 295,
+          "labeled_tokens": 11,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              287
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              277,
+              292
+            ],
+            "end_of_turn": [
+              275,
+              289,
+              290
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 275,
+              "length": 275,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 277,
+              "end": 289,
+              "length": 13,
+              "prediction_tokens": 10,
+              "has_predictions": true
+            },
+            {
+              "start": 292,
+              "end": 295,
+              "length": 4,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "sem_seg",
+          "dataset_description": "Semantic Segmentation (ADE20K)"
+        },
+        {
+          "sample_idx": 8,
+          "sequence_length": 294,
+          "non_padding_tokens": 293,
+          "labeled_tokens": 9,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              285
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              277,
+              290
+            ],
+            "end_of_turn": [
+              275,
+              287,
+              288
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 275,
+              "length": 275,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 277,
+              "end": 287,
+              "length": 11,
+              "prediction_tokens": 8,
+              "has_predictions": true
+            },
+            {
+              "start": 290,
+              "end": 294,
+              "length": 5,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "sem_seg",
+          "dataset_description": "Semantic Segmentation (ADE20K)"
+        },
+        {
+          "sample_idx": 9,
+          "sequence_length": 294,
+          "non_padding_tokens": 291,
+          "labeled_tokens": 7,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              283
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              277,
+              288
+            ],
+            "end_of_turn": [
+              275,
+              285,
+              286
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 275,
+              "length": 275,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 277,
+              "end": 285,
+              "length": 9,
+              "prediction_tokens": 6,
+              "has_predictions": true
+            },
+            {
+              "start": 288,
+              "end": 294,
+              "length": 7,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "sem_seg",
+          "dataset_description": "Semantic Segmentation (ADE20K)"
+        },
+        {
+          "sample_idx": 10,
+          "sequence_length": 294,
+          "non_padding_tokens": 291,
+          "labeled_tokens": 7,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              283
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              277,
+              288
+            ],
+            "end_of_turn": [
+              275,
+              285,
+              286
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 275,
+              "length": 275,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 277,
+              "end": 285,
+              "length": 9,
+              "prediction_tokens": 6,
+              "has_predictions": true
+            },
+            {
+              "start": 288,
+              "end": 294,
+              "length": 7,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "sem_seg",
+          "dataset_description": "Semantic Segmentation (ADE20K)"
+        },
+        {
+          "sample_idx": 11,
+          "sequence_length": 294,
+          "non_padding_tokens": 294,
+          "labeled_tokens": 11,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              286
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              276,
+              291
+            ],
+            "end_of_turn": [
+              274,
+              288,
+              289
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 274,
+              "length": 274,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 276,
+              "end": 288,
+              "length": 13,
+              "prediction_tokens": 10,
+              "has_predictions": true
+            },
+            {
+              "start": 291,
+              "end": 294,
+              "length": 4,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "sem_seg",
+          "dataset_description": "Semantic Segmentation (ADE20K)"
+        },
+        {
+          "sample_idx": 12,
+          "sequence_length": 295,
+          "non_padding_tokens": 295,
+          "labeled_tokens": 11,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              287
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              277,
+              292
+            ],
+            "end_of_turn": [
+              275,
+              289,
+              290
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 275,
+              "length": 275,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 277,
+              "end": 289,
+              "length": 13,
+              "prediction_tokens": 10,
+              "has_predictions": true
+            },
+            {
+              "start": 292,
+              "end": 295,
+              "length": 4,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "sem_seg",
+          "dataset_description": "Semantic Segmentation (ADE20K)"
+        },
+        {
+          "sample_idx": 13,
+          "sequence_length": 295,
+          "non_padding_tokens": 291,
+          "labeled_tokens": 7,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              283
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              277,
+              288
+            ],
+            "end_of_turn": [
+              275,
+              285,
+              286
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 275,
+              "length": 275,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 277,
+              "end": 285,
+              "length": 9,
+              "prediction_tokens": 6,
+              "has_predictions": true
+            },
+            {
+              "start": 288,
+              "end": 295,
+              "length": 8,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "sem_seg",
+          "dataset_description": "Semantic Segmentation (ADE20K)"
+        },
+        {
+          "sample_idx": 14,
+          "sequence_length": 295,
+          "non_padding_tokens": 295,
+          "labeled_tokens": 11,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              287
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              277,
+              292
+            ],
+            "end_of_turn": [
+              275,
+              289,
+              290
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 275,
+              "length": 275,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 277,
+              "end": 289,
+              "length": 13,
+              "prediction_tokens": 10,
+              "has_predictions": true
+            },
+            {
+              "start": 292,
+              "end": 295,
+              "length": 4,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "sem_seg",
+          "dataset_description": "Semantic Segmentation (ADE20K)"
+        },
+        {
+          "sample_idx": 15,
+          "sequence_length": 295,
+          "non_padding_tokens": 295,
+          "labeled_tokens": 11,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              287
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              277,
+              292
+            ],
+            "end_of_turn": [
+              275,
+              289,
+              290
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 275,
+              "length": 275,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 277,
+              "end": 289,
+              "length": 13,
+              "prediction_tokens": 10,
+              "has_predictions": true
+            },
+            {
+              "start": 292,
+              "end": 295,
+              "length": 4,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "sem_seg",
+          "dataset_description": "Semantic Segmentation (ADE20K)"
+        },
+        {
+          "sample_idx": 16,
+          "sequence_length": 295,
+          "non_padding_tokens": 295,
+          "labeled_tokens": 11,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              287
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              277,
+              292
+            ],
+            "end_of_turn": [
+              275,
+              289,
+              290
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 275,
+              "length": 275,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 277,
+              "end": 289,
+              "length": 13,
+              "prediction_tokens": 10,
+              "has_predictions": true
+            },
+            {
+              "start": 292,
+              "end": 295,
+              "length": 4,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "sem_seg",
+          "dataset_description": "Semantic Segmentation (ADE20K)"
+        },
+        {
+          "sample_idx": 17,
+          "sequence_length": 295,
+          "non_padding_tokens": 291,
+          "labeled_tokens": 7,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              283
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              277,
+              288
+            ],
+            "end_of_turn": [
+              275,
+              285,
+              286
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 275,
+              "length": 275,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 277,
+              "end": 285,
+              "length": 9,
+              "prediction_tokens": 6,
+              "has_predictions": true
+            },
+            {
+              "start": 288,
+              "end": 295,
+              "length": 8,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "sem_seg",
+          "dataset_description": "Semantic Segmentation (ADE20K)"
+        },
+        {
+          "sample_idx": 18,
+          "sequence_length": 295,
+          "non_padding_tokens": 291,
+          "labeled_tokens": 11,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              283
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              273,
+              288
+            ],
+            "end_of_turn": [
+              271,
+              285,
+              286
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 271,
+              "length": 271,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 273,
+              "end": 285,
+              "length": 13,
+              "prediction_tokens": 10,
+              "has_predictions": true
+            },
+            {
+              "start": 288,
+              "end": 295,
+              "length": 8,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "sem_seg",
+          "dataset_description": "Semantic Segmentation (ADE20K)"
+        },
+        {
+          "sample_idx": 19,
+          "sequence_length": 295,
+          "non_padding_tokens": 287,
+          "labeled_tokens": 4,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              279
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              276,
+              284
+            ],
+            "end_of_turn": [
+              274,
+              281,
+              282
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 274,
+              "length": 274,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 276,
+              "end": 281,
+              "length": 6,
+              "prediction_tokens": 3,
+              "has_predictions": true
+            },
+            {
+              "start": 284,
+              "end": 295,
+              "length": 12,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "sem_seg",
+          "dataset_description": "Semantic Segmentation (ADE20K)"
+        },
+        {
+          "sample_idx": 20,
+          "sequence_length": 294,
+          "non_padding_tokens": 294,
+          "labeled_tokens": 11,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              286
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              276,
+              291
+            ],
+            "end_of_turn": [
+              274,
+              288,
+              289
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 274,
+              "length": 274,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 276,
+              "end": 288,
+              "length": 13,
+              "prediction_tokens": 10,
+              "has_predictions": true
+            },
+            {
+              "start": 291,
+              "end": 294,
+              "length": 4,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "sem_seg",
+          "dataset_description": "Semantic Segmentation (ADE20K)"
+        },
+        {
+          "sample_idx": 21,
+          "sequence_length": 294,
+          "non_padding_tokens": 293,
+          "labeled_tokens": 9,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              285
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              277,
+              290
+            ],
+            "end_of_turn": [
+              275,
+              287,
+              288
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 275,
+              "length": 275,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 277,
+              "end": 287,
+              "length": 11,
+              "prediction_tokens": 8,
+              "has_predictions": true
+            },
+            {
+              "start": 290,
+              "end": 294,
+              "length": 5,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "sem_seg",
+          "dataset_description": "Semantic Segmentation (ADE20K)"
+        },
+        {
+          "sample_idx": 22,
+          "sequence_length": 294,
+          "non_padding_tokens": 293,
+          "labeled_tokens": 9,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              285
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              277,
+              290
+            ],
+            "end_of_turn": [
+              275,
+              287,
+              288
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 275,
+              "length": 275,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 277,
+              "end": 287,
+              "length": 11,
+              "prediction_tokens": 8,
+              "has_predictions": true
+            },
+            {
+              "start": 290,
+              "end": 294,
+              "length": 5,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "sem_seg",
+          "dataset_description": "Semantic Segmentation (ADE20K)"
+        },
+        {
+          "sample_idx": 23,
+          "sequence_length": 294,
+          "non_padding_tokens": 291,
+          "labeled_tokens": 7,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              283
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              277,
+              288
+            ],
+            "end_of_turn": [
+              275,
+              285,
+              286
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 275,
+              "length": 275,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 277,
+              "end": 285,
+              "length": 9,
+              "prediction_tokens": 6,
+              "has_predictions": true
+            },
+            {
+              "start": 288,
+              "end": 294,
+              "length": 7,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "sem_seg",
+          "dataset_description": "Semantic Segmentation (ADE20K)"
+        },
+        {
+          "sample_idx": 24,
+          "sequence_length": 289,
+          "non_padding_tokens": 289,
+          "labeled_tokens": 4,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              281
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              278,
+              286
+            ],
+            "end_of_turn": [
+              276,
+              283,
+              284
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 276,
+              "length": 276,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 278,
+              "end": 283,
+              "length": 6,
+              "prediction_tokens": 3,
+              "has_predictions": true
+            },
+            {
+              "start": 286,
+              "end": 289,
+              "length": 4,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "sem_seg",
+          "dataset_description": "Semantic Segmentation (ADE20K)"
+        }
+      ]
+    },
+    "refer_seg": {
+      "dataset_name": "refer_seg",
+      "description": "Referring Expression Segmentation (RefCOCO)",
+      "expected_features": [
+        "referring_expression",
+        "segmentation_mask"
+      ],
+      "processing_time_seconds": 7.7427592277526855,
+      "total_samples": 25,
+      "correct_samples": 25,
+      "success_rate": 100.0,
+      "statistics": {
+        "avg_sequence_length": 301.04,
+        "avg_labeled_tokens": 8.0,
+        "seg_token_samples": 25,
+        "seg_token_rate": 100.0
+      },
+      "error_analysis": {},
+      "sample_details": [
+        {
+          "sample_idx": 0,
+          "sequence_length": 300,
+          "non_padding_tokens": 300,
+          "labeled_tokens": 11,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              292
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              282,
+              297
+            ],
+            "end_of_turn": [
+              280,
+              294,
+              295
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 280,
+              "length": 280,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 282,
+              "end": 294,
+              "length": 13,
+              "prediction_tokens": 10,
+              "has_predictions": true
+            },
+            {
+              "start": 297,
+              "end": 300,
+              "length": 4,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "refer_seg",
+          "dataset_description": "Referring Expression Segmentation (RefCOCO)"
+        },
+        {
+          "sample_idx": 1,
+          "sequence_length": 300,
+          "non_padding_tokens": 298,
+          "labeled_tokens": 11,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              290
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              280,
+              295
+            ],
+            "end_of_turn": [
+              278,
+              292,
+              293
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 278,
+              "length": 278,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 280,
+              "end": 292,
+              "length": 13,
+              "prediction_tokens": 10,
+              "has_predictions": true
+            },
+            {
+              "start": 295,
+              "end": 300,
+              "length": 6,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "refer_seg",
+          "dataset_description": "Referring Expression Segmentation (RefCOCO)"
+        },
+        {
+          "sample_idx": 2,
+          "sequence_length": 300,
+          "non_padding_tokens": 297,
+          "labeled_tokens": 7,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              289
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              283,
+              294
+            ],
+            "end_of_turn": [
+              281,
+              291,
+              292
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 281,
+              "length": 281,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 283,
+              "end": 291,
+              "length": 9,
+              "prediction_tokens": 6,
+              "has_predictions": true
+            },
+            {
+              "start": 294,
+              "end": 300,
+              "length": 7,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "refer_seg",
+          "dataset_description": "Referring Expression Segmentation (RefCOCO)"
+        },
+        {
+          "sample_idx": 3,
+          "sequence_length": 300,
+          "non_padding_tokens": 300,
+          "labeled_tokens": 7,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              292
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              286,
+              297
+            ],
+            "end_of_turn": [
+              284,
+              294,
+              295
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 284,
+              "length": 284,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 286,
+              "end": 294,
+              "length": 9,
+              "prediction_tokens": 6,
+              "has_predictions": true
+            },
+            {
+              "start": 297,
+              "end": 300,
+              "length": 4,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "refer_seg",
+          "dataset_description": "Referring Expression Segmentation (RefCOCO)"
+        },
+        {
+          "sample_idx": 4,
+          "sequence_length": 302,
+          "non_padding_tokens": 296,
+          "labeled_tokens": 7,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              288
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              282,
+              293
+            ],
+            "end_of_turn": [
+              280,
+              290,
+              291
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 280,
+              "length": 280,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 282,
+              "end": 290,
+              "length": 9,
+              "prediction_tokens": 6,
+              "has_predictions": true
+            },
+            {
+              "start": 293,
+              "end": 302,
+              "length": 10,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "refer_seg",
+          "dataset_description": "Referring Expression Segmentation (RefCOCO)"
+        },
+        {
+          "sample_idx": 5,
+          "sequence_length": 302,
+          "non_padding_tokens": 302,
+          "labeled_tokens": 7,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              294
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              288,
+              299
+            ],
+            "end_of_turn": [
+              286,
+              296,
+              297
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 286,
+              "length": 286,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 288,
+              "end": 296,
+              "length": 9,
+              "prediction_tokens": 6,
+              "has_predictions": true
+            },
+            {
+              "start": 299,
+              "end": 302,
+              "length": 4,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "refer_seg",
+          "dataset_description": "Referring Expression Segmentation (RefCOCO)"
+        },
+        {
+          "sample_idx": 6,
+          "sequence_length": 302,
+          "non_padding_tokens": 291,
+          "labeled_tokens": 7,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              283
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              277,
+              288
+            ],
+            "end_of_turn": [
+              275,
+              285,
+              286
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 275,
+              "length": 275,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 277,
+              "end": 285,
+              "length": 9,
+              "prediction_tokens": 6,
+              "has_predictions": true
+            },
+            {
+              "start": 288,
+              "end": 302,
+              "length": 15,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "refer_seg",
+          "dataset_description": "Referring Expression Segmentation (RefCOCO)"
+        },
+        {
+          "sample_idx": 7,
+          "sequence_length": 302,
+          "non_padding_tokens": 293,
+          "labeled_tokens": 7,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              285
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              279,
+              290
+            ],
+            "end_of_turn": [
+              277,
+              287,
+              288
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 277,
+              "length": 277,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 279,
+              "end": 287,
+              "length": 9,
+              "prediction_tokens": 6,
+              "has_predictions": true
+            },
+            {
+              "start": 290,
+              "end": 302,
+              "length": 13,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "refer_seg",
+          "dataset_description": "Referring Expression Segmentation (RefCOCO)"
+        },
+        {
+          "sample_idx": 8,
+          "sequence_length": 300,
+          "non_padding_tokens": 299,
+          "labeled_tokens": 11,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              291
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              281,
+              296
+            ],
+            "end_of_turn": [
+              279,
+              293,
+              294
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 279,
+              "length": 279,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 281,
+              "end": 293,
+              "length": 13,
+              "prediction_tokens": 10,
+              "has_predictions": true
+            },
+            {
+              "start": 296,
+              "end": 300,
+              "length": 5,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "refer_seg",
+          "dataset_description": "Referring Expression Segmentation (RefCOCO)"
+        },
+        {
+          "sample_idx": 9,
+          "sequence_length": 300,
+          "non_padding_tokens": 299,
+          "labeled_tokens": 9,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              291
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              283,
+              296
+            ],
+            "end_of_turn": [
+              281,
+              293,
+              294
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 281,
+              "length": 281,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 283,
+              "end": 293,
+              "length": 11,
+              "prediction_tokens": 8,
+              "has_predictions": true
+            },
+            {
+              "start": 296,
+              "end": 300,
+              "length": 5,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "refer_seg",
+          "dataset_description": "Referring Expression Segmentation (RefCOCO)"
+        },
+        {
+          "sample_idx": 10,
+          "sequence_length": 300,
+          "non_padding_tokens": 300,
+          "labeled_tokens": 9,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              292
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              284,
+              297
+            ],
+            "end_of_turn": [
+              282,
+              294,
+              295
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 282,
+              "length": 282,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 284,
+              "end": 294,
+              "length": 11,
+              "prediction_tokens": 8,
+              "has_predictions": true
+            },
+            {
+              "start": 297,
+              "end": 300,
+              "length": 4,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "refer_seg",
+          "dataset_description": "Referring Expression Segmentation (RefCOCO)"
+        },
+        {
+          "sample_idx": 11,
+          "sequence_length": 300,
+          "non_padding_tokens": 300,
+          "labeled_tokens": 11,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              292
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              282,
+              297
+            ],
+            "end_of_turn": [
+              280,
+              294,
+              295
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 280,
+              "length": 280,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 282,
+              "end": 294,
+              "length": 13,
+              "prediction_tokens": 10,
+              "has_predictions": true
+            },
+            {
+              "start": 297,
+              "end": 300,
+              "length": 4,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "refer_seg",
+          "dataset_description": "Referring Expression Segmentation (RefCOCO)"
+        },
+        {
+          "sample_idx": 12,
+          "sequence_length": 303,
+          "non_padding_tokens": 293,
+          "labeled_tokens": 7,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              285
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              279,
+              290
+            ],
+            "end_of_turn": [
+              277,
+              287,
+              288
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 277,
+              "length": 277,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 279,
+              "end": 287,
+              "length": 9,
+              "prediction_tokens": 6,
+              "has_predictions": true
+            },
+            {
+              "start": 290,
+              "end": 303,
+              "length": 14,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "refer_seg",
+          "dataset_description": "Referring Expression Segmentation (RefCOCO)"
+        },
+        {
+          "sample_idx": 13,
+          "sequence_length": 303,
+          "non_padding_tokens": 303,
+          "labeled_tokens": 11,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              295
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              285,
+              300
+            ],
+            "end_of_turn": [
+              283,
+              297,
+              298
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 283,
+              "length": 283,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 285,
+              "end": 297,
+              "length": 13,
+              "prediction_tokens": 10,
+              "has_predictions": true
+            },
+            {
+              "start": 300,
+              "end": 303,
+              "length": 4,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "refer_seg",
+          "dataset_description": "Referring Expression Segmentation (RefCOCO)"
+        },
+        {
+          "sample_idx": 14,
+          "sequence_length": 303,
+          "non_padding_tokens": 295,
+          "labeled_tokens": 7,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              287
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              281,
+              292
+            ],
+            "end_of_turn": [
+              279,
+              289,
+              290
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 279,
+              "length": 279,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 281,
+              "end": 289,
+              "length": 9,
+              "prediction_tokens": 6,
+              "has_predictions": true
+            },
+            {
+              "start": 292,
+              "end": 303,
+              "length": 12,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "refer_seg",
+          "dataset_description": "Referring Expression Segmentation (RefCOCO)"
+        },
+        {
+          "sample_idx": 15,
+          "sequence_length": 303,
+          "non_padding_tokens": 292,
+          "labeled_tokens": 4,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              284
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              281,
+              289
+            ],
+            "end_of_turn": [
+              279,
+              286,
+              287
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 279,
+              "length": 279,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 281,
+              "end": 286,
+              "length": 6,
+              "prediction_tokens": 3,
+              "has_predictions": true
+            },
+            {
+              "start": 289,
+              "end": 303,
+              "length": 15,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "refer_seg",
+          "dataset_description": "Referring Expression Segmentation (RefCOCO)"
+        },
+        {
+          "sample_idx": 16,
+          "sequence_length": 303,
+          "non_padding_tokens": 303,
+          "labeled_tokens": 7,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              295
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              289,
+              300
+            ],
+            "end_of_turn": [
+              287,
+              297,
+              298
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 287,
+              "length": 287,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 289,
+              "end": 297,
+              "length": 9,
+              "prediction_tokens": 6,
+              "has_predictions": true
+            },
+            {
+              "start": 300,
+              "end": 303,
+              "length": 4,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "refer_seg",
+          "dataset_description": "Referring Expression Segmentation (RefCOCO)"
+        },
+        {
+          "sample_idx": 17,
+          "sequence_length": 303,
+          "non_padding_tokens": 296,
+          "labeled_tokens": 7,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              288
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              282,
+              293
+            ],
+            "end_of_turn": [
+              280,
+              290,
+              291
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 280,
+              "length": 280,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 282,
+              "end": 290,
+              "length": 9,
+              "prediction_tokens": 6,
+              "has_predictions": true
+            },
+            {
+              "start": 293,
+              "end": 303,
+              "length": 11,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "refer_seg",
+          "dataset_description": "Referring Expression Segmentation (RefCOCO)"
+        },
+        {
+          "sample_idx": 18,
+          "sequence_length": 303,
+          "non_padding_tokens": 296,
+          "labeled_tokens": 7,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              288
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              282,
+              293
+            ],
+            "end_of_turn": [
+              280,
+              290,
+              291
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 280,
+              "length": 280,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 282,
+              "end": 290,
+              "length": 9,
+              "prediction_tokens": 6,
+              "has_predictions": true
+            },
+            {
+              "start": 293,
+              "end": 303,
+              "length": 11,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "refer_seg",
+          "dataset_description": "Referring Expression Segmentation (RefCOCO)"
+        },
+        {
+          "sample_idx": 19,
+          "sequence_length": 303,
+          "non_padding_tokens": 294,
+          "labeled_tokens": 4,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              286
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              283,
+              291
+            ],
+            "end_of_turn": [
+              281,
+              288,
+              289
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 281,
+              "length": 281,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 283,
+              "end": 288,
+              "length": 6,
+              "prediction_tokens": 3,
+              "has_predictions": true
+            },
+            {
+              "start": 291,
+              "end": 303,
+              "length": 13,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "refer_seg",
+          "dataset_description": "Referring Expression Segmentation (RefCOCO)"
+        },
+        {
+          "sample_idx": 20,
+          "sequence_length": 300,
+          "non_padding_tokens": 298,
+          "labeled_tokens": 9,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              290
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              282,
+              295
+            ],
+            "end_of_turn": [
+              280,
+              292,
+              293
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 280,
+              "length": 280,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 282,
+              "end": 292,
+              "length": 11,
+              "prediction_tokens": 8,
+              "has_predictions": true
+            },
+            {
+              "start": 295,
+              "end": 300,
+              "length": 6,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "refer_seg",
+          "dataset_description": "Referring Expression Segmentation (RefCOCO)"
+        },
+        {
+          "sample_idx": 21,
+          "sequence_length": 300,
+          "non_padding_tokens": 300,
+          "labeled_tokens": 11,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              292
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              282,
+              297
+            ],
+            "end_of_turn": [
+              280,
+              294,
+              295
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 280,
+              "length": 280,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 282,
+              "end": 294,
+              "length": 13,
+              "prediction_tokens": 10,
+              "has_predictions": true
+            },
+            {
+              "start": 297,
+              "end": 300,
+              "length": 4,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "refer_seg",
+          "dataset_description": "Referring Expression Segmentation (RefCOCO)"
+        },
+        {
+          "sample_idx": 22,
+          "sequence_length": 300,
+          "non_padding_tokens": 300,
+          "labeled_tokens": 11,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              292
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              282,
+              297
+            ],
+            "end_of_turn": [
+              280,
+              294,
+              295
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 280,
+              "length": 280,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 282,
+              "end": 294,
+              "length": 13,
+              "prediction_tokens": 10,
+              "has_predictions": true
+            },
+            {
+              "start": 297,
+              "end": 300,
+              "length": 4,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "refer_seg",
+          "dataset_description": "Referring Expression Segmentation (RefCOCO)"
+        },
+        {
+          "sample_idx": 23,
+          "sequence_length": 300,
+          "non_padding_tokens": 291,
+          "labeled_tokens": 7,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              283
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              277,
+              288
+            ],
+            "end_of_turn": [
+              275,
+              285,
+              286
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 275,
+              "length": 275,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 277,
+              "end": 285,
+              "length": 9,
+              "prediction_tokens": 6,
+              "has_predictions": true
+            },
+            {
+              "start": 288,
+              "end": 300,
+              "length": 13,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "refer_seg",
+          "dataset_description": "Referring Expression Segmentation (RefCOCO)"
+        },
+        {
+          "sample_idx": 24,
+          "sequence_length": 294,
+          "non_padding_tokens": 294,
+          "labeled_tokens": 4,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              286
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              283,
+              291
+            ],
+            "end_of_turn": [
+              281,
+              288,
+              289
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 281,
+              "length": 281,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 283,
+              "end": 288,
+              "length": 6,
+              "prediction_tokens": 3,
+              "has_predictions": true
+            },
+            {
+              "start": 291,
+              "end": 294,
+              "length": 4,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "refer_seg",
+          "dataset_description": "Referring Expression Segmentation (RefCOCO)"
+        }
+      ]
+    },
+    "vqa": {
+      "dataset_name": "vqa",
+      "description": "Visual Question Answering (LLaVA)",
+      "expected_features": [
+        "question_answer",
+        "no_segmentation"
+      ],
+      "processing_time_seconds": 6.767489910125732,
+      "total_samples": 25,
+      "correct_samples": 25,
+      "success_rate": 100.0,
+      "statistics": {
+        "avg_sequence_length": 637.2,
+        "avg_labeled_tokens": 170.64,
+        "seg_token_samples": 25,
+        "seg_token_rate": 100.0
+      },
+      "error_analysis": {},
+      "sample_details": [
+        {
+          "sample_idx": 0,
+          "sequence_length": 584,
+          "non_padding_tokens": 433,
+          "labeled_tokens": 136,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              427
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              287,
+              430
+            ],
+            "end_of_turn": [
+              285,
+              424,
+              428
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 285,
+              "length": 285,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 287,
+              "end": 424,
+              "length": 138,
+              "prediction_tokens": 135,
+              "has_predictions": true
+            },
+            {
+              "start": 430,
+              "end": 584,
+              "length": 155,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "vqa",
+          "dataset_description": "Visual Question Answering (LLaVA)"
+        },
+        {
+          "sample_idx": 1,
+          "sequence_length": 584,
+          "non_padding_tokens": 584,
+          "labeled_tokens": 202,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              578
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              283,
+              307,
+              323,
+              338,
+              362,
+              386,
+              402,
+              427,
+              444,
+              581
+            ],
+            "end_of_turn": [
+              281,
+              305,
+              321,
+              336,
+              360,
+              384,
+              400,
+              425,
+              442,
+              575,
+              579
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 281,
+              "length": 281,
+              "all_masked": true
+            },
+            {
+              "start": 307,
+              "end": 321,
+              "length": 15,
+              "all_masked": true
+            },
+            {
+              "start": 338,
+              "end": 360,
+              "length": 23,
+              "all_masked": true
+            },
+            {
+              "start": 386,
+              "end": 400,
+              "length": 15,
+              "all_masked": true
+            },
+            {
+              "start": 427,
+              "end": 442,
+              "length": 16,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 283,
+              "end": 305,
+              "length": 23,
+              "prediction_tokens": 20,
+              "has_predictions": true
+            },
+            {
+              "start": 323,
+              "end": 336,
+              "length": 14,
+              "prediction_tokens": 11,
+              "has_predictions": true
+            },
+            {
+              "start": 362,
+              "end": 384,
+              "length": 23,
+              "prediction_tokens": 20,
+              "has_predictions": true
+            },
+            {
+              "start": 402,
+              "end": 425,
+              "length": 24,
+              "prediction_tokens": 21,
+              "has_predictions": true
+            },
+            {
+              "start": 444,
+              "end": 575,
+              "length": 132,
+              "prediction_tokens": 129,
+              "has_predictions": true
+            },
+            {
+              "start": 581,
+              "end": 584,
+              "length": 4,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "vqa",
+          "dataset_description": "Visual Question Answering (LLaVA)"
+        },
+        {
+          "sample_idx": 2,
+          "sequence_length": 584,
+          "non_padding_tokens": 463,
+          "labeled_tokens": 162,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              457
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              291,
+              460
+            ],
+            "end_of_turn": [
+              289,
+              454,
+              458
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 289,
+              "length": 289,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 291,
+              "end": 454,
+              "length": 164,
+              "prediction_tokens": 161,
+              "has_predictions": true
+            },
+            {
+              "start": 460,
+              "end": 584,
+              "length": 125,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "vqa",
+          "dataset_description": "Visual Question Answering (LLaVA)"
+        },
+        {
+          "sample_idx": 3,
+          "sequence_length": 584,
+          "non_padding_tokens": 431,
+          "labeled_tokens": 131,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              425
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              290,
+              428
+            ],
+            "end_of_turn": [
+              288,
+              422,
+              426
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 288,
+              "length": 288,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 290,
+              "end": 422,
+              "length": 133,
+              "prediction_tokens": 130,
+              "has_predictions": true
+            },
+            {
+              "start": 428,
+              "end": 584,
+              "length": 157,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "vqa",
+          "dataset_description": "Visual Question Answering (LLaVA)"
+        },
+        {
+          "sample_idx": 4,
+          "sequence_length": 887,
+          "non_padding_tokens": 887,
+          "labeled_tokens": 504,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              881
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              282,
+              318,
+              333,
+              349,
+              367,
+              390,
+              407,
+              462,
+              487,
+              884
+            ],
+            "end_of_turn": [
+              280,
+              316,
+              331,
+              347,
+              365,
+              388,
+              405,
+              460,
+              485,
+              878,
+              882
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 280,
+              "length": 280,
+              "all_masked": true
+            },
+            {
+              "start": 318,
+              "end": 331,
+              "length": 14,
+              "all_masked": true
+            },
+            {
+              "start": 349,
+              "end": 365,
+              "length": 17,
+              "all_masked": true
+            },
+            {
+              "start": 390,
+              "end": 405,
+              "length": 16,
+              "all_masked": true
+            },
+            {
+              "start": 462,
+              "end": 485,
+              "length": 24,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 282,
+              "end": 316,
+              "length": 35,
+              "prediction_tokens": 32,
+              "has_predictions": true
+            },
+            {
+              "start": 333,
+              "end": 347,
+              "length": 15,
+              "prediction_tokens": 12,
+              "has_predictions": true
+            },
+            {
+              "start": 367,
+              "end": 388,
+              "length": 22,
+              "prediction_tokens": 19,
+              "has_predictions": true
+            },
+            {
+              "start": 407,
+              "end": 460,
+              "length": 54,
+              "prediction_tokens": 51,
+              "has_predictions": true
+            },
+            {
+              "start": 487,
+              "end": 878,
+              "length": 392,
+              "prediction_tokens": 389,
+              "has_predictions": true
+            },
+            {
+              "start": 884,
+              "end": 887,
+              "length": 4,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "vqa",
+          "dataset_description": "Visual Question Answering (LLaVA)"
+        },
+        {
+          "sample_idx": 5,
+          "sequence_length": 887,
+          "non_padding_tokens": 410,
+          "labeled_tokens": 112,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              404
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              288,
+              407
+            ],
+            "end_of_turn": [
+              286,
+              401,
+              405
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 286,
+              "length": 286,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 288,
+              "end": 401,
+              "length": 114,
+              "prediction_tokens": 111,
+              "has_predictions": true
+            },
+            {
+              "start": 407,
+              "end": 887,
+              "length": 481,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "vqa",
+          "dataset_description": "Visual Question Answering (LLaVA)"
+        },
+        {
+          "sample_idx": 6,
+          "sequence_length": 887,
+          "non_padding_tokens": 419,
+          "labeled_tokens": 62,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              413
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              284,
+              302,
+              317,
+              340,
+              358,
+              379,
+              397,
+              416
+            ],
+            "end_of_turn": [
+              282,
+              300,
+              315,
+              338,
+              356,
+              377,
+              395,
+              410,
+              414
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 282,
+              "length": 282,
+              "all_masked": true
+            },
+            {
+              "start": 302,
+              "end": 315,
+              "length": 14,
+              "all_masked": true
+            },
+            {
+              "start": 340,
+              "end": 356,
+              "length": 17,
+              "all_masked": true
+            },
+            {
+              "start": 379,
+              "end": 395,
+              "length": 17,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 284,
+              "end": 300,
+              "length": 17,
+              "prediction_tokens": 14,
+              "has_predictions": true
+            },
+            {
+              "start": 317,
+              "end": 338,
+              "length": 22,
+              "prediction_tokens": 19,
+              "has_predictions": true
+            },
+            {
+              "start": 358,
+              "end": 377,
+              "length": 20,
+              "prediction_tokens": 17,
+              "has_predictions": true
+            },
+            {
+              "start": 397,
+              "end": 410,
+              "length": 14,
+              "prediction_tokens": 11,
+              "has_predictions": true
+            },
+            {
+              "start": 416,
+              "end": 887,
+              "length": 472,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "vqa",
+          "dataset_description": "Visual Question Answering (LLaVA)"
+        },
+        {
+          "sample_idx": 7,
+          "sequence_length": 887,
+          "non_padding_tokens": 434,
+          "labeled_tokens": 143,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              428
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              281,
+              431
+            ],
+            "end_of_turn": [
+              279,
+              425,
+              429
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 279,
+              "length": 279,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 281,
+              "end": 425,
+              "length": 145,
+              "prediction_tokens": 142,
+              "has_predictions": true
+            },
+            {
+              "start": 431,
+              "end": 887,
+              "length": 457,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "vqa",
+          "dataset_description": "Visual Question Answering (LLaVA)"
+        },
+        {
+          "sample_idx": 8,
+          "sequence_length": 458,
+          "non_padding_tokens": 458,
+          "labeled_tokens": 98,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              452
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              284,
+              301,
+              317,
+              338,
+              358,
+              381,
+              399,
+              455
+            ],
+            "end_of_turn": [
+              282,
+              299,
+              315,
+              336,
+              356,
+              379,
+              397,
+              449,
+              453
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 282,
+              "length": 282,
+              "all_masked": true
+            },
+            {
+              "start": 301,
+              "end": 315,
+              "length": 15,
+              "all_masked": true
+            },
+            {
+              "start": 338,
+              "end": 356,
+              "length": 19,
+              "all_masked": true
+            },
+            {
+              "start": 381,
+              "end": 397,
+              "length": 17,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 284,
+              "end": 299,
+              "length": 16,
+              "prediction_tokens": 13,
+              "has_predictions": true
+            },
+            {
+              "start": 317,
+              "end": 336,
+              "length": 20,
+              "prediction_tokens": 17,
+              "has_predictions": true
+            },
+            {
+              "start": 358,
+              "end": 379,
+              "length": 22,
+              "prediction_tokens": 19,
+              "has_predictions": true
+            },
+            {
+              "start": 399,
+              "end": 449,
+              "length": 51,
+              "prediction_tokens": 48,
+              "has_predictions": true
+            },
+            {
+              "start": 455,
+              "end": 458,
+              "length": 4,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "vqa",
+          "dataset_description": "Visual Question Answering (LLaVA)"
+        },
+        {
+          "sample_idx": 9,
+          "sequence_length": 458,
+          "non_padding_tokens": 388,
+          "labeled_tokens": 91,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              382
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              287,
+              385
+            ],
+            "end_of_turn": [
+              285,
+              379,
+              383
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 285,
+              "length": 285,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 287,
+              "end": 379,
+              "length": 93,
+              "prediction_tokens": 90,
+              "has_predictions": true
+            },
+            {
+              "start": 385,
+              "end": 458,
+              "length": 74,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "vqa",
+          "dataset_description": "Visual Question Answering (LLaVA)"
+        },
+        {
+          "sample_idx": 10,
+          "sequence_length": 458,
+          "non_padding_tokens": 421,
+          "labeled_tokens": 126,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              415
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              285,
+              418
+            ],
+            "end_of_turn": [
+              283,
+              412,
+              416
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 283,
+              "length": 283,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 285,
+              "end": 412,
+              "length": 128,
+              "prediction_tokens": 125,
+              "has_predictions": true
+            },
+            {
+              "start": 418,
+              "end": 458,
+              "length": 41,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "vqa",
+          "dataset_description": "Visual Question Answering (LLaVA)"
+        },
+        {
+          "sample_idx": 11,
+          "sequence_length": 458,
+          "non_padding_tokens": 429,
+          "labeled_tokens": 136,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              423
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              283,
+              426
+            ],
+            "end_of_turn": [
+              281,
+              420,
+              424
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 281,
+              "length": 281,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 283,
+              "end": 420,
+              "length": 138,
+              "prediction_tokens": 135,
+              "has_predictions": true
+            },
+            {
+              "start": 426,
+              "end": 458,
+              "length": 33,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "vqa",
+          "dataset_description": "Visual Question Answering (LLaVA)"
+        },
+        {
+          "sample_idx": 12,
+          "sequence_length": 708,
+          "non_padding_tokens": 504,
+          "labeled_tokens": 154,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              498
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              281,
+              299,
+              316,
+              333,
+              348,
+              383,
+              398,
+              501
+            ],
+            "end_of_turn": [
+              279,
+              297,
+              314,
+              331,
+              346,
+              381,
+              396,
+              495,
+              499
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 279,
+              "length": 279,
+              "all_masked": true
+            },
+            {
+              "start": 299,
+              "end": 314,
+              "length": 16,
+              "all_masked": true
+            },
+            {
+              "start": 333,
+              "end": 346,
+              "length": 14,
+              "all_masked": true
+            },
+            {
+              "start": 383,
+              "end": 396,
+              "length": 14,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 281,
+              "end": 297,
+              "length": 17,
+              "prediction_tokens": 14,
+              "has_predictions": true
+            },
+            {
+              "start": 316,
+              "end": 331,
+              "length": 16,
+              "prediction_tokens": 13,
+              "has_predictions": true
+            },
+            {
+              "start": 348,
+              "end": 381,
+              "length": 34,
+              "prediction_tokens": 31,
+              "has_predictions": true
+            },
+            {
+              "start": 398,
+              "end": 495,
+              "length": 98,
+              "prediction_tokens": 95,
+              "has_predictions": true
+            },
+            {
+              "start": 501,
+              "end": 708,
+              "length": 208,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "vqa",
+          "dataset_description": "Visual Question Answering (LLaVA)"
+        },
+        {
+          "sample_idx": 13,
+          "sequence_length": 708,
+          "non_padding_tokens": 588,
+          "labeled_tokens": 292,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              582
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              286,
+              585
+            ],
+            "end_of_turn": [
+              284,
+              579,
+              583
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 284,
+              "length": 284,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 286,
+              "end": 579,
+              "length": 294,
+              "prediction_tokens": 291,
+              "has_predictions": true
+            },
+            {
+              "start": 585,
+              "end": 708,
+              "length": 124,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "vqa",
+          "dataset_description": "Visual Question Answering (LLaVA)"
+        },
+        {
+          "sample_idx": 14,
+          "sequence_length": 708,
+          "non_padding_tokens": 708,
+          "labeled_tokens": 350,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              702
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              281,
+              334,
+              348,
+              363,
+              379,
+              395,
+              420,
+              705
+            ],
+            "end_of_turn": [
+              279,
+              332,
+              346,
+              361,
+              377,
+              393,
+              418,
+              699,
+              703
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 279,
+              "length": 279,
+              "all_masked": true
+            },
+            {
+              "start": 334,
+              "end": 346,
+              "length": 13,
+              "all_masked": true
+            },
+            {
+              "start": 363,
+              "end": 377,
+              "length": 15,
+              "all_masked": true
+            },
+            {
+              "start": 395,
+              "end": 418,
+              "length": 24,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 281,
+              "end": 332,
+              "length": 52,
+              "prediction_tokens": 49,
+              "has_predictions": true
+            },
+            {
+              "start": 348,
+              "end": 361,
+              "length": 14,
+              "prediction_tokens": 11,
+              "has_predictions": true
+            },
+            {
+              "start": 379,
+              "end": 393,
+              "length": 15,
+              "prediction_tokens": 12,
+              "has_predictions": true
+            },
+            {
+              "start": 420,
+              "end": 699,
+              "length": 280,
+              "prediction_tokens": 277,
+              "has_predictions": true
+            },
+            {
+              "start": 705,
+              "end": 708,
+              "length": 4,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "vqa",
+          "dataset_description": "Visual Question Answering (LLaVA)"
+        },
+        {
+          "sample_idx": 15,
+          "sequence_length": 708,
+          "non_padding_tokens": 438,
+          "labeled_tokens": 65,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              432
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              284,
+              303,
+              318,
+              335,
+              347,
+              361,
+              375,
+              388,
+              410,
+              435
+            ],
+            "end_of_turn": [
+              282,
+              301,
+              316,
+              333,
+              345,
+              359,
+              373,
+              386,
+              408,
+              429,
+              433
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 282,
+              "length": 282,
+              "all_masked": true
+            },
+            {
+              "start": 303,
+              "end": 316,
+              "length": 14,
+              "all_masked": true
+            },
+            {
+              "start": 335,
+              "end": 345,
+              "length": 11,
+              "all_masked": true
+            },
+            {
+              "start": 361,
+              "end": 373,
+              "length": 13,
+              "all_masked": true
+            },
+            {
+              "start": 388,
+              "end": 408,
+              "length": 21,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 284,
+              "end": 301,
+              "length": 18,
+              "prediction_tokens": 15,
+              "has_predictions": true
+            },
+            {
+              "start": 318,
+              "end": 333,
+              "length": 16,
+              "prediction_tokens": 13,
+              "has_predictions": true
+            },
+            {
+              "start": 347,
+              "end": 359,
+              "length": 13,
+              "prediction_tokens": 10,
+              "has_predictions": true
+            },
+            {
+              "start": 375,
+              "end": 386,
+              "length": 12,
+              "prediction_tokens": 9,
+              "has_predictions": true
+            },
+            {
+              "start": 410,
+              "end": 429,
+              "length": 20,
+              "prediction_tokens": 17,
+              "has_predictions": true
+            },
+            {
+              "start": 435,
+              "end": 708,
+              "length": 274,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "vqa",
+          "dataset_description": "Visual Question Answering (LLaVA)"
+        },
+        {
+          "sample_idx": 16,
+          "sequence_length": 570,
+          "non_padding_tokens": 570,
+          "labeled_tokens": 196,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              564
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              281,
+              308,
+              322,
+              335,
+              351,
+              365,
+              378,
+              393,
+              417,
+              567
+            ],
+            "end_of_turn": [
+              279,
+              306,
+              320,
+              333,
+              349,
+              363,
+              376,
+              391,
+              415,
+              561,
+              565
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 279,
+              "length": 279,
+              "all_masked": true
+            },
+            {
+              "start": 308,
+              "end": 320,
+              "length": 13,
+              "all_masked": true
+            },
+            {
+              "start": 335,
+              "end": 349,
+              "length": 15,
+              "all_masked": true
+            },
+            {
+              "start": 365,
+              "end": 376,
+              "length": 12,
+              "all_masked": true
+            },
+            {
+              "start": 393,
+              "end": 415,
+              "length": 23,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 281,
+              "end": 306,
+              "length": 26,
+              "prediction_tokens": 23,
+              "has_predictions": true
+            },
+            {
+              "start": 322,
+              "end": 333,
+              "length": 12,
+              "prediction_tokens": 9,
+              "has_predictions": true
+            },
+            {
+              "start": 351,
+              "end": 363,
+              "length": 13,
+              "prediction_tokens": 10,
+              "has_predictions": true
+            },
+            {
+              "start": 378,
+              "end": 391,
+              "length": 14,
+              "prediction_tokens": 11,
+              "has_predictions": true
+            },
+            {
+              "start": 417,
+              "end": 561,
+              "length": 145,
+              "prediction_tokens": 142,
+              "has_predictions": true
+            },
+            {
+              "start": 567,
+              "end": 570,
+              "length": 4,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "vqa",
+          "dataset_description": "Visual Question Answering (LLaVA)"
+        },
+        {
+          "sample_idx": 17,
+          "sequence_length": 570,
+          "non_padding_tokens": 479,
+          "labeled_tokens": 182,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              473
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              287,
+              476
+            ],
+            "end_of_turn": [
+              285,
+              470,
+              474
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 285,
+              "length": 285,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 287,
+              "end": 470,
+              "length": 184,
+              "prediction_tokens": 181,
+              "has_predictions": true
+            },
+            {
+              "start": 476,
+              "end": 570,
+              "length": 95,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "vqa",
+          "dataset_description": "Visual Question Answering (LLaVA)"
+        },
+        {
+          "sample_idx": 18,
+          "sequence_length": 570,
+          "non_padding_tokens": 346,
+          "labeled_tokens": 54,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              340
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              282,
+              343
+            ],
+            "end_of_turn": [
+              280,
+              337,
+              341
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 280,
+              "length": 280,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 282,
+              "end": 337,
+              "length": 56,
+              "prediction_tokens": 53,
+              "has_predictions": true
+            },
+            {
+              "start": 343,
+              "end": 570,
+              "length": 228,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "vqa",
+          "dataset_description": "Visual Question Answering (LLaVA)"
+        },
+        {
+          "sample_idx": 19,
+          "sequence_length": 570,
+          "non_padding_tokens": 413,
+          "labeled_tokens": 118,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              407
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              285,
+              410
+            ],
+            "end_of_turn": [
+              283,
+              404,
+              408
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 283,
+              "length": 283,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 285,
+              "end": 404,
+              "length": 120,
+              "prediction_tokens": 117,
+              "has_predictions": true
+            },
+            {
+              "start": 410,
+              "end": 570,
+              "length": 161,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "vqa",
+          "dataset_description": "Visual Question Answering (LLaVA)"
+        },
+        {
+          "sample_idx": 20,
+          "sequence_length": 627,
+          "non_padding_tokens": 627,
+          "labeled_tokens": 264,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              621
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              282,
+              300,
+              319,
+              346,
+              367,
+              394,
+              413,
+              624
+            ],
+            "end_of_turn": [
+              280,
+              298,
+              317,
+              344,
+              365,
+              392,
+              411,
+              618,
+              622
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 280,
+              "length": 280,
+              "all_masked": true
+            },
+            {
+              "start": 300,
+              "end": 317,
+              "length": 18,
+              "all_masked": true
+            },
+            {
+              "start": 346,
+              "end": 365,
+              "length": 20,
+              "all_masked": true
+            },
+            {
+              "start": 394,
+              "end": 411,
+              "length": 18,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 282,
+              "end": 298,
+              "length": 17,
+              "prediction_tokens": 14,
+              "has_predictions": true
+            },
+            {
+              "start": 319,
+              "end": 344,
+              "length": 26,
+              "prediction_tokens": 23,
+              "has_predictions": true
+            },
+            {
+              "start": 367,
+              "end": 392,
+              "length": 26,
+              "prediction_tokens": 23,
+              "has_predictions": true
+            },
+            {
+              "start": 413,
+              "end": 618,
+              "length": 206,
+              "prediction_tokens": 203,
+              "has_predictions": true
+            },
+            {
+              "start": 624,
+              "end": 627,
+              "length": 4,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "vqa",
+          "dataset_description": "Visual Question Answering (LLaVA)"
+        },
+        {
+          "sample_idx": 21,
+          "sequence_length": 627,
+          "non_padding_tokens": 458,
+          "labeled_tokens": 160,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              452
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              288,
+              455
+            ],
+            "end_of_turn": [
+              286,
+              449,
+              453
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 286,
+              "length": 286,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 288,
+              "end": 449,
+              "length": 162,
+              "prediction_tokens": 159,
+              "has_predictions": true
+            },
+            {
+              "start": 455,
+              "end": 627,
+              "length": 173,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "vqa",
+          "dataset_description": "Visual Question Answering (LLaVA)"
+        },
+        {
+          "sample_idx": 22,
+          "sequence_length": 627,
+          "non_padding_tokens": 434,
+          "labeled_tokens": 144,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              428
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              280,
+              431
+            ],
+            "end_of_turn": [
+              278,
+              425,
+              429
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 278,
+              "length": 278,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 280,
+              "end": 425,
+              "length": 146,
+              "prediction_tokens": 143,
+              "has_predictions": true
+            },
+            {
+              "start": 431,
+              "end": 627,
+              "length": 197,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "vqa",
+          "dataset_description": "Visual Question Answering (LLaVA)"
+        },
+        {
+          "sample_idx": 23,
+          "sequence_length": 627,
+          "non_padding_tokens": 389,
+          "labeled_tokens": 87,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              383
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              292,
+              386
+            ],
+            "end_of_turn": [
+              290,
+              380,
+              384
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 290,
+              "length": 290,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 292,
+              "end": 380,
+              "length": 89,
+              "prediction_tokens": 86,
+              "has_predictions": true
+            },
+            {
+              "start": 386,
+              "end": 627,
+              "length": 242,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "vqa",
+          "dataset_description": "Visual Question Answering (LLaVA)"
+        },
+        {
+          "sample_idx": 24,
+          "sequence_length": 594,
+          "non_padding_tokens": 594,
+          "labeled_tokens": 297,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              588
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              287,
+              591
+            ],
+            "end_of_turn": [
+              285,
+              585,
+              589
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 285,
+              "length": 285,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 287,
+              "end": 585,
+              "length": 299,
+              "prediction_tokens": 296,
+              "has_predictions": true
+            },
+            {
+              "start": 591,
+              "end": 594,
+              "length": 4,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "vqa",
+          "dataset_description": "Visual Question Answering (LLaVA)"
+        }
+      ]
+    },
+    "reason_seg": {
+      "dataset_name": "reason_seg",
+      "description": "Reasoning Segmentation (ReasonSeg)",
+      "expected_features": [
+        "complex_reasoning",
+        "segmentation_mask"
+      ],
+      "processing_time_seconds": 8.620921850204468,
+      "total_samples": 25,
+      "correct_samples": 25,
+      "success_rate": 100.0,
+      "statistics": {
+        "avg_sequence_length": 403.6,
+        "avg_labeled_tokens": 43.56,
+        "seg_token_samples": 25,
+        "seg_token_rate": 100.0
+      },
+      "error_analysis": {},
+      "sample_details": [
+        {
+          "sample_idx": 0,
+          "sequence_length": 428,
+          "non_padding_tokens": 316,
+          "labeled_tokens": 4,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              308
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              305,
+              313
+            ],
+            "end_of_turn": [
+              303,
+              310,
+              311
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 303,
+              "length": 303,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 305,
+              "end": 310,
+              "length": 6,
+              "prediction_tokens": 3,
+              "has_predictions": true
+            },
+            {
+              "start": 313,
+              "end": 428,
+              "length": 116,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "reason_seg",
+          "dataset_description": "Reasoning Segmentation (ReasonSeg)"
+        },
+        {
+          "sample_idx": 1,
+          "sequence_length": 428,
+          "non_padding_tokens": 314,
+          "labeled_tokens": 9,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              306
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              298,
+              311
+            ],
+            "end_of_turn": [
+              296,
+              308,
+              309
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 296,
+              "length": 296,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 298,
+              "end": 308,
+              "length": 11,
+              "prediction_tokens": 8,
+              "has_predictions": true
+            },
+            {
+              "start": 311,
+              "end": 428,
+              "length": 118,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "reason_seg",
+          "dataset_description": "Reasoning Segmentation (ReasonSeg)"
+        },
+        {
+          "sample_idx": 2,
+          "sequence_length": 428,
+          "non_padding_tokens": 308,
+          "labeled_tokens": 7,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              300
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              294,
+              305
+            ],
+            "end_of_turn": [
+              292,
+              302,
+              303
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 292,
+              "length": 292,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 294,
+              "end": 302,
+              "length": 9,
+              "prediction_tokens": 6,
+              "has_predictions": true
+            },
+            {
+              "start": 305,
+              "end": 428,
+              "length": 124,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "reason_seg",
+          "dataset_description": "Reasoning Segmentation (ReasonSeg)"
+        },
+        {
+          "sample_idx": 3,
+          "sequence_length": 428,
+          "non_padding_tokens": 428,
+          "labeled_tokens": 126,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              422
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              292,
+              425
+            ],
+            "end_of_turn": [
+              290,
+              419,
+              423
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 290,
+              "length": 290,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 292,
+              "end": 419,
+              "length": 128,
+              "prediction_tokens": 125,
+              "has_predictions": true
+            },
+            {
+              "start": 425,
+              "end": 428,
+              "length": 4,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "reason_seg",
+          "dataset_description": "Reasoning Segmentation (ReasonSeg)"
+        },
+        {
+          "sample_idx": 4,
+          "sequence_length": 391,
+          "non_padding_tokens": 391,
+          "labeled_tokens": 85,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              305
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              299,
+              388
+            ],
+            "end_of_turn": [
+              297,
+              385,
+              386
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 297,
+              "length": 297,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 299,
+              "end": 385,
+              "length": 87,
+              "prediction_tokens": 84,
+              "has_predictions": true
+            },
+            {
+              "start": 388,
+              "end": 391,
+              "length": 4,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "reason_seg",
+          "dataset_description": "Reasoning Segmentation (ReasonSeg)"
+        },
+        {
+          "sample_idx": 5,
+          "sequence_length": 391,
+          "non_padding_tokens": 329,
+          "labeled_tokens": 7,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              321
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              315,
+              326
+            ],
+            "end_of_turn": [
+              313,
+              323,
+              324
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 313,
+              "length": 313,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 315,
+              "end": 323,
+              "length": 9,
+              "prediction_tokens": 6,
+              "has_predictions": true
+            },
+            {
+              "start": 326,
+              "end": 391,
+              "length": 66,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "reason_seg",
+          "dataset_description": "Reasoning Segmentation (ReasonSeg)"
+        },
+        {
+          "sample_idx": 6,
+          "sequence_length": 391,
+          "non_padding_tokens": 306,
+          "labeled_tokens": 4,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              298
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              295,
+              303
+            ],
+            "end_of_turn": [
+              293,
+              300,
+              301
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 293,
+              "length": 293,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 295,
+              "end": 300,
+              "length": 6,
+              "prediction_tokens": 3,
+              "has_predictions": true
+            },
+            {
+              "start": 303,
+              "end": 391,
+              "length": 89,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "reason_seg",
+          "dataset_description": "Reasoning Segmentation (ReasonSeg)"
+        },
+        {
+          "sample_idx": 7,
+          "sequence_length": 391,
+          "non_padding_tokens": 327,
+          "labeled_tokens": 11,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              319
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              309,
+              324
+            ],
+            "end_of_turn": [
+              307,
+              321,
+              322
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 307,
+              "length": 307,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 309,
+              "end": 321,
+              "length": 13,
+              "prediction_tokens": 10,
+              "has_predictions": true
+            },
+            {
+              "start": 324,
+              "end": 391,
+              "length": 68,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "reason_seg",
+          "dataset_description": "Reasoning Segmentation (ReasonSeg)"
+        },
+        {
+          "sample_idx": 8,
+          "sequence_length": 381,
+          "non_padding_tokens": 381,
+          "labeled_tokens": 63,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              317
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              311,
+              378
+            ],
+            "end_of_turn": [
+              309,
+              375,
+              376
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 309,
+              "length": 309,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 311,
+              "end": 375,
+              "length": 65,
+              "prediction_tokens": 62,
+              "has_predictions": true
+            },
+            {
+              "start": 378,
+              "end": 381,
+              "length": 4,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "reason_seg",
+          "dataset_description": "Reasoning Segmentation (ReasonSeg)"
+        },
+        {
+          "sample_idx": 9,
+          "sequence_length": 381,
+          "non_padding_tokens": 313,
+          "labeled_tokens": 7,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              305
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              299,
+              310
+            ],
+            "end_of_turn": [
+              297,
+              307,
+              308
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 297,
+              "length": 297,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 299,
+              "end": 307,
+              "length": 9,
+              "prediction_tokens": 6,
+              "has_predictions": true
+            },
+            {
+              "start": 310,
+              "end": 381,
+              "length": 72,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "reason_seg",
+          "dataset_description": "Reasoning Segmentation (ReasonSeg)"
+        },
+        {
+          "sample_idx": 10,
+          "sequence_length": 381,
+          "non_padding_tokens": 341,
+          "labeled_tokens": 9,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              333
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              325,
+              338
+            ],
+            "end_of_turn": [
+              323,
+              335,
+              336
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 323,
+              "length": 323,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 325,
+              "end": 335,
+              "length": 11,
+              "prediction_tokens": 8,
+              "has_predictions": true
+            },
+            {
+              "start": 338,
+              "end": 381,
+              "length": 44,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "reason_seg",
+          "dataset_description": "Reasoning Segmentation (ReasonSeg)"
+        },
+        {
+          "sample_idx": 11,
+          "sequence_length": 381,
+          "non_padding_tokens": 358,
+          "labeled_tokens": 51,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              352
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              297,
+              355
+            ],
+            "end_of_turn": [
+              295,
+              349,
+              353
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 295,
+              "length": 295,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 297,
+              "end": 349,
+              "length": 53,
+              "prediction_tokens": 50,
+              "has_predictions": true
+            },
+            {
+              "start": 355,
+              "end": 381,
+              "length": 27,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "reason_seg",
+          "dataset_description": "Reasoning Segmentation (ReasonSeg)"
+        },
+        {
+          "sample_idx": 12,
+          "sequence_length": 416,
+          "non_padding_tokens": 378,
+          "labeled_tokens": 66,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              313
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              305,
+              375
+            ],
+            "end_of_turn": [
+              303,
+              372,
+              373
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 303,
+              "length": 303,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 305,
+              "end": 372,
+              "length": 68,
+              "prediction_tokens": 65,
+              "has_predictions": true
+            },
+            {
+              "start": 375,
+              "end": 416,
+              "length": 42,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "reason_seg",
+          "dataset_description": "Reasoning Segmentation (ReasonSeg)"
+        },
+        {
+          "sample_idx": 13,
+          "sequence_length": 416,
+          "non_padding_tokens": 416,
+          "labeled_tokens": 98,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              314
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              311,
+              413
+            ],
+            "end_of_turn": [
+              309,
+              410,
+              411
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 309,
+              "length": 309,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 311,
+              "end": 410,
+              "length": 100,
+              "prediction_tokens": 97,
+              "has_predictions": true
+            },
+            {
+              "start": 413,
+              "end": 416,
+              "length": 4,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "reason_seg",
+          "dataset_description": "Reasoning Segmentation (ReasonSeg)"
+        },
+        {
+          "sample_idx": 14,
+          "sequence_length": 416,
+          "non_padding_tokens": 319,
+          "labeled_tokens": 7,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              311
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              305,
+              316
+            ],
+            "end_of_turn": [
+              303,
+              313,
+              314
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 303,
+              "length": 303,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 305,
+              "end": 313,
+              "length": 9,
+              "prediction_tokens": 6,
+              "has_predictions": true
+            },
+            {
+              "start": 316,
+              "end": 416,
+              "length": 101,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "reason_seg",
+          "dataset_description": "Reasoning Segmentation (ReasonSeg)"
+        },
+        {
+          "sample_idx": 15,
+          "sequence_length": 416,
+          "non_padding_tokens": 318,
+          "labeled_tokens": 7,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              310
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              304,
+              315
+            ],
+            "end_of_turn": [
+              302,
+              312,
+              313
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 302,
+              "length": 302,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 304,
+              "end": 312,
+              "length": 9,
+              "prediction_tokens": 6,
+              "has_predictions": true
+            },
+            {
+              "start": 315,
+              "end": 416,
+              "length": 102,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "reason_seg",
+          "dataset_description": "Reasoning Segmentation (ReasonSeg)"
+        },
+        {
+          "sample_idx": 16,
+          "sequence_length": 409,
+          "non_padding_tokens": 387,
+          "labeled_tokens": 67,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              319
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              313,
+              384
+            ],
+            "end_of_turn": [
+              311,
+              381,
+              382
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 311,
+              "length": 311,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 313,
+              "end": 381,
+              "length": 69,
+              "prediction_tokens": 66,
+              "has_predictions": true
+            },
+            {
+              "start": 384,
+              "end": 409,
+              "length": 26,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "reason_seg",
+          "dataset_description": "Reasoning Segmentation (ReasonSeg)"
+        },
+        {
+          "sample_idx": 17,
+          "sequence_length": 409,
+          "non_padding_tokens": 409,
+          "labeled_tokens": 90,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              318
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              312,
+              406
+            ],
+            "end_of_turn": [
+              310,
+              403,
+              404
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 310,
+              "length": 310,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 312,
+              "end": 403,
+              "length": 92,
+              "prediction_tokens": 89,
+              "has_predictions": true
+            },
+            {
+              "start": 406,
+              "end": 409,
+              "length": 4,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "reason_seg",
+          "dataset_description": "Reasoning Segmentation (ReasonSeg)"
+        },
+        {
+          "sample_idx": 18,
+          "sequence_length": 409,
+          "non_padding_tokens": 399,
+          "labeled_tokens": 83,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              315
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              309,
+              396
+            ],
+            "end_of_turn": [
+              307,
+              393,
+              394
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 307,
+              "length": 307,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 309,
+              "end": 393,
+              "length": 85,
+              "prediction_tokens": 82,
+              "has_predictions": true
+            },
+            {
+              "start": 396,
+              "end": 409,
+              "length": 14,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "reason_seg",
+          "dataset_description": "Reasoning Segmentation (ReasonSeg)"
+        },
+        {
+          "sample_idx": 19,
+          "sequence_length": 409,
+          "non_padding_tokens": 327,
+          "labeled_tokens": 11,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              319
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              309,
+              324
+            ],
+            "end_of_turn": [
+              307,
+              321,
+              322
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 307,
+              "length": 307,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 309,
+              "end": 321,
+              "length": 13,
+              "prediction_tokens": 10,
+              "has_predictions": true
+            },
+            {
+              "start": 324,
+              "end": 409,
+              "length": 86,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "reason_seg",
+          "dataset_description": "Reasoning Segmentation (ReasonSeg)"
+        },
+        {
+          "sample_idx": 20,
+          "sequence_length": 393,
+          "non_padding_tokens": 393,
+          "labeled_tokens": 80,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              309
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              306,
+              390
+            ],
+            "end_of_turn": [
+              304,
+              387,
+              388
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 304,
+              "length": 304,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 306,
+              "end": 387,
+              "length": 82,
+              "prediction_tokens": 79,
+              "has_predictions": true
+            },
+            {
+              "start": 390,
+              "end": 393,
+              "length": 4,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "reason_seg",
+          "dataset_description": "Reasoning Segmentation (ReasonSeg)"
+        },
+        {
+          "sample_idx": 21,
+          "sequence_length": 393,
+          "non_padding_tokens": 326,
+          "labeled_tokens": 7,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              318
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              312,
+              323
+            ],
+            "end_of_turn": [
+              310,
+              320,
+              321
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 310,
+              "length": 310,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 312,
+              "end": 320,
+              "length": 9,
+              "prediction_tokens": 6,
+              "has_predictions": true
+            },
+            {
+              "start": 323,
+              "end": 393,
+              "length": 71,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "reason_seg",
+          "dataset_description": "Reasoning Segmentation (ReasonSeg)"
+        },
+        {
+          "sample_idx": 22,
+          "sequence_length": 393,
+          "non_padding_tokens": 386,
+          "labeled_tokens": 83,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              380
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              293,
+              383
+            ],
+            "end_of_turn": [
+              291,
+              377,
+              381
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 291,
+              "length": 291,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 293,
+              "end": 377,
+              "length": 85,
+              "prediction_tokens": 82,
+              "has_predictions": true
+            },
+            {
+              "start": 383,
+              "end": 393,
+              "length": 11,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "reason_seg",
+          "dataset_description": "Reasoning Segmentation (ReasonSeg)"
+        },
+        {
+          "sample_idx": 23,
+          "sequence_length": 393,
+          "non_padding_tokens": 310,
+          "labeled_tokens": 4,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              302
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              299,
+              307
+            ],
+            "end_of_turn": [
+              297,
+              304,
+              305
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 297,
+              "length": 297,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 299,
+              "end": 304,
+              "length": 6,
+              "prediction_tokens": 3,
+              "has_predictions": true
+            },
+            {
+              "start": 307,
+              "end": 393,
+              "length": 87,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "reason_seg",
+          "dataset_description": "Reasoning Segmentation (ReasonSeg)"
+        },
+        {
+          "sample_idx": 24,
+          "sequence_length": 418,
+          "non_padding_tokens": 418,
+          "labeled_tokens": 103,
+          "special_tokens": {
+            "BOS": [
+              0
+            ],
+            "SEG": [
+              316
+            ],
+            "start_of_turn": [
+              1,
+              263,
+              308,
+              415
+            ],
+            "end_of_turn": [
+              306,
+              412,
+              413
+            ]
+          },
+          "user_turns": [
+            {
+              "start": 1,
+              "end": 306,
+              "length": 306,
+              "all_masked": true
+            }
+          ],
+          "model_turns": [
+            {
+              "start": 308,
+              "end": 412,
+              "length": 105,
+              "prediction_tokens": 102,
+              "has_predictions": true
+            },
+            {
+              "start": 415,
+              "end": 418,
+              "length": 4,
+              "prediction_tokens": 1,
+              "has_predictions": true
+            }
+          ],
+          "masking_correct": true,
+          "masking_errors": [],
+          "has_seg_token": true,
+          "dataset_name": "reason_seg",
+          "dataset_description": "Reasoning Segmentation (ReasonSeg)"
+        }
+      ]
+    }
+  }
+}

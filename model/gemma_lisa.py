@@ -13,6 +13,7 @@ import numpy as np
 from transformers import AutoProcessor, Gemma3ForConditionalGeneration, PreTrainedModel, PretrainedConfig
 from model.segment_anything import sam_model_registry
 from model.segment_anything.modeling import MaskDecoder, PromptEncoder, TwoWayTransformer
+from utils.constants import IMAGE_TOKEN_INDEX, GEMMA_IMAGE_TOKEN_NUM
 
 # LISA-Gemmaモデルのカスタム設定クラス
 class LisaGemmaConfig(PretrainedConfig):
@@ -132,45 +133,48 @@ class LisaGemmaForCausalLM(PreTrainedModel):
             # トークンを追加
             num_added_tokens = self.gemma_processor.tokenizer.add_tokens([self.seg_token], special_tokens=True)
             print(f"✅ {num_added_tokens}個のトークンが追加されました")
-            
-            # resize_token_embeddingsを強制的に実行
-            new_vocab_size = len(self.gemma_processor.tokenizer)
-            
-            # Gemma-3モデルの語彙サイズを取得（モデルタイプに応じて適切に処理）
-            if hasattr(self.gemma_model.config, 'vocab_size'):
-                current_vocab_size = self.gemma_model.config.vocab_size
-            elif hasattr(self.gemma_model.config, 'text_config') and hasattr(self.gemma_model.config.text_config, 'vocab_size'):
-                current_vocab_size = self.gemma_model.config.text_config.vocab_size
-            else:
-                # 埋め込み層のサイズから直接取得
-                current_vocab_size = self.gemma_model.get_input_embeddings().weight.shape[0]
-            
-            print(f"語彙サイズを拡張中: {current_vocab_size} -> {new_vocab_size}")
-            
-            # DeepSpeed互換: resize_token_embeddingsを条件付きで実行
-            try:
-                self.gemma_model.resize_token_embeddings(new_vocab_size)
-                print(f"✅ 埋め込み層が正常にリサイズされました（新サイズ: {new_vocab_size}）")
-            except RuntimeError as e:
-                if "DTensor" in str(e):
-                    print(f"⚠️ DeepSpeed環境での実行を検出。埋め込み層のリサイズを延期します")
-                    # DeepSpeedでは後で手動で拡張する必要がある
-                else:
-                    # その他のエラーは再スロー
-                    raise e
-            
-            # リサイズ後のサイズを確認
-            actual_embed_size = self.gemma_model.get_input_embeddings().weight.shape[0]
-            print(f"実際の埋め込み層サイズ: {actual_embed_size}")
-            
-            if actual_embed_size < new_vocab_size:
-                print(f"⚠️ 警告: 埋め込み層のサイズ({actual_embed_size})が語彙サイズ({new_vocab_size})より小さいです")
         else:
             print(f"✅ {self.seg_token}は既に語彙に存在します")
         
         # SEGトークンのIDを取得
         self.seg_token_id = self.gemma_processor.tokenizer.convert_tokens_to_ids(self.seg_token)
         print(f"SEGトークンID: {self.seg_token_id}")
+        
+        # 埋め込み層のリサイズ（画像トークン範囲を含む）
+        # 必要な語彙サイズを計算
+        # 現在の語彙サイズ + 画像トークン範囲（256個）
+        current_vocab_size = len(self.gemma_processor.tokenizer)
+        required_vocab_size = max(current_vocab_size, IMAGE_TOKEN_INDEX + GEMMA_IMAGE_TOKEN_NUM)
+        
+        # 埋め込み層の現在のサイズを確認
+        actual_embed_size = self.gemma_model.get_input_embeddings().weight.shape[0]
+        print(f"現在の埋め込み層サイズ: {actual_embed_size}")
+        print(f"現在の語彙サイズ: {current_vocab_size}")
+        print(f"必要な語彙サイズ: {required_vocab_size}")
+        print(f"画像トークン範囲: {IMAGE_TOKEN_INDEX} - {IMAGE_TOKEN_INDEX + GEMMA_IMAGE_TOKEN_NUM - 1}")
+        
+        # 埋め込み層のリサイズが必要かチェック
+        if actual_embed_size < required_vocab_size:
+            print(f"埋め込み層をリサイズ中: {actual_embed_size} -> {required_vocab_size}")
+            
+            try:
+                self.gemma_model.resize_token_embeddings(required_vocab_size)
+                print(f"✅ 埋め込み層が正常にリサイズされました（新サイズ: {required_vocab_size}）")
+            except RuntimeError as e:
+                if "DTensor" in str(e):
+                    print(f"⚠️ DeepSpeed環境での実行を検出。埋め込み層のリサイズを延期します")
+                else:
+                    print(f"❌ 埋め込み層のリサイズに失敗: {e}")
+                    raise e
+            
+            # リサイズ後のサイズを確認
+            new_embed_size = self.gemma_model.get_input_embeddings().weight.shape[0]
+            print(f"リサイズ後の埋め込み層サイズ: {new_embed_size}")
+            
+            if new_embed_size < required_vocab_size:
+                raise RuntimeError(f"埋め込み層のリサイズに失敗: {new_embed_size} < {required_vocab_size}")
+        else:
+            print(f"✅ 埋め込み層サイズは十分です: {actual_embed_size} >= {required_vocab_size}")
         
         # 設定情報を保存
         self.gemma_image_size = config.gemma_image_size
@@ -373,45 +377,23 @@ class LisaGemmaForCausalLM(PreTrainedModel):
         
         # pixel_valuesが空の場合の処理
         if pixel_values.numel() == 0:
-            print("⚠️ pixel_valuesが空です。テキストのみで処理します。")
-            # テキストのみでGemmaモデルを実行
-            gemma_outputs = self.gemma_model(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                labels=labels,
-                output_hidden_states=True,
-                return_dict=True
-            )
-            
-            results = {
-                "text_loss": gemma_outputs.loss,
-                "logits": gemma_outputs.logits,
-                "hidden_states": gemma_outputs.hidden_states,
-                "predicted_masks": None,  # マスクは生成されない
-            }
-            return results
+            raise ValueError("pixel_valuesが空です。マルチモーダル処理には画像が必要です。")
         
         # 1. Gemmaモデルでのフォワードパス（画像あり）
-        try:
-            gemma_outputs = self.gemma_model(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                pixel_values=pixel_values,
-                labels=labels,
-                output_hidden_states=True,
-                return_dict=True
-            )
-        except Exception as e:
-            print(f"⚠️ Gemmaモデルでエラーが発生: {e}")
-            print("テキストのみで再試行します...")
-            # フォールバック: テキストのみで処理
-            gemma_outputs = self.gemma_model(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                labels=labels,
-                output_hidden_states=True,
-                return_dict=True
-            )
+        print(f"🔍 Gemmaモデル入力情報:")
+        print(f"  - input_ids: {input_ids.shape}")
+        print(f"  - attention_mask: {attention_mask.shape}")
+        print(f"  - pixel_values: {pixel_values.shape}")
+        print(f"  - labels: {labels.shape if labels is not None else 'None'}")
+        
+        gemma_outputs = self.gemma_model(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            pixel_values=pixel_values,
+            labels=labels,
+            output_hidden_states=True,
+            return_dict=True
+        )
         
         results = {
             "text_loss": gemma_outputs.loss,  # Gemmaのlanguage modeling loss
@@ -535,27 +517,21 @@ class LisaGemmaForCausalLM(PreTrainedModel):
         # ======================================================================
         # パスウェイ 2: Gemmaの推論 (意図理解用)
         # ======================================================================
-        try:
-            # Gemmaモデルに画像とテキストを入力し、出力を得る
-            gemma_outputs = self.gemma_model(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                pixel_values=images_for_gemma,  # Gemma用前処理済み画像
-                labels=labels,
-                output_hidden_states=True,
-                return_dict=True
-            )
-        except Exception as e:
-            print(f"⚠️ Gemmaモデルでエラーが発生: {e}")
-            print("テキストのみで再試行します...")
-            # フォールバック: テキストのみで処理
-            gemma_outputs = self.gemma_model(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                labels=labels,
-                output_hidden_states=True,
-                return_dict=True
-            )
+        print(f"🔍 Gemmaモデル入力情報 (デュアルストリーム):")
+        print(f"  - input_ids: {input_ids.shape}")
+        print(f"  - attention_mask: {attention_mask.shape}")
+        print(f"  - images_for_gemma: {images_for_gemma.shape}")
+        print(f"  - labels: {labels.shape if labels is not None else 'None'}")
+        
+        # Gemmaモデルに画像とテキストを入力し、出力を得る
+        gemma_outputs = self.gemma_model(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            pixel_values=images_for_gemma,  # Gemma用前処理済み画像
+            labels=labels,
+            output_hidden_states=True,
+            return_dict=True
+        )
         
         # テキスト生成の損失（VQAタスクなどで使用）
         text_loss = gemma_outputs.loss

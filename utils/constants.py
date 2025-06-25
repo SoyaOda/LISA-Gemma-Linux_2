@@ -20,7 +20,12 @@ GEMMA_EOS_TOKEN = "<eos>"
 
 # 無視すべきインデックス
 IGNORE_INDEX = -100
-IMAGE_TOKEN_INDEX = -200
+# Gemma-3-4b-itでは負のトークンインデックスは使用不可
+# 画像トークンとSEGトークンは異なるIDを使用する必要がある
+# <image_soft_token>: 262144 (Gemma-3で自動追加)
+# [SEG]: 262145 (カスタム追加)
+# 画像トークン（256個の連続トークン）: 262146から262401まで
+IMAGE_TOKEN_INDEX = 262146  # 画像パッチトークンの開始インデックス
 
 # システムプロンプト
 SYSTEM_PROMPT = """You are a helpful assistant that can analyze images and understand visual content. You can describe what you see in images and answer questions about them."""

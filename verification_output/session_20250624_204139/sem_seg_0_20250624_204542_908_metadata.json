@@ -1,0 +1,26 @@
+{
+  "dataset_name": "sem_seg",
+  "sample_idx": 0,
+  "session_timestamp": "20250624_204139",
+  "item_timestamp": "20250624_204542_908",
+  "original_image_path": "/mnt/h/download/LISA-dataset/dataset/mapillary/training/images/aaGTCYD5WJ-jQ7Z_FSWhcw.jpg",
+  "conversations": [
+    "<start_of_turn>user\nCan you identify and segment the traffic light - pedestrians?<end_of_turn>\n<start_of_turn>model\nSure, the segmentation result is [SEG].<end_of_turn>\n",
+    "<start_of_turn>user\nCan you identify and segment the signage - advertisement?<end_of_turn>\n<start_of_turn>model\n[SEG].<end_of_turn>\n",
+    "<start_of_turn>user\nCan you identify and segment the lane marking - crosswalk?<end_of_turn>\n<start_of_turn>model\n[SEG].<end_of_turn>\n"
+  ],
+  "questions": [
+    "Can you identify and segment the traffic light - pedestrians?",
+    "Can you identify and segment the signage - advertisement?",
+    "Can you identify and segment the lane marking - crosswalk?"
+  ],
+  "class_names": [
+    "traffic light - pedestrians",
+    "signage - advertisement",
+    "lane marking - crosswalk"
+  ],
+  "comparison_image": "verification_output/session_20250624_204139/sem_seg_0_20250624_204542_908_comparison.png",
+  "processing_note": "Simple resize: mask resized to match processed image size",
+  "image_size": "3840x2160",
+  "mask_size": "3840x2160"
+}

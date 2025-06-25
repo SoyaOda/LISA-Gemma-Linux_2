@@ -173,7 +173,8 @@ class VQADataset(torch.utils.data.Dataset):
         conversations.append(conv.get_prompt())
 
         # VQAデータセットではマスクは不要（オリジナル準拠）
-        masks = torch.rand(0, *ori_size)  # オリジナルと同じくtorch.rand(0, ...)
+        # 空のマスクではなく、適切なサイズのゼロマスクを作成
+        masks = torch.zeros(1, *ori_size)  # (1, H, W) 形式のゼロマスク
         label = torch.ones(ori_size) * self.ignore_label
 
         # 質問と回答の抽出（Original-LISA-Code準拠）

@@ -1,0 +1,28 @@
+{
+  "session_info": {
+    "timestamp": "20250624_215518",
+    "model_id": 4368,
+    "batch_size": 4,
+    "num_samples_checked": 2
+  },
+  "tokenizer_info": {
+    "vocab_size": 262144,
+    "special_tokens": {
+      "bos": "<bos>",
+      "eos": "<eos>",
+      "pad": "<pad>",
+      "has_seg_token": true
+    }
+  },
+  "batch_statistics": {
+    "total_samples": 4,
+    "avg_sequence_length": 409.0,
+    "avg_labeled_tokens": 47.5,
+    "samples_with_seg_token": 2
+  },
+  "format_compliance": {
+    "gemma3_chat_template": true,
+    "proper_label_masking": true,
+    "masking_issues": []
+  }
+}

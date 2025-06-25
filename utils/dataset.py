@@ -72,7 +72,8 @@ config = get_config()
 
 # デフォルト設定
 DEFAULT_IMAGE_TOKEN = "<image>"
-IMAGE_TOKEN_INDEX = -200
+# utils/constants.pyから統一されたIMAGE_TOKEN_INDEXを使用
+from .constants import IMAGE_TOKEN_INDEX
 DEFAULT_SEG_TOKEN = getattr(config, 'SEG_TOKEN', "[SEG]")
 IGNORE_INDEX = -100
 
@@ -150,33 +151,7 @@ def preprocess_gemma_image(image: Image.Image, processor: AutoProcessor, target_
         ])
         return transform(image_resized)
 
-def apply_gemma3_chat_template(text: str, tokenizer) -> str:
-    """
-    Gemma-3の正式なチャットテンプレートを適用
-    """
-    # すでにテンプレートが適用されているかチェック
-    if "<start_of_turn>" in text:
-        return text
-    
-    # Gemma-3チャットテンプレート適用
-    messages = [
-        {"role": "user", "content": text}
-    ]
-    
-    # tokenizerのapply_chat_templateメソッドを使用
-    if hasattr(tokenizer, 'apply_chat_template'):
-        try:
-            templated_text = tokenizer.apply_chat_template(
-                messages,
-                tokenize=False,
-                add_generation_prompt=True
-            )
-            return templated_text
-        except Exception as e:
-            print(f"チャットテンプレート適用エラー: {e}")
-    
-    # フォールバック: 手動でテンプレート適用
-    return f"<start_of_turn>user\n{text}<end_of_turn>\n<start_of_turn>model\n"
+
 
 def build_correct_labels_for_gemma3(input_ids: torch.Tensor, tokenizer) -> torch.Tensor:
     """
@@ -234,12 +209,20 @@ def build_correct_labels_for_gemma3(input_ids: torch.Tensor, tokenizer) -> torch
                     while j < len(input_ids_list) and input_ids_list[j] != turn_end:
                         j += 1
                     
-                    # modelの応答部分（start_pred から end_of_turn の直前まで）を予測対象に
-                    if j < len(input_ids_list):  # <end_of_turn>が見つかった場合
+                    # modelの応答部分を予測対象に
+                    if j < len(input_ids_list):  
+                        # <end_of_turn>が見つかった場合: start_pred から end_of_turn の直前まで
                         labels[start_pred:j] = input_ids[start_pred:j]
-                    
-                    i = j + 1  # <end_of_turn>の次へ
-                    
+                        i = j + 1  # <end_of_turn>の次へ
+                    else:
+                        # <end_of_turn>が見つからない場合（最後のmodelターン）: シーケンス末尾まで
+                        # PADトークンは除外
+                        end_pos = len(input_ids_list)
+                        while end_pos > start_pred and input_ids_list[end_pos - 1] == 0:  # PADトークン除外
+                            end_pos -= 1
+                        if end_pos > start_pred:
+                            labels[start_pred:end_pos] = input_ids[start_pred:end_pos]
+                        i = len(input_ids_list)  # ループ終了
                 elif next_token == user_token_id:
                     # userターンの場合: 完全にマスク（何もしない、既に-100）
                     # 対応する<end_of_turn>を探して飛ばす
@@ -530,16 +513,43 @@ class HybridDataset(torch.utils.data.Dataset):
                         image_np = (image_np * 255).astype(np.uint8)
                 else:
                     image_np = image_data.cpu().numpy()
+                
+                # 形状の検証
+                if len(image_np.shape) >= 2 and (image_np.shape[0] <= 1 or image_np.shape[1] <= 1):
+                    raise ValueError(f"無効な画像サイズ: {image_np.shape}")
+                
+                # データ型の検証と変換
+                if image_np.dtype == np.float32 or image_np.dtype == np.float64:
+                    # float型の場合、0-1範囲を0-255に変換してuint8に
+                    if image_np.max() <= 1.0:
+                        image_np = (image_np * 255).astype(np.uint8)
+                    else:
+                        # 既に0-255範囲の場合
+                        image_np = image_np.astype(np.uint8)
+                elif image_np.dtype != np.uint8:
+                    # その他の型の場合はuint8に変換
+                    image_np = image_np.astype(np.uint8)
+                
+                # PIL画像に変換
                 image_pil = Image.fromarray(image_np)
+                
             elif isinstance(image_data, Image.Image):
                 image_pil = image_data
             else:
                 # numpyまたはその他の形式
                 if hasattr(image_data, 'shape'):
+                    # データ型の検証と変換
+                    if image_data.dtype == np.float32 or image_data.dtype == np.float64:
+                        if image_data.max() <= 1.0:
+                            image_data = (image_data * 255).astype(np.uint8)
+                        else:
+                            image_data = image_data.astype(np.uint8)
+                    elif image_data.dtype != np.uint8:
+                        image_data = image_data.astype(np.uint8)
+                    
                     image_pil = Image.fromarray(image_data)
                 else:
-                    print(f"不明な画像形式: {type(image_data)}")
-                    image_pil = Image.new('RGB', (896, 896), color='black')
+                    raise ValueError(f"サポートされていない画像形式: {type(image_data)}")
             
             # デュアル前処理
             image_gemma = preprocess_gemma_image(image_pil, self.gemma_processor, self.gemma_image_size)
@@ -553,49 +563,91 @@ class HybridDataset(torch.utils.data.Dataset):
         else:
             raise ValueError(f"不明なサンプル形式: {len(sample)} 要素")
         
-        # 画像の型と形状を確認・修正
-        if isinstance(image_gemma, torch.Tensor):
-            if image_gemma.dim() == 4:  # (1, C, H, W) → (C, H, W)
-                image_gemma = image_gemma.squeeze(0)
-        else:
-            print(f"image_gemmaが予期しない型: {type(image_gemma)}")
-            image_gemma = torch.zeros(3, self.gemma_image_size, self.gemma_image_size)
 
-        if isinstance(image_sam, torch.Tensor):
-            if image_sam.dim() == 4:  # (1, C, H, W) → (C, H, W)
-                image_sam = image_sam.squeeze(0)
-        else:
-            print(f"image_samが予期しない型: {type(image_sam)}")
-            image_sam = torch.zeros(3, self.sam_image_size, self.sam_image_size)
 
         # [SEG]トークンが含まれていることを確認
         if self.seg_token not in text_prompt:
             text_prompt += f" {self.seg_token}"
 
-        # Gemma-3チャットテンプレートを適用
-        text_prompt = apply_gemma3_chat_template(text_prompt, self.gemma_processor.tokenizer)
-
-        # テキストのトークン化（画像トークンを考慮）
+        # Gemma-3の正しいマルチモーダル処理
+        # PIL画像を準備
+        if len(sample) == 9:
+            # 新しい9要素形式の場合、既にPIL画像がある
+            if isinstance(image_sam, torch.Tensor):
+                # SAM画像テンソルからPIL画像を復元
+                if image_sam.dim() == 3:  # (C, H, W)
+                    image_np = image_sam.permute(1, 2, 0).cpu().numpy()
+                    if image_np.max() <= 1.0:
+                        image_np = (image_np * 255).astype(np.uint8)
+                    
+                    # 形状の検証
+                    if image_np.shape[0] == 1 or image_np.shape[1] == 1:
+                        raise ValueError(f"無効な画像サイズ: {image_np.shape}")
+                    
+                    # データ型の検証と変換
+                    if image_np.dtype == np.float32 or image_np.dtype == np.float64:
+                        if image_np.max() <= 1.0:
+                            image_np = (image_np * 255).astype(np.uint8)
+                        else:
+                            image_np = image_np.astype(np.uint8)
+                    elif image_np.dtype != np.uint8:
+                        image_np = image_np.astype(np.uint8)
+                    
+                    image_pil = Image.fromarray(image_np)
+                else:
+                    raise ValueError(f"無効なテンソル次元: {image_sam.dim()}")
+            else:
+                if isinstance(image_sam, Image.Image):
+                    image_pil = image_sam
+                else:
+                    raise ValueError(f"サポートされていない画像形式: {type(image_sam)}")
+        else:
+            # 5要素形式の場合、既にimage_pilが準備されている
+            pass
+        
+        # Gemma-3の公式apply_chat_templateを使用
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image", "image": image_pil},
+                    {"type": "text", "text": text_prompt}
+                ]
+            }
+        ]
+        
         try:
-            # utilsからtokenizer_image_token関数をインポート
-            from .utils import tokenizer_image_token
-            
-            # 画像トークンを含むテキストをトークン化
-            input_ids = tokenizer_image_token(
-                text_prompt,
-                self.gemma_processor.tokenizer,
-                image_token_index=IMAGE_TOKEN_INDEX,
+            # Gemma-3プロセッサーでマルチモーダル処理
+            gemma_processed = self.gemma_processor.apply_chat_template(
+                messages,
+                add_generation_prompt=True,
+                tokenize=True,
+                return_dict=True,
                 return_tensors="pt"
             )
             
-            # attention_maskの生成
-            attention_mask = torch.ones_like(input_ids)
+            # 処理結果から必要な要素を抽出
+            input_ids = gemma_processed['input_ids'].squeeze(0)
+            attention_mask = gemma_processed['attention_mask'].squeeze(0)
+            pixel_values = gemma_processed['pixel_values'].squeeze(0)
+            
+            # pixel_valuesをimage_gemmaとして使用
+            image_gemma = pixel_values
+            
+            # SAM用画像を別途処理
+            image_sam = preprocess_sam_image(image_pil, self.sam_image_size)
             
         except Exception as e:
-            print(f"トークン化エラー: {e}")
-            # フォールバック
-            input_ids = torch.tensor([1, 2, 3], dtype=torch.long)  # ダミー
-            attention_mask = torch.ones_like(input_ids)
+            print(f"❌ Gemma-3マルチモーダル処理エラー: {e}")
+            print(f"   テキスト: {text_prompt[:100]}...")
+            raise RuntimeError(f"Gemma-3マルチモーダル処理に失敗: {e}")
+
+        # 画像の形状を確認（apply_chat_templateで処理済みなので基本的に正しい形状）
+        if image_gemma.dim() == 4:  # (1, C, H, W) → (C, H, W)
+            image_gemma = image_gemma.squeeze(0)
+        
+        if image_sam.dim() == 4:  # (1, C, H, W) → (C, H, W)
+            image_sam = image_sam.squeeze(0)
 
         # [SEG]トークンの位置を特定（オリジナルLISA準拠）
         seg_token_mask = (input_ids == self.seg_token_idx)

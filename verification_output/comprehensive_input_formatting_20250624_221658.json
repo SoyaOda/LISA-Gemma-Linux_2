@@ -1,0 +1,453 @@
+{
+  "session_id": "20250624_221658",
+  "timestamp": "2025-06-24T22:17:02.258319",
+  "total_datasets": 4,
+  "successful_datasets": 4,
+  "failed_datasets": 0,
+  "dataset_results": {
+    "sem_seg_ade20k": {
+      "subtype": "ade20k",
+      "total_samples": 25,
+      "successful_samples": 25,
+      "failed_samples": 0,
+      "sample_analyses": [
+        {
+          "token_analysis": {
+            "sample_idx": 0,
+            "sequence_length": 295,
+            "non_pad_tokens": 295,
+            "labeled_tokens": 11,
+            "seg_token_positions": [
+              287
+            ],
+            "image_token_positions": 0,
+            "seg_token_detected": true
+          },
+          "masking_result": {
+            "sample_idx": 0,
+            "is_correct": true,
+            "errors": [],
+            "user_turns": 1,
+            "model_turns": 2
+          }
+        },
+        {
+          "token_analysis": {
+            "sample_idx": 1,
+            "sequence_length": 295,
+            "non_pad_tokens": 295,
+            "labeled_tokens": 11,
+            "seg_token_positions": [
+              287
+            ],
+            "image_token_positions": 0,
+            "seg_token_detected": true
+          },
+          "masking_result": {
+            "sample_idx": 1,
+            "is_correct": true,
+            "errors": [],
+            "user_turns": 1,
+            "model_turns": 2
+          }
+        },
+        {
+          "token_analysis": {
+            "sample_idx": 2,
+            "sequence_length": 295,
+            "non_pad_tokens": 291,
+            "labeled_tokens": 7,
+            "seg_token_positions": [
+              283
+            ],
+            "image_token_positions": 0,
+            "seg_token_detected": true
+          },
+          "masking_result": {
+            "sample_idx": 2,
+            "is_correct": true,
+            "errors": [],
+            "user_turns": 1,
+            "model_turns": 2
+          }
+        },
+        {
+          "token_analysis": {
+            "sample_idx": 3,
+            "sequence_length": 295,
+            "non_pad_tokens": 293,
+            "labeled_tokens": 9,
+            "seg_token_positions": [
+              285
+            ],
+            "image_token_positions": 0,
+            "seg_token_detected": true
+          },
+          "masking_result": {
+            "sample_idx": 3,
+            "is_correct": true,
+            "errors": [],
+            "user_turns": 1,
+            "model_turns": 2
+          }
+        },
+        {
+          "token_analysis": {
+            "sample_idx": 4,
+            "sequence_length": 295,
+            "non_pad_tokens": 291,
+            "labeled_tokens": 7,
+            "seg_token_positions": [
+              283
+            ],
+            "image_token_positions": 0,
+            "seg_token_detected": true
+          },
+          "masking_result": {
+            "sample_idx": 4,
+            "is_correct": true,
+            "errors": [],
+            "user_turns": 1,
+            "model_turns": 2
+          }
+        }
+      ],
+      "error_details": []
+    },
+    "refer_seg_refcoco": {
+      "subtype": "refcoco",
+      "total_samples": 25,
+      "successful_samples": 25,
+      "failed_samples": 0,
+      "sample_analyses": [
+        {
+          "token_analysis": {
+            "sample_idx": 0,
+            "sequence_length": 299,
+            "non_pad_tokens": 299,
+            "labeled_tokens": 9,
+            "seg_token_positions": [
+              291
+            ],
+            "image_token_positions": 0,
+            "seg_token_detected": true
+          },
+          "masking_result": {
+            "sample_idx": 0,
+            "is_correct": true,
+            "errors": [],
+            "user_turns": 1,
+            "model_turns": 2
+          }
+        },
+        {
+          "token_analysis": {
+            "sample_idx": 1,
+            "sequence_length": 299,
+            "non_pad_tokens": 292,
+            "labeled_tokens": 4,
+            "seg_token_positions": [
+              284
+            ],
+            "image_token_positions": 0,
+            "seg_token_detected": true
+          },
+          "masking_result": {
+            "sample_idx": 1,
+            "is_correct": true,
+            "errors": [],
+            "user_turns": 1,
+            "model_turns": 2
+          }
+        },
+        {
+          "token_analysis": {
+            "sample_idx": 2,
+            "sequence_length": 299,
+            "non_pad_tokens": 293,
+            "labeled_tokens": 4,
+            "seg_token_positions": [
+              285
+            ],
+            "image_token_positions": 0,
+            "seg_token_detected": true
+          },
+          "masking_result": {
+            "sample_idx": 2,
+            "is_correct": true,
+            "errors": [],
+            "user_turns": 1,
+            "model_turns": 2
+          }
+        },
+        {
+          "token_analysis": {
+            "sample_idx": 3,
+            "sequence_length": 299,
+            "non_pad_tokens": 296,
+            "labeled_tokens": 7,
+            "seg_token_positions": [
+              288
+            ],
+            "image_token_positions": 0,
+            "seg_token_detected": true
+          },
+          "masking_result": {
+            "sample_idx": 3,
+            "is_correct": true,
+            "errors": [],
+            "user_turns": 1,
+            "model_turns": 2
+          }
+        },
+        {
+          "token_analysis": {
+            "sample_idx": 4,
+            "sequence_length": 299,
+            "non_pad_tokens": 292,
+            "labeled_tokens": 7,
+            "seg_token_positions": [
+              284
+            ],
+            "image_token_positions": 0,
+            "seg_token_detected": true
+          },
+          "masking_result": {
+            "sample_idx": 4,
+            "is_correct": true,
+            "errors": [],
+            "user_turns": 1,
+            "model_turns": 2
+          }
+        }
+      ],
+      "error_details": []
+    },
+    "vqa_llava_instruct_150k": {
+      "subtype": "llava_instruct_150k",
+      "total_samples": 25,
+      "successful_samples": 25,
+      "failed_samples": 0,
+      "sample_analyses": [
+        {
+          "token_analysis": {
+            "sample_idx": 0,
+            "sequence_length": 709,
+            "non_pad_tokens": 437,
+            "labeled_tokens": 65,
+            "seg_token_positions": [
+              431
+            ],
+            "image_token_positions": 0,
+            "seg_token_detected": true
+          },
+          "masking_result": {
+            "sample_idx": 0,
+            "is_correct": true,
+            "errors": [],
+            "user_turns": 5,
+            "model_turns": 6
+          }
+        },
+        {
+          "token_analysis": {
+            "sample_idx": 1,
+            "sequence_length": 709,
+            "non_pad_tokens": 709,
+            "labeled_tokens": 334,
+            "seg_token_positions": [
+              703
+            ],
+            "image_token_positions": 0,
+            "seg_token_detected": true
+          },
+          "masking_result": {
+            "sample_idx": 1,
+            "is_correct": true,
+            "errors": [],
+            "user_turns": 5,
+            "model_turns": 6
+          }
+        },
+        {
+          "token_analysis": {
+            "sample_idx": 2,
+            "sequence_length": 709,
+            "non_pad_tokens": 452,
+            "labeled_tokens": 155,
+            "seg_token_positions": [
+              446
+            ],
+            "image_token_positions": 0,
+            "seg_token_detected": true
+          },
+          "masking_result": {
+            "sample_idx": 2,
+            "is_correct": true,
+            "errors": [],
+            "user_turns": 1,
+            "model_turns": 2
+          }
+        },
+        {
+          "token_analysis": {
+            "sample_idx": 3,
+            "sequence_length": 709,
+            "non_pad_tokens": 469,
+            "labeled_tokens": 178,
+            "seg_token_positions": [
+              463
+            ],
+            "image_token_positions": 0,
+            "seg_token_detected": true
+          },
+          "masking_result": {
+            "sample_idx": 3,
+            "is_correct": true,
+            "errors": [],
+            "user_turns": 1,
+            "model_turns": 2
+          }
+        },
+        {
+          "token_analysis": {
+            "sample_idx": 4,
+            "sequence_length": 709,
+            "non_pad_tokens": 496,
+            "labeled_tokens": 202,
+            "seg_token_positions": [
+              490
+            ],
+            "image_token_positions": 0,
+            "seg_token_detected": true
+          },
+          "masking_result": {
+            "sample_idx": 4,
+            "is_correct": true,
+            "errors": [],
+            "user_turns": 1,
+            "model_turns": 2
+          }
+        }
+      ],
+      "error_details": []
+    },
+    "reason_seg_ReasonSeg_train": {
+      "subtype": "ReasonSeg|train",
+      "total_samples": 25,
+      "successful_samples": 25,
+      "failed_samples": 0,
+      "sample_analyses": [
+        {
+          "token_analysis": {
+            "sample_idx": 0,
+            "sequence_length": 435,
+            "non_pad_tokens": 313,
+            "labeled_tokens": 7,
+            "seg_token_positions": [
+              305
+            ],
+            "image_token_positions": 0,
+            "seg_token_detected": true
+          },
+          "masking_result": {
+            "sample_idx": 0,
+            "is_correct": true,
+            "errors": [],
+            "user_turns": 1,
+            "model_turns": 2
+          }
+        },
+        {
+          "token_analysis": {
+            "sample_idx": 1,
+            "sequence_length": 435,
+            "non_pad_tokens": 377,
+            "labeled_tokens": 58,
+            "seg_token_positions": [
+              320
+            ],
+            "image_token_positions": 0,
+            "seg_token_detected": true
+          },
+          "masking_result": {
+            "sample_idx": 1,
+            "is_correct": true,
+            "errors": [],
+            "user_turns": 1,
+            "model_turns": 2
+          }
+        },
+        {
+          "token_analysis": {
+            "sample_idx": 2,
+            "sequence_length": 435,
+            "non_pad_tokens": 410,
+            "labeled_tokens": 95,
+            "seg_token_positions": [
+              404
+            ],
+            "image_token_positions": 0,
+            "seg_token_detected": true
+          },
+          "masking_result": {
+            "sample_idx": 2,
+            "is_correct": true,
+            "errors": [],
+            "user_turns": 1,
+            "model_turns": 2
+          }
+        },
+        {
+          "token_analysis": {
+            "sample_idx": 3,
+            "sequence_length": 435,
+            "non_pad_tokens": 342,
+            "labeled_tokens": 21,
+            "seg_token_positions": [
+              320
+            ],
+            "image_token_positions": 0,
+            "seg_token_detected": true
+          },
+          "masking_result": {
+            "sample_idx": 3,
+            "is_correct": true,
+            "errors": [],
+            "user_turns": 1,
+            "model_turns": 2
+          }
+        },
+        {
+          "token_analysis": {
+            "sample_idx": 4,
+            "sequence_length": 435,
+            "non_pad_tokens": 315,
+            "labeled_tokens": 9,
+            "seg_token_positions": [
+              307
+            ],
+            "image_token_positions": 0,
+            "seg_token_detected": true
+          },
+          "masking_result": {
+            "sample_idx": 4,
+            "is_correct": true,
+            "errors": [],
+            "user_turns": 1,
+            "model_turns": 2
+          }
+        }
+      ],
+      "error_details": []
+    }
+  },
+  "summary_stats": {
+    "processing_time_seconds": 95.37,
+    "total_samples_processed": 100,
+    "total_successful_samples": 100,
+    "overall_success_rate": 100.0,
+    "dataset_success_rate": 100.0
+  },
+  "error_analysis": {}
+}

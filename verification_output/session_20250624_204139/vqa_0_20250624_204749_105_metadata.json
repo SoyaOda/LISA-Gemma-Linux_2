@@ -1,0 +1,20 @@
+{
+  "dataset_name": "vqa",
+  "sample_idx": 0,
+  "session_timestamp": "20250624_204139",
+  "item_timestamp": "20250624_204749_105",
+  "original_image_path": "/mnt/h/download/LISA-dataset/dataset/coco/train2017/000000234032.jpg",
+  "conversations": [
+    "<start_of_turn>user\n<image>\nWhat makes the elephant in this scene stand out from a typical elephant?<end_of_turn>\n<start_of_turn>model\nThe elephant in this scene stands out from a typical elephant due to its distinctive appearance. It is a spotted elephant, which is different from the usual grey or brown skin tone seen on elephants. Additionally, there are three people riding the elephant, which makes for an interesting and less common sight. This unique appearance and the interaction between the elephant and the riders make the scene highly intriguing and memorable.<end_of_turn>\n"
+  ],
+  "questions": [
+    "<start_of_turn>user\n<image>\nWhat makes the elephant in this scene stand out from a typical elephant?<end_of_turn>\n<start_of_turn>model\nThe elephant in this scene stands out from a typical elephant due to its distinctive appearance. It is a spotted elephant, which is different from the usual grey or brown skin tone seen on elephants. Additionally, there are three people riding the elephant, which makes for an interesting and less common sight. This unique appearance and the interaction between the elephant and the riders make the scene highly intriguing and memorable.<end_of_turn>\n"
+  ],
+  "class_names": [
+    "<start_of_turn>user\n<image>\nWhat makes the elephant in this scene stand out from a typical elephant?<end_of_turn>\n<start_of_turn>model\nThe elephant in this scene stands out from a typical elephant due to its distinctive appearance. It is a spotted elephant, which is different from the usual grey or brown skin tone seen on elephants. Additionally, there are three people riding the elephant, which makes for an interesting and less common sight. This unique appearance and the interaction between the elephant and the riders make the scene highly intriguing and memorable.<end_of_turn>\n"
+  ],
+  "comparison_image": "verification_output/session_20250624_204139/vqa_0_20250624_204749_105_comparison.png",
+  "processing_note": "Simple resize: mask resized to match processed image size",
+  "image_size": "640x427",
+  "mask_size": "None"
+}
