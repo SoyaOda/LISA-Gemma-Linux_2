@@ -1,0 +1,43 @@
+{
+  "session_timestamp": "20250625_134742",
+  "test_config": {
+    "dataset_type": "reason_seg",
+    "num_samples": 3,
+    "max_new_tokens": 50,
+    "pretrained_from_overfit": true
+  },
+  "results": [
+    {
+      "sample_idx": 0,
+      "dataset_type": "reason_seg",
+      "success": true,
+      "inference_time": 20.32071352005005,
+      "error": null,
+      "visualization_path": "verification_output/inference_result_sample_0_20250625_134916_361.png",
+      "has_predicted_mask": true,
+      "has_generated_text": true
+    },
+    {
+      "sample_idx": 1,
+      "dataset_type": "reason_seg",
+      "success": true,
+      "inference_time": 1.9926807880401611,
+      "error": null,
+      "visualization_path": "verification_output/inference_result_sample_1_20250625_134925_157.png",
+      "has_predicted_mask": true,
+      "has_generated_text": true
+    },
+    {
+      "sample_idx": 2,
+      "dataset_type": "reason_seg",
+      "success": true,
+      "inference_time": 1.8448069095611572,
+      "error": null,
+      "visualization_path": "verification_output/inference_result_sample_2_20250625_134933_207.png",
+      "has_predicted_mask": true,
+      "has_generated_text": true
+    }
+  ],
+  "overall_success": true,
+  "total_inference_time": 24.158201217651367
+}

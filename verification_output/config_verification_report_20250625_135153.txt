@@ -1,0 +1,70 @@
+================================================================================
+LISA-Gemma 設定ファイル検証レポート
+設定ファイル: config_linux
+検証日時: 2025-06-25 13:51:53
+================================================================================
+
+[MODEL CONFIG]
+----------------------------------------
+  GEMMA_MODEL_ID: google/gemma-3-4b-it
+  GEMMA_IMAGE_SIZE: 896
+  SAM_CHECKPOINT_PATH: /mnt/c/Users/oda/foodlmm-llama/weights/sam_vit_h_4b8939.pth
+
+[DATASET CONFIG]
+----------------------------------------
+  DATASET_BASE_DIR: /mnt/h/download/LISA-dataset/dataset
+  DATASET_STRUCTURE:
+    sem_seg: {'ade20k': {'path': 'ade20k', 'images': 'images', 'annotations': 'annotations', 'required_files': ['images', 'annotations']}, 'cocostuff': {'path': 'cocostuff', 'images': 'train2017', 'annotations': 'train2017', 'required_files': ['train2017']}, 'mapillary': {'path': 'mapillary', 'images': 'training/images', 'annotations': 'training/labels', 'config': 'config_v2.0.json', 'required_files': ['training', 'config_v2.0.json']}, 'pascal_part': {'path': 'vlpart/pascal_part', 'json_file': 'train.json', 'images': 'VOCdevkit/VOC2010/JPEGImages', 'required_files': ['train.json', 'VOCdevkit']}, 'paco_lvis': {'path': 'vlpart/paco', 'annotations': 'annotations', 'required_files': ['annotations']}}
+    refer_seg: {'base_path': 'refer_seg', 'datasets': {'refcoco': {'annotations': 'refcoco', 'images': 'images/mscoco/images/train2014'}, 'refcoco+': {'annotations': 'refcoco+', 'images': 'images/mscoco/images/train2014'}, 'refcocog': {'annotations': 'refcocog', 'images': 'images/mscoco/images/train2014'}, 'refclef': {'annotations': 'refclef', 'images': 'images/saiapr_tc-12'}}, 'required_files': ['refcoco', 'refcoco+', 'refcocog', 'refclef', 'images']}
+    vqa: {'llava_instruct_150k': {'path': 'llava_dataset', 'json_file': 'llava_instruct_150k.json', 'required_files': ['llava_instruct_150k.json']}}
+    reason_seg: {'ReasonSeg': {'path': 'reason_seg/ReasonSeg', 'train': 'train', 'val': 'val', 'explanatory': 'explanatory', 'required_files': ['train', 'val', 'explanatory']}}
+    vlpart: {'paco': {'path': 'vlpart/paco', 'annotations': 'annotations', 'required_files': ['annotations']}, 'pascal_part': {'path': 'vlpart/pascal_part', 'annotations': 'train.json', 'images': 'VOCdevkit', 'required_files': ['train.json', 'VOCdevkit']}}
+  SEM_SEG_DATA: ade20k||cocostuff||mapillary||pascal_part||paco_lvis
+  REFER_SEG_DATA: refclef||refcoco||refcoco+||refcocog
+  VQA_DATA: llava_instruct_150k
+  REASON_SEG_DATA: ReasonSeg|train
+
+[TRAINING CONFIG]
+----------------------------------------
+  EPOCHS: 10
+  STEPS_PER_EPOCH: 500
+  LEARNING_RATE: 0.0001
+  WEIGHT_DECAY: 0.01
+
+[OTHER CONFIG]
+----------------------------------------
+  BCE_LOSS_WEIGHT: 2.0
+  BETA1: 0.9
+  BETA2: 0.95
+  CE_LOSS_WEIGHT: 1.0
+  DATASET_SAMPLE_RATES: 9,3,3,1
+  DICE_LOSS_WEIGHT: 0.5
+  GEMMA_HIDDEN_SIZE: 2560
+  HF_CACHE_DIR: None
+  LOG_BASE_DIR: /home/oda/LISA-Gemma-Linux/runs
+  LORA_ALPHA: 64
+  LORA_DROPOUT: 0.05
+  LORA_R: 32
+  LORA_TARGET_MODULES: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]
+  MODEL_MAX_LENGTH: 2048
+  PROJECT_ROOT: /home/oda/LISA-Gemma-Linux
+  SAM_IMAGE_SIZE: 1024
+  SEG_PROJECTION_DIM: 256
+  SEG_TOKEN: [SEG]
+  VAL_DATASET: ReasonSeg|val
+  WEIGHTS_DIR: /home/oda/LISA-Gemma-Linux/weights
+================================================================================
+重要なハイパーパラメータ サマリー
+================================================================================
+Parameter                      | Value                     | Status              
+--------------------------------------------------------------------------------
+学習率                            | 0.0001                    | ✓ OK                
+バッチサイズ                         | 未設定                       | ⚠ 未設定               
+重み減衰                           | 0.01                      | ✓ OK                
+エポック数                          | 10                        | ✓ OK                
+エポック当たりステップ数                   | 500                       | ✓ OK                
+勾配蓄積ステップ                       | 未設定                       | ⚠ 未設定               
+Gemma画像サイズ                     | 896                       | ✓ OK                
+混合精度                           | 未設定                       | ⚠ 未設定               
+勾配チェックポイント                     | 未設定                       | ⚠ 未設定               
+
