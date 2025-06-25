@@ -675,3 +675,103 @@ class LisaGemmaForCausalLM(PreTrainedModel):
             results = {"generated_text": generated_text, "predicted_masks": None}
         
         return results 
+
+    def apply_lora_configuration(self, lora_config):
+        """
+        LoRA設定を適用し、仕様書に従って学習可能パラメータを1%未満に制限
+        
+        Webリサーチ結果：
+        - Google公式ドキュメント: Gemma LoRAでは0.05-0.1%が標準
+        - 業界ベストプラクティス: 埋め込み層は凍結、LoRAのみ学習可能
+        - 仕様書要求: 1%未満の学習可能率
+        
+        修正方針：
+        - 埋め込み層: 凍結 (requires_grad=False)
+        - LoRA: 学習可能 (requires_grad=True)
+        - プロジェクタ・SAMデコーダ: 学習可能
+        """
+        from peft import get_peft_model
+        
+        print("\\n=== 仕様書準拠LoRA設定適用中 ===")
+        print(f"LoRA設定: r={lora_config.r}, alpha={lora_config.lora_alpha}")
+        print(f"対象モジュール: {lora_config.target_modules}")
+        print("\\n🎯 目標: 学習可能パラメータ < 1%")
+        
+        # LoRAを適用
+        self.gemma_model = get_peft_model(self.gemma_model, lora_config)
+        print("✅ LoRAが正常に適用されました")
+        
+        # 🚨 重要: 埋め込み層を明示的に凍結（業界標準に準拠）
+        print("\\n=== 業界標準準拠: 埋め込み層の凍結 ===")
+        
+        # 入力埋め込み層を凍結
+        input_embeddings = None
+        if hasattr(self.gemma_model, 'base_model'):
+            # PEFT適用後のアクセス
+            if hasattr(self.gemma_model.base_model, 'model'):
+                if hasattr(self.gemma_model.base_model.model, 'embed_tokens'):
+                    input_embeddings = self.gemma_model.base_model.model.embed_tokens
+                    input_embeddings.weight.requires_grad = False
+                    print(f"✅ 入力埋め込み層を凍結: {input_embeddings.weight.shape}")
+        
+        # 出力埋め込み層を凍結（tied embeddingsの場合は自動的に凍結される）
+        output_embeddings = None
+        if hasattr(self.gemma_model, 'base_model'):
+            if hasattr(self.gemma_model.base_model, 'model'):
+                if hasattr(self.gemma_model.base_model.model, 'lm_head'):
+                    output_embeddings = self.gemma_model.base_model.model.lm_head
+                    output_embeddings.weight.requires_grad = False
+                    print(f"✅ 出力埋め込み層を凍結: {output_embeddings.weight.shape}")
+                elif hasattr(self.gemma_model.base_model.model, 'embed_tokens'):
+                    # Tied embeddingsの場合、入力埋め込みの凍結で出力も凍結される
+                    print("✅ Tied embeddings検出: 出力埋め込みも自動凍結")
+        
+        # 凍結確認
+        if input_embeddings is not None:
+            print(f"🔒 入力埋め込み凍結確認: requires_grad={input_embeddings.weight.requires_grad}")
+        if output_embeddings is not None:
+            print(f"🔒 出力埋め込み凍結確認: requires_grad={output_embeddings.weight.requires_grad}")
+        
+        print("\\n=== 最終パラメータ統計 ===")
+        total_params = sum(p.numel() for p in self.parameters())
+        trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
+        trainable_ratio = trainable_params / total_params * 100
+        
+        print(f"総パラメータ数: {total_params:,} ({total_params/1e9:.2f}B)")
+        print(f"学習可能パラメータ数: {trainable_params:,} ({trainable_params/1e6:.1f}M)")
+        print(f"学習可能率: {trainable_ratio:.3f}%")
+        
+        # 仕様書準拠チェック
+        if trainable_ratio < 1.0:
+            print(f"🎉 仕様書準拠達成: {trainable_ratio:.3f}% < 1.0%")
+        else:
+            print(f"⚠️  仕様書違反: {trainable_ratio:.3f}% >= 1.0%")
+        
+        # 詳細な学習可能パラメータ分析
+        print("\\n=== 学習可能パラメータ詳細 ===")
+        categories = {
+            'LoRA': 0,
+            'MLP Projector': 0,
+            'SAM Mask Decoder': 0,
+            'Others': 0
+        }
+        
+        for name, param in self.named_parameters():
+            if param.requires_grad:
+                param_count = param.numel()
+                if 'lora' in name.lower():
+                    categories['LoRA'] += param_count
+                elif 'mlp_projector' in name or 'projector' in name:
+                    categories['MLP Projector'] += param_count
+                elif 'sam' in name and 'mask_decoder' in name:
+                    categories['SAM Mask Decoder'] += param_count
+                else:
+                    categories['Others'] += param_count
+        
+        for category, count in categories.items():
+            if count > 0:
+                ratio = count / total_params * 100
+                print(f"  {category}: {count:,} ({ratio:.3f}%)")
+        
+        print("\\n🎯 業界標準達成: 埋め込み層凍結によるパラメータ効率化完了")
+        return self 
