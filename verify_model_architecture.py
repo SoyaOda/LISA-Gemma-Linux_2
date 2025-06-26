@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-第3節：視覚-言語アライメントのためのアーキテクチャ監査
+第3節：視覚-言語アライメントのためのアーキテクチャ監査 (Lambda Cloud最適化)
 
 完全なLISA-Gemmaモデルをインスタンス化し、その構成要素（Vision Tower, Projector, LLM, Seg Decoder）を検査し、
 次元の互換性を検証し、各モジュールの学習可能パラメータの状態を報告する。
@@ -18,8 +18,11 @@ import sys
 import traceback
 from datetime import datetime
 
-import torch
-import torch.nn as nn
+print("🚀 LISA-Gemma Model Architecture Verification (Lambda Cloud Optimized)")
+
+# 重いライブラリは遅延読み込み
+# import torch  # 遅延読み込み
+# import torch.nn as nn  # 遅延読み込み
 
 # プロジェクトのルートディレクトリをsys.pathに追加
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -40,6 +43,18 @@ def get_config():
         print(f"   ファイル存在確認: {os.path.exists('config_linux.py')}")
         raise SystemExit("config_linux.pyが必須です。ファイルが存在することを確認してください。")
 
+def load_heavy_libraries():
+    """重いライブラリを必要時に読み込む"""
+    print("📦 重いライブラリを読み込み中...")
+    global torch, nn, LisaGemmaForCausalLM, LisaGemmaConfig, LoraConfig, get_peft_model
+    
+    import torch
+    import torch.nn as nn
+    from model.gemma_lisa import LisaGemmaForCausalLM, LisaGemmaConfig
+    from peft import LoraConfig, get_peft_model
+    
+    print("✅ PyTorch, LISA-Gemma, PEFT読み込み完了")
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Verify model architecture and parameters")
     return parser.parse_args()
@@ -58,11 +73,22 @@ def count_parameters(module):
 
 def main():
     args = parse_args()
-    config = get_config()
     
     print("="*80)
     print("第3節: 視覚-言語アライメントのためのアーキテクチャ監査")
     print("="*80)
+    
+    # 重いライブラリを読み込み
+    load_heavy_libraries()
+    
+    # 設定読み込み
+    config = get_config()
+    print(f"✅ 設定読み込み完了")
+    print(f"  Gemmaモデル: {config.GEMMA_MODEL_ID}")
+    print(f"  SAMチェックポイント: {config.SAM_CHECKPOINT_PATH}")
+    print(f"  Gemma画像サイズ: {config.GEMMA_IMAGE_SIZE}")
+    print(f"  SAM画像サイズ: {config.SAM_IMAGE_SIZE}")
+    print(f"  LoRA設定: r={config.LORA_R}, alpha={config.LORA_ALPHA}")
     
     try:
         # デバイス設定
@@ -71,8 +97,6 @@ def main():
         
         # 1. モデルの初期化
         print("\n📝 LISA-Gemmaモデルを初期化中...")
-        
-        from model.gemma_lisa import LisaGemmaForCausalLM, LisaGemmaConfig
         
         # LisaGemmaConfigの作成
         lisa_config = LisaGemmaConfig(
@@ -93,8 +117,6 @@ def main():
         # LoRA設定を適用（最適化後の設定で検証するため）
         print("\n🔧 LoRA設定を適用中...")
         try:
-            from peft import LoraConfig, get_peft_model
-            
             lora_config = LoraConfig(
                 r=config.LORA_R,
                 lora_alpha=config.LORA_ALPHA,
