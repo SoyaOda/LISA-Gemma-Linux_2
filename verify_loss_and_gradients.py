@@ -233,8 +233,8 @@ def main():
         
         print(f"✅ データセット準備完了（サンプル数: {len(dataset)}）")
         
-        # 3. オプティマイザーの準備
-        optimizer = AdamW(model.parameters(), lr=1e-5)
+        # 3. オプティマイザーの準備（学習率はconfig_linux.pyから取得）
+        optimizer = AdamW(model.parameters(), lr=config.LEARNING_RATE)
         
         # 4. 損失関数の準備（config_linux.pyの重みを使用）
         loss_fn = CompositeLoss(
