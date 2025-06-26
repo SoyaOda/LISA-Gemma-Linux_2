@@ -13,19 +13,72 @@ import json
 
 # SSH設定
 SSH_KEY = "~/.ssh/lambda_cloud_key"
-LAMBDA_IP = "150.136.47.58"
 LAMBDA_USER = "ubuntu"
 CODE_PATH = "/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux"
 VENV_PATH = "/lambda/nfs/lisa-gemma-project-fs/venvs/lisa_gemma_venv"
 
+# グローバル変数でIPアドレスをキャッシュ
+_cached_lambda_ip = None
+
+def get_lambda_ip():
+    """Lambda Cloud IPアドレスを取得（キャッシュ機能付き）"""
+    global _cached_lambda_ip
+    
+    # 既にキャッシュされている場合はそれを返す
+    if _cached_lambda_ip:
+        return _cached_lambda_ip
+    
+    # 環境変数から取得を試行
+    if 'LAMBDA_IP' in os.environ:
+        ip = os.environ['LAMBDA_IP']
+        print(f"🔍 環境変数からIP取得: {ip}")
+        _cached_lambda_ip = ip
+        return ip
+    
+    # 対話式で入力
+    print("🌐 Lambda Cloud IPアドレスを入力してください")
+    print("   例: 150.136.114.187 (A100)")
+    print("   例: 150.136.47.58 (A10)")
+    
+    while True:
+        ip = input("Lambda Cloud IP: ").strip()
+        if not ip:
+            print("❌ IPアドレスを入力してください")
+            continue
+        
+        # 簡易的なIPアドレス形式チェック
+        parts = ip.split('.')
+        if len(parts) != 4:
+            print("❌ 正しいIPアドレス形式で入力してください (例: 150.136.114.187)")
+            continue
+        
+        try:
+            for part in parts:
+                int(part)
+            print(f"✅ IP設定: {ip}")
+            _cached_lambda_ip = ip
+            return ip
+        except ValueError:
+            print("❌ 正しいIPアドレス形式で入力してください (例: 150.136.114.187)")
+            continue
+
+def set_lambda_ip(ip):
+    """Lambda Cloud IPアドレスを設定"""
+    global _cached_lambda_ip
+    _cached_lambda_ip = ip
+
 # Hugging Face Token設定
 HF_TOKEN_FILE = "hf_token.txt"
 
-def run_ssh_command(command, use_tmux=False, session_name=None, detach=False, timeout=None):
+def run_ssh_command(command, use_tmux=False, session_name=None, detach=False, timeout=None, lambda_ip=None):
     """SSH経由でコマンドを実行"""
+    # IPアドレスの取得
+    if lambda_ip is None:
+        lambda_ip = get_lambda_ip()
+    
     # TensorFlow初期化を無効化する環境変数を追加
     tf_disable_env = "export TF_CPP_MIN_LOG_LEVEL=3 && export TF_ENABLE_ONEDNN_OPTS=0 && "
-    ssh_base = f"ssh -i {SSH_KEY} {LAMBDA_USER}@{LAMBDA_IP}"
+    ssh_base = f"ssh -i {SSH_KEY} {LAMBDA_USER}@{lambda_ip}"
     
     if use_tmux:
         session_name = session_name or "lisa_dev"
@@ -60,13 +113,16 @@ def run_ssh_command(command, use_tmux=False, session_name=None, detach=False, ti
         except Exception as e:
             return False, "", str(e)
 
-def sync_code():
+def sync_code(lambda_ip=None):
     """ローカルコードをLambda Cloudに同期"""
+    if lambda_ip is None:
+        lambda_ip = get_lambda_ip()
+    
     print("📤 コードをLambda Cloudに同期中...")
     
     rsync_cmd = f"""rsync -avz --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' \
         --exclude='lambda_results' --exclude='runs' \
-        ./ {LAMBDA_USER}@{LAMBDA_IP}:{CODE_PATH}/"""
+        ./ {LAMBDA_USER}@{lambda_ip}:{CODE_PATH}/"""
     
     result = subprocess.run(rsync_cmd, shell=True)
     if result.returncode == 0:
@@ -75,14 +131,17 @@ def sync_code():
         print("❌ コード同期失敗")
     return result.returncode == 0
 
-def sync_results():
+def sync_results(lambda_ip=None):
     """Lambda Cloudから結果をローカルに同期"""
+    if lambda_ip is None:
+        lambda_ip = get_lambda_ip()
+    
     print("📥 結果をLambda Cloudから取得中...")
     
     # ローカルの結果ディレクトリを作成
     os.makedirs("lambda_results", exist_ok=True)
     
-    rsync_cmd = f"""rsync -avz {LAMBDA_USER}@{LAMBDA_IP}:/lambda/nfs/lisa-gemma-project-fs/artifacts/ \
+    rsync_cmd = f"""rsync -avz {LAMBDA_USER}@{lambda_ip}:/lambda/nfs/lisa-gemma-project-fs/artifacts/ \
         ./lambda_results/"""
     
     result = subprocess.run(rsync_cmd, shell=True)
@@ -157,8 +216,8 @@ def start_training(script_name, experiment_name=None, use_tmux=True):
     else:
         # 前景実行（非推奨）
         print("⚠️  前景実行での学習開始 (SSH切断で停止します)")
-        result = run_ssh_command(training_cmd, use_tmux=False)
-        return result.returncode == 0
+        success, stdout, stderr = run_ssh_command(training_cmd, use_tmux=False)
+        return success
 
 def monitor_training():
     """学習状況をモニタリング"""
@@ -206,8 +265,8 @@ def setup_instance():
     # セットアップ実行
     for i, cmd in enumerate(setup_commands, 1):
         print(f"\n🔧 ステップ {i}/{len(setup_commands)}: {cmd}")
-        result = run_ssh_command(cmd, use_tmux=False)
-        if result.returncode != 0:
+        success, stdout, stderr = run_ssh_command(cmd, use_tmux=False)
+        if not success:
             print(f"❌ ステップ {i} でエラーが発生しました")
             return False
     
@@ -226,51 +285,53 @@ def check_cloud():
     
     # SSH接続をチェック
     print("📋 SSH接続をチェック中...")
-    result = run_ssh_command("echo 'SSH OK'", use_tmux=False)
-    checks["SSH接続"] = result.returncode == 0
+    success, stdout, stderr = run_ssh_command("echo 'SSH OK'", use_tmux=False)
+    checks["SSH接続"] = success
     print(f"   {'✅' if checks['SSH接続'] else '❌'} SSH接続")
     
     # Filesystemをチェック
     print("📋 Filesystem存在をチェック中...")
-    result = run_ssh_command("ls -la /lambda/nfs/lisa-gemma-project-fs", use_tmux=False)
-    checks["Filesystem存在"] = result.returncode == 0
+    success, stdout, stderr = run_ssh_command("ls -la /lambda/nfs/lisa-gemma-project-fs", use_tmux=False)
+    checks["Filesystem存在"] = success
     print(f"   {'✅' if checks['Filesystem存在'] else '❌'} Filesystem存在")
     
     # 仮想環境をチェック
     print("📋 仮想環境をチェック中...")
-    result = run_ssh_command(f"source {VENV_PATH}/bin/activate && python --version", use_tmux=False)
-    checks["仮想環境"] = result.returncode == 0
+    success, stdout, stderr = run_ssh_command(f"source {VENV_PATH}/bin/activate && python --version", use_tmux=False)
+    checks["仮想環境"] = success
     print(f"   {'✅' if checks['仮想環境'] else '❌'} 仮想環境")
     
     # GPU認識をチェック
     print("📋 GPU認識をチェック中...")
-    result = run_ssh_command("nvidia-smi --query-gpu=name --format=csv,noheader", use_tmux=False)
-    checks["GPU認識"] = result.returncode == 0
+    success, stdout, stderr = run_ssh_command("nvidia-smi --query-gpu=name --format=csv,noheader", use_tmux=False)
+    checks["GPU認識"] = success
     print(f"   {'✅' if checks['GPU認識'] else '❌'} GPU認識")
+    if success and stdout:
+        print(f"       GPU: {stdout.strip()}")
     
     # プロジェクト設定をチェック
     print("📋 プロジェクト設定をチェック中...")
-    result = run_ssh_command(f"cd {CODE_PATH} && python config_lambda_cloud.py", use_tmux=False)
-    checks["プロジェクト設定"] = result.returncode == 0
+    success, stdout, stderr = run_ssh_command(f"cd {CODE_PATH} && python config_linux.py", use_tmux=False)
+    checks["プロジェクト設定"] = success
     print(f"   {'✅' if checks['プロジェクト設定'] else '❌'} プロジェクト設定")
     
     # パッケージをチェック
     print("📋 必要パッケージをチェック中...")
-    result = run_ssh_command(
+    success, stdout, stderr = run_ssh_command(
         f"source {VENV_PATH}/bin/activate && pip list | grep -E 'torch|transformers|deepspeed'",
         use_tmux=False
     )
     # 出力から必要なパッケージが見つかるかチェック
-    checks["必要パッケージ"] = result.returncode == 0
+    checks["必要パッケージ"] = success
     print(f"   {'✅' if checks['必要パッケージ'] else '❌'} 必要パッケージ")
     
     # Hugging Face認証をチェック
     print("📋 Hugging Face認証をチェック中...")
-    result = run_ssh_command(
+    success, stdout, stderr = run_ssh_command(
         f"source {VENV_PATH}/bin/activate && huggingface-cli whoami",
         use_tmux=False
     )
-    checks["HF認証"] = result.returncode == 0
+    checks["HF認証"] = success
     print(f"   {'✅' if checks['HF認証'] else '❌'} Hugging Face認証")
     
     print("\n📊 環境チェック結果:")
@@ -307,12 +368,12 @@ def install_missing_packages():
     response = input("インストールを実行しますか？ (y/N): ")
     
     if response.lower() == 'y':
-        result = run_ssh_command(install_cmd, use_tmux=False)
-        if result.returncode == 0:
+        success, stdout, stderr = run_ssh_command(install_cmd, use_tmux=False)
+        if success:
             print("✅ パッケージインストール完了")
         else:
             print("❌ パッケージインストール失敗")
-        return result.returncode == 0
+        return success
     else:
         print("❌ インストールをキャンセルしました")
         return False
@@ -348,8 +409,8 @@ def run_validation_test():
     success_count = 0
     for i, cmd in enumerate(test_commands, 1):
         print(f"\n🧪 テスト {i}/{len(test_commands)}")
-        result = run_ssh_command(cmd, use_tmux=False)
-        if result.returncode == 0:
+        success, stdout, stderr = run_ssh_command(cmd, use_tmux=False)
+        if success:
             print(f"✅ テスト {i} 成功")
             success_count += 1
         else:
@@ -375,17 +436,17 @@ def setup_hf_token(token=None):
         
         # Lambda CloudでHugging Face CLIに直接ログイン
         print("🔐 Lambda CloudでHugging Face CLIにログイン中...")
-        result = run_ssh_command(
+        success, stdout, stderr = run_ssh_command(
             f"source {VENV_PATH}/bin/activate && huggingface-cli login --token {token.strip()}",
             use_tmux=False
         )
-        if result.returncode == 0:
+        if success:
             print("✅ Hugging Face CLIログイン成功")
             return True
         else:
             print("❌ Hugging Face CLIログイン失敗")
-            print(f"エラー出力: {result.stderr}")
-            print(f"標準出力: {result.stdout}")
+            print(f"エラー出力: {stderr}")
+            print(f"標準出力: {stdout}")
             return False
     else:
         # 既存のトークンファイルから読み込み
@@ -401,11 +462,11 @@ def setup_hf_token(token=None):
 def check_hf_auth():
     """Hugging Face認証状態をチェック"""
     print("🔐 Hugging Face認証状態をチェック中...")
-    result = run_ssh_command(
+    success, stdout, stderr = run_ssh_command(
         f"source {VENV_PATH}/bin/activate && huggingface-cli whoami",
         use_tmux=False
     )
-    if result.returncode == 0:
+    if success:
         print("✅ Hugging Face認証済み")
         return True
     else:
@@ -429,14 +490,38 @@ def main():
         print("  emergency   - 緊急停止（全tmuxセッション終了）")
         print("  setup_hf    - Hugging Face Tokenを設定")
         print("")
+        print("オプション:")
+        print("  --ip IP_ADDRESS  - Lambda Cloud IPアドレスを指定")
+        print("")
         print("例:")
         print("  python lambda_dev_utils.py sync")
-        print("  python lambda_dev_utils.py train train_ds.py")
+        print("  python lambda_dev_utils.py check --ip 150.136.114.187")
+        print("  python lambda_dev_utils.py train train_ds.py --ip 150.136.47.58")
         print("  python lambda_dev_utils.py setup_hf hf_xxxxxxx")
-        print("  python lambda_dev_utils.py check")
         return
     
-    command = sys.argv[1]
+    # IPアドレスの処理
+    lambda_ip = None
+    args = sys.argv[1:]
+    
+    # --ipオプションを探す
+    if '--ip' in args:
+        ip_index = args.index('--ip')
+        if ip_index + 1 < len(args):
+            lambda_ip = args[ip_index + 1]
+            set_lambda_ip(lambda_ip)
+            print(f"🔍 コマンドライン引数からIP取得: {lambda_ip}")
+            # --ipとIPアドレスを引数リストから削除
+            args = args[:ip_index] + args[ip_index + 2:]
+        else:
+            print("❌ --ipオプションにIPアドレスが指定されていません")
+            return
+    
+    if not args:
+        print("❌ コマンドが指定されていません")
+        return
+    
+    command = args[0]
     
     if command == "sync":
         sync_code()
@@ -445,11 +530,11 @@ def main():
         sync_results()
     
     elif command == "train":
-        if len(sys.argv) < 3:
+        if len(args) < 2:
             print("❌ 学習スクリプト名を指定してください")
             return
-        script_name = sys.argv[2]
-        experiment_name = sys.argv[3] if len(sys.argv) > 3 else None
+        script_name = args[1]
+        experiment_name = args[2] if len(args) > 2 else None
         start_training(script_name, experiment_name)
     
     elif command == "monitor":
@@ -474,21 +559,21 @@ def main():
         list_tmux_sessions()
     
     elif command == "attach":
-        session_name = sys.argv[2] if len(sys.argv) > 2 else "lisa_dev"
+        session_name = args[1] if len(args) > 1 else "lisa_dev"
         attach_tmux_session(session_name)
     
     elif command == "kill":
-        session_name = sys.argv[2] if len(sys.argv) > 2 else "lisa_dev"
+        session_name = args[1] if len(args) > 1 else "lisa_dev"
         kill_tmux_session(session_name)
     
     elif command == "emergency":
         emergency_stop()
     
     elif command == "setup_hf":
-        if len(sys.argv) < 3:
+        if len(args) < 2:
             print("❌ Hugging Face Tokenを指定してください")
             return
-        token = sys.argv[2]
+        token = args[1]
         setup_hf_token(token)
     
     else:

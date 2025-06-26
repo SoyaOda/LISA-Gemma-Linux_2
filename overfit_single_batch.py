@@ -62,7 +62,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="単一バッチでの過学習テスト")
     parser.add_argument("--iterations", type=int, default=20, help="過学習テストのイテレーション数")
     parser.add_argument("--learning_rate", type=float, default=config.LEARNING_RATE, help="学習率")
-    parser.add_argument("--dataset_type", type=str, default="reason_seg", 
+    parser.add_argument("--dataset_type", type=str, default="all", 
                        choices=["sem_seg", "refer_seg", "vqa", "reason_seg", "all"],
                        help="テストに使用するデータセットタイプ（'all'で全データセット）")
     parser.add_argument("--batch_size", type=int, default=config.BATCH_SIZE_PER_GPU, help="バッチサイズ")
@@ -579,10 +579,21 @@ def main():
             
             # 最新の成功チェックポイントのシンボリックリンクを作成
             latest_checkpoint_path = os.path.join(output_dir, "latest_overfit_checkpoint.pth")
-            if os.path.exists(latest_checkpoint_path):
-                os.remove(latest_checkpoint_path)
-            os.symlink(os.path.basename(checkpoint_path), latest_checkpoint_path)
-            print(f"  - 最新チェックポイント: {latest_checkpoint_path}")
+            try:
+                # 既存のシンボリックリンクを安全に削除
+                if os.path.islink(latest_checkpoint_path):
+                    os.unlink(latest_checkpoint_path)
+                elif os.path.exists(latest_checkpoint_path):
+                    os.remove(latest_checkpoint_path)
+                
+                # 絶対パスを使用してシンボリックリンクを作成
+                os.symlink(os.path.abspath(checkpoint_path), latest_checkpoint_path)
+                print(f"  - 最新チェックポイント: {latest_checkpoint_path}")
+            except (OSError, FileExistsError) as e:
+                print(f"  ⚠️  シンボリックリンク作成をスキップ: {e}")
+                print(f"      最新チェックポイント: {checkpoint_path} (直接参照)")
+            except Exception as e:
+                print(f"  ⚠️  予期しないエラーでシンボリックリンクをスキップ: {e}")
         
         print(f"✅ 結果保存完了:")
         print(f"  - 損失曲線: {plot_path}")
