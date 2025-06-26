@@ -1,370 +1,208 @@
-# Lambda Cloud開発ガイド 🚀
+# Lambda Cloud開発ガイド
 
-## 📋 目次
-- [開発方針](#開発方針)
-- [環境構成](#環境構成)
-- [初期セットアップ](#初期セットアップ)
-- [日常開発ワークフロー](#日常開発ワークフロー)
-- [学習実行手順](#学習実行手順)
-- [モニタリング](#モニタリング)
-- [トラブルシューティング](#トラブルシューティング)
-- [緊急停止手順](#緊急停止手順)
-- [ベストプラクティス](#ベストプラクティス)
+## 🚀 クイックスタート
 
----
-
-## 🎯 開発方針
-
-### 基本原則
-- **ローカル編集**: コードはローカル環境で快適に編集
-- **リモート実行**: 計算処理はLambda Cloud上で実行
-- **tmux活用**: SSH切断に対する耐性を確保
-- **Persistent Filesystem**: 全てのデータ・結果をクラウド上に永続保存
-- **コスト効率**: 必要時のみGPUリソースを使用
-
-### アーキテクチャ
-```
-ローカル環境 (編集・管理)
-    ↕ rsync同期
-Lambda Cloud (実行・保存)
-├── Persistent Filesystem
-│   ├── data/ (データセット - 変更禁止)
-│   ├── code/ (同期されたコード)
-│   ├── artifacts/ (学習結果)
-│   └── venvs/ (Python環境)
-└── GPU Instance (計算リソース)
-```
-
----
-
-## 🏗️ 環境構成
-
-### ローカル環境
-- **OS**: Linux (WSL2)
-- **Python**: 3.10+
-- **Git**: ブランチ管理
-- **SSH**: Lambda Cloud接続
-
-### Lambda Cloud環境
-- **Instance**: 1x A10 GPU (開発時) / 8x H100 (本番時)
-- **Filesystem**: `/lambda/nfs/lisa-gemma-project-fs/`
-- **Python環境**: `lisa_gemma_venv`
-- **tmux**: セッション管理
-
-### 主要ファイル
-- `lambda_dev_utils.py`: 開発ユーティリティ（メインツール）
-- `code/LISA-Gemma-Linux/config_lambda_cloud.py`: Lambda Cloud専用設定
-
----
-
-## 🚀 初期セットアップ
-
-### 1. ローカル環境準備
-
+### 1. 基本セットアップ
 ```bash
-# ブランチ確認・作成
-cd ~/LISA-Gemma-Linux
-git checkout specification-validation-test2
-git pull origin specification-validation-test2
-git checkout -b lambda_dev
+# 環境チェック
+python lambda_dev_utils.py check
 
-# 開発ツールの実行可能化
-chmod +x lambda_dev_utils.py
+# Hugging Face Token設定（初回のみ）
+python lambda_dev_utils.py setup_hf your_hf_token_here
 ```
 
-### 2. Lambda Cloud環境確認
-
+### 2. 開発サイクル
 ```bash
-# 環境状況確認
-python lambda_dev_utils.py gpu
-
-# 設定ファイル確認
-python lambda_dev_utils.py sync
-ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "cd /lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux && python config_lambda_cloud.py"
-```
-
-### 3. 初回同期
-
-```bash
-# コードをLambda Cloudに同期
-python lambda_dev_utils.py sync
-```
-
----
-
-## 🔄 日常開発ワークフロー
-
-### 基本サイクル
-
-```bash
-# 1. ローカルでコード編集
-# お好みのエディタ（VSCode、Cursor等）でコードを編集
-
-# 2. Lambda Cloudに同期
+# コード同期
 python lambda_dev_utils.py sync
 
-# 3. 動作確認
-python lambda_dev_utils.py gpu
-ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "cd /lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux && source ../../venvs/lisa_gemma_venv/bin/activate && python your_test_script.py"
+# 学習実行
+python lambda_dev_utils.py train your_script.py
 
-# 4. 変更をコミット（ローカル）
-git add .
-git commit -m "feat: 変更内容の説明"
+# 監視
+python lambda_dev_utils.py monitor
 ```
 
-### ファイル同期ルール
+## 📋 コマンド一覧
 
-**同期対象** ✅
-- `.py` ファイル（全てのPythonコード）
-- `.json` ファイル（設定ファイル）
-- `.txt` ファイル（requirements等）
-- `.sh` ファイル（スクリプト）
+| コマンド | 説明 | 例 |
+|---------|------|-----|
+| `check` | 環境の健全性チェック | `python lambda_dev_utils.py check` |
+| `setup_hf` | Hugging Face Token設定 | `python lambda_dev_utils.py setup_hf hf_xxx` |
+| `sync` | コード同期 | `python lambda_dev_utils.py sync` |
+| `train` | 学習実行（tmux） | `python lambda_dev_utils.py train train_ds.py` |
+| `monitor` | GPU・学習状況監視 | `python lambda_dev_utils.py monitor` |
+| `results` | 結果取得 | `python lambda_dev_utils.py results` |
+| `emergency` | 緊急停止 | `python lambda_dev_utils.py emergency` |
 
-**同期除外** ❌
-- `.git/` （バージョン管理情報）
-- `__pycache__/` （Pythonキャッシュ）
-- `*.pyc` （コンパイル済みPython）
-- `lambda_results/` （ローカル結果フォルダ）
-- `runs/` （ローカル実行履歴）
+## 🔧 環境設定
 
----
+### Lambda Cloud設定
+- **インスタンス**: 150.136.47.58 (1x A10 GPU)
+- **SSH鍵**: `~/.ssh/lambda_cloud_key`
+- **Persistent Filesystem**: `/lambda/nfs/lisa-gemma-project-fs/`
 
-## 🏋️ 学習実行手順
+### ディレクトリ構造
+```
+/lambda/nfs/lisa-gemma-project-fs/
+├── data/           # データセット
+├── code/           # プロジェクトコード
+├── artifacts/      # 学習結果
+│   ├── checkpoints/
+│   ├── logs/
+│   └── final_models/
+└── venvs/          # Python仮想環境
+```
 
-### A. 短時間テスト実行
+## 🔐 セキュリティ
 
+### Hugging Face Token
+- **ローカル保存**: `hf_token.txt`（.gitignoreで除外済み）
+- **自動設定**: Lambda Cloud上に安全に設定
+- **確認**: `python lambda_dev_utils.py check`でHF認証状態を確認
+
+### 注意事項
+- Tokenファイルは絶対にGitにコミットしない
+- `.gitignore`に機密ファイルパターンを追加済み
+
+## 🎯 開発ワークフロー
+
+### Phase 1: 環境確認
+```bash
+# 1. 全体チェック
+python lambda_dev_utils.py check
+
+# 2. 必要に応じてToken設定
+python lambda_dev_utils.py setup_hf your_token
+```
+
+### Phase 2: 開発・デバッグ
 ```bash
 # 1. コード同期
 python lambda_dev_utils.py sync
 
-# 2. 短時間テスト（前景実行）
-ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "cd /lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux && source ../../venvs/lisa_gemma_venv/bin/activate && python test_script.py --max_steps 10"
+# 2. 短いテスト実行
+python lambda_dev_utils.py train test_basic_model.py
+
+# 3. 監視
+python lambda_dev_utils.py monitor
 ```
 
-### B. 本格学習実行（推奨）
-
+### Phase 3: 本格学習
 ```bash
-# 1. 学習開始（tmuxバックグラウンド）
-python lambda_dev_utils.py train train_ds.py my_experiment_name
-
-# または実験名自動生成
+# 1. 学習開始（tmuxセッション）
 python lambda_dev_utils.py train train_ds.py
 
-# 💡 SSH接続が切れても学習継続！
-```
-
-### C. 学習パラメータ指定
-
-```bash
-# 複雑なパラメータを指定したい場合
-python lambda_dev_utils.py sync
-ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "tmux new-session -d -s my_training 'cd /lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux && source ../../venvs/lisa_gemma_venv/bin/activate && python train_ds.py --batch_size 8 --learning_rate 1e-4 --epochs 5'"
-```
-
----
-
-## 📊 モニタリング
-
-### 学習状況確認
-
-```bash
-# 総合モニタリング
+# 2. 進捗監視
 python lambda_dev_utils.py monitor
 
-# GPU使用状況のみ
-python lambda_dev_utils.py gpu
-
-# tmuxセッション一覧
-python lambda_dev_utils.py tmux-list
-```
-
-### tmuxセッション操作
-
-```bash
-# 特定のセッションにアタッチ（学習ログを見る）
-python lambda_dev_utils.py attach training_my_experiment
-
-# tmuxセッション内での操作
-Ctrl+B, D    # セッションから離脱（学習は継続）
-Ctrl+C       # 学習を停止
-exit         # セッション終了
-```
-
-### ログファイル確認
-
-```bash
-# ログファイルを直接確認
-ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "tail -f /lambda/nfs/lisa-gemma-project-fs/artifacts/logs/latest.log"
-
-# または結果をローカルに取得
+# 3. 結果取得
 python lambda_dev_utils.py results
-ls lambda_results/logs/
 ```
 
----
+## 🚨 トラブルシューティング
 
-## 🔧 トラブルシューティング
+### よくある問題
 
-### よくある問題と解決方法
-
-#### 1. SSH接続エラー
+#### SSH接続エラー
 ```bash
-# 接続テスト
-ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "echo 'Connection OK'"
-
-# 鍵権限確認
+# SSH鍵のパーミッション確認
 chmod 600 ~/.ssh/lambda_cloud_key
+
+# 接続テスト
+ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58
 ```
 
-#### 2. コード同期失敗
+#### Hugging Face認証エラー
 ```bash
-# 手動同期（詳細表示）
-rsync -avz --progress --exclude='.git' --exclude='__pycache__' ./ ubuntu@150.136.47.58:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/
+# 認証状態確認
+python lambda_dev_utils.py check
+
+# Token再設定
+python lambda_dev_utils.py setup_hf your_new_token
 ```
 
-#### 3. 仮想環境エラー
-```bash
-# 仮想環境確認
-ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "source /lambda/nfs/lisa-gemma-project-fs/venvs/lisa_gemma_venv/bin/activate && python --version"
-
-# パッケージ再インストール
-ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "source /lambda/nfs/lisa-gemma-project-fs/venvs/lisa_gemma_venv/bin/activate && pip install -r /lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/requirements.txt"
-```
-
-#### 4. GPU認識エラー
+#### GPU使用率が低い
 ```bash
 # GPU状況確認
-python lambda_dev_utils.py gpu
+python lambda_dev_utils.py monitor
 
-# CUDA確認
-ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "nvcc --version"
-ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "python -c 'import torch; print(torch.cuda.is_available())'"
-```
-
-#### 5. メモリ不足
-```bash
 # プロセス確認
-ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "ps aux | grep python"
-
-# メモリ使用量確認
-ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "free -h"
 ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "nvidia-smi"
 ```
 
----
-
-## 🚨 緊急停止手順
-
-### 即座の全停止
+#### 学習が停止
 ```bash
-# 🚨 全Pythonプロセス緊急停止
+# tmuxセッション確認
+ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "tmux list-sessions"
+
+# 緊急停止
 python lambda_dev_utils.py emergency
 ```
 
-### 段階的停止
-
+### パッケージ互換性問題
 ```bash
-# 1. 特定のtmuxセッションのみ停止
-python lambda_dev_utils.py kill training_my_experiment
-
-# 2. 全tmuxセッション確認
-python lambda_dev_utils.py tmux-list
-
-# 3. 手動でプロセス確認・停止
-ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "ps aux | grep python"
-ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "kill <PID>"
+# NumPy互換性修正（必要に応じて）
+ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "source /lambda/nfs/lisa-gemma-project-fs/venvs/lisa_gemma_venv/bin/activate && pip install 'numpy<2.0'"
 ```
-
-### インスタンス停止前の準備
-```bash
-# 1. 重要な結果をローカルに保存
-python lambda_dev_utils.py results
-
-# 2. 現在の状況をバックアップ
-git add .
-git commit -m "backup: インスタンス停止前のバックアップ"
-git push origin lambda_dev
-
-# 3. Lambda Cloudのダッシュボードからインスタンス停止
-```
-
----
 
 ## 💡 ベストプラクティス
 
-### 開発時
-- **小さな変更を頻繁にテスト**: 大きな変更をいきなり長時間学習で試さない
-- **実験名を明確に**: 後で結果を特定しやすい名前を使用
-- **定期的な結果取得**: `python lambda_dev_utils.py results`を習慣に
+### 開発効率化
+1. **小さなテストから始める**: `test_basic_model.py`で動作確認
+2. **定期的な監視**: `monitor`コマンドで進捗確認
+3. **結果の定期取得**: 重要なチェックポイントで`results`実行
 
-### 学習時
-- **tmuxを必ず使用**: 長時間学習では必須
-- **段階的なスケールアップ**: 1GPU → 4GPU → 8GPUの順で検証
-- **チェックポイント保存**: 定期的な中間保存設定
+### コスト最適化
+1. **不要時はインスタンス停止**: 学習完了後は速やかに停止
+2. **効率的なデバッグ**: ローカルで可能な限りテスト
+3. **バッチサイズ調整**: GPU使用率を最大化
 
-### コスト管理
-- **使用後は即座に停止**: 不要な課金を避ける
-- **開発時は小さなインスタンス**: A10でテスト、H100で本番
-- **Persistent Filesystemを活用**: データロストを防ぐ
+### データ管理
+1. **Persistent Filesystem活用**: 全データをクラウド上に保存
+2. **定期バックアップ**: 重要な結果はローカルにも保存
+3. **バージョン管理**: Git経由でコード変更を管理
 
-### バックアップ
+## 🔄 アップデート手順
+
+### 新しいインスタンスでの作業
 ```bash
-# 定期的なローカルバックアップ
-python lambda_dev_utils.py results
-git add lambda_results/
-git commit -m "backup: 実験結果 $(date)"
+# 1. 環境チェック
+python lambda_dev_utils.py check
+
+# 2. 必要に応じてセットアップ
+python lambda_dev_utils.py setup
+
+# 3. HF Token設定
+python lambda_dev_utils.py setup_hf your_token
 ```
 
-### セキュリティ
-- **SSH鍵の適切な管理**: 権限600、バックアップ保存
-- **機密データの扱い**: HuggingFace tokenなどの適切な管理
-
----
-
-## 📞 サポート・リファレンス
-
-### 主要コマンド一覧
+### コード更新
 ```bash
-# 基本操作
-python lambda_dev_utils.py sync          # コード同期
-python lambda_dev_utils.py train <script> # 学習開始
-python lambda_dev_utils.py monitor       # 状況確認
-python lambda_dev_utils.py results       # 結果取得
+# 1. ローカルでGit操作
+git pull origin main
+git checkout your_branch
 
-# tmux操作
-python lambda_dev_utils.py tmux-list     # セッション一覧
-python lambda_dev_utils.py attach <name> # セッション接続
-python lambda_dev_utils.py kill <name>   # セッション終了
-
-# 緊急時
-python lambda_dev_utils.py emergency     # 緊急停止
-python lambda_dev_utils.py gpu           # GPU確認
+# 2. Lambda Cloudに同期
+python lambda_dev_utils.py sync
 ```
 
-### 設定ファイル
-- `config_lambda_cloud.py`: Lambda Cloud環境の全設定
-- `lambda_dev_utils.py`: 開発ワークフローの自動化
+## 📞 サポート
 
-### ディレクトリ構造
+### 環境チェック
+問題が発生した場合、まず環境チェックを実行：
+```bash
+python lambda_dev_utils.py check
 ```
-Lambda Cloud Filesystem: /lambda/nfs/lisa-gemma-project-fs/
-├── data/              # データセット（保護）
-├── code/              # 同期されたコード
-├── artifacts/         # 学習結果
-│   ├── checkpoints/   # モデルチェックポイント
-│   ├── logs/          # 学習ログ
-│   └── final_models/  # 最終モデル
-└── venvs/            # Python仮想環境
+
+### ログ確認
+詳細なエラー情報が必要な場合：
+```bash
+# tmuxセッション内のログ確認
+ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58
+tmux attach-session -t training
 ```
 
 ---
 
-## 🎉 この開発環境の利点
-
-✅ **接続安定性**: tmuxによるSSH切断耐性  
-✅ **開発効率**: ローカル編集 + ワンコマンド同期  
-✅ **コスト効率**: 必要時のみGPU使用  
-✅ **安全性**: 緊急停止・バックアップ機能  
-✅ **スケーラビリティ**: A10開発 → H100本番の段階的移行  
-
-Happy Coding! 🚀 
+**このガイドは`lambda_dev_utils.py`の機能に基づいています。最新の機能については`python lambda_dev_utils.py`でヘルプを確認してください。** 

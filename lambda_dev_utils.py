@@ -9,6 +9,7 @@ import sys
 import os
 import time
 from datetime import datetime
+import json
 
 # SSH設定
 SSH_KEY = "~/.ssh/lambda_cloud_key"
@@ -16,6 +17,9 @@ LAMBDA_IP = "150.136.47.58"
 LAMBDA_USER = "ubuntu"
 CODE_PATH = "/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux"
 VENV_PATH = "/lambda/nfs/lisa-gemma-project-fs/venvs/lisa_gemma_venv"
+
+# Hugging Face Token設定
+HF_TOKEN_FILE = "hf_token.txt"
 
 def run_ssh_command(command, use_tmux=False, session_name=None, detach=False):
     """SSH経由でコマンドを実行"""
@@ -162,33 +166,263 @@ def monitor_training():
     print("📝 最新ログ:")
     run_ssh_command("find /lambda/nfs/lisa-gemma-project-fs/artifacts/logs -name '*.log' -type f -exec ls -lt {} + | head -5", use_tmux=False)
 
+def setup_instance():
+    """新しいLambda Cloudインスタンスをセットアップ"""
+    print("🏗️  Lambda Cloudインスタンスをセットアップ中...")
+    
+    setup_commands = [
+        # システム更新と基本ツールインストール
+        "sudo apt-get update",
+        "sudo apt-get install -y tmux htop tree",
+        
+        # シンボリックリンク作成
+        "ln -sfn /lambda/nfs/lisa-gemma-project-fs ~/persistent_storage",
+        "ln -sfn /lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux ~/project",
+        
+        # 環境確認
+        f"cd {CODE_PATH} && source {VENV_PATH}/bin/activate && python config_lambda_cloud.py"
+    ]
+    
+    print("📋 実行するセットアップ手順:")
+    for i, cmd in enumerate(setup_commands, 1):
+        print(f"  {i}. {cmd}")
+    
+    response = input("\n⚠️  セットアップを実行しますか？ (y/N): ")
+    if response.lower() != 'y':
+        print("❌ セットアップをキャンセルしました")
+        return
+    
+    # セットアップ実行
+    for i, cmd in enumerate(setup_commands, 1):
+        print(f"\n🔧 ステップ {i}/{len(setup_commands)}: {cmd}")
+        result = run_ssh_command(cmd, use_tmux=False)
+        if result.returncode != 0:
+            print(f"❌ ステップ {i} でエラーが発生しました")
+            return False
+    
+    print("\n✅ セットアップ完了！")
+    print("📂 利用可能なショートカット:")
+    print("  ~/persistent_storage → Persistent Filesystem")
+    print("  ~/project → プロジェクトルート")
+    
+    return True
+
+def check_cloud():
+    """Lambda Cloud環境をチェック"""
+    print("🔍 Lambda Cloud環境をチェック中...")
+    
+    checks = {}
+    
+    # SSH接続をチェック
+    print("📋 SSH接続をチェック中...")
+    result = run_ssh_command("echo 'SSH OK'", use_tmux=False)
+    checks["SSH接続"] = result.returncode == 0
+    print(f"   {'✅' if checks['SSH接続'] else '❌'} SSH接続")
+    
+    # Filesystemをチェック
+    print("📋 Filesystem存在をチェック中...")
+    result = run_ssh_command("ls -la /lambda/nfs/lisa-gemma-project-fs", use_tmux=False)
+    checks["Filesystem存在"] = result.returncode == 0
+    print(f"   {'✅' if checks['Filesystem存在'] else '❌'} Filesystem存在")
+    
+    # 仮想環境をチェック
+    print("📋 仮想環境をチェック中...")
+    result = run_ssh_command(f"source {VENV_PATH}/bin/activate && python --version", use_tmux=False)
+    checks["仮想環境"] = result.returncode == 0
+    print(f"   {'✅' if checks['仮想環境'] else '❌'} 仮想環境")
+    
+    # GPU認識をチェック
+    print("📋 GPU認識をチェック中...")
+    result = run_ssh_command("nvidia-smi --query-gpu=name --format=csv,noheader", use_tmux=False)
+    checks["GPU認識"] = result.returncode == 0
+    print(f"   {'✅' if checks['GPU認識'] else '❌'} GPU認識")
+    
+    # プロジェクト設定をチェック
+    print("📋 プロジェクト設定をチェック中...")
+    result = run_ssh_command(f"cd {CODE_PATH} && python config_lambda_cloud.py", use_tmux=False)
+    checks["プロジェクト設定"] = result.returncode == 0
+    print(f"   {'✅' if checks['プロジェクト設定'] else '❌'} プロジェクト設定")
+    
+    # パッケージをチェック
+    print("📋 必要パッケージをチェック中...")
+    result = run_ssh_command(
+        f"source {VENV_PATH}/bin/activate && pip list | grep -E 'torch|transformers|deepspeed'",
+        use_tmux=False
+    )
+    # 出力から必要なパッケージが見つかるかチェック
+    checks["必要パッケージ"] = result.returncode == 0
+    print(f"   {'✅' if checks['必要パッケージ'] else '❌'} 必要パッケージ")
+    
+    # Hugging Face認証をチェック
+    print("📋 Hugging Face認証をチェック中...")
+    result = run_ssh_command(
+        f"source {VENV_PATH}/bin/activate && huggingface-cli whoami",
+        use_tmux=False
+    )
+    checks["HF認証"] = result.returncode == 0
+    print(f"   {'✅' if checks['HF認証'] else '❌'} Hugging Face認証")
+    
+    print("\n📊 環境チェック結果:")
+    print("=" * 30)
+    for check_name, status in checks.items():
+        print(f"{'✅' if status else '❌'} {check_name}")
+    
+    all_passed = all(checks.values())
+    if all_passed:
+        print("\n🎉 全てのチェックが成功しました！")
+    else:
+        print("\n⚠️  一部のチェックが失敗しています。修正が必要です。")
+        if not checks.get("HF認証", False):
+            print("💡 Hugging Face認証が必要です: python lambda_dev_utils.py setup_hf <your_token>")
+        
+    return all_passed
+
+def install_missing_packages():
+    """不足パッケージの追加インストール"""
+    print("📦 追加パッケージをインストール中...")
+    
+    additional_packages = [
+        "mlflow",
+        "boto3", 
+        "tensorboard",
+        "wandb",
+        "matplotlib",
+        "seaborn"
+    ]
+    
+    install_cmd = f"source {VENV_PATH}/bin/activate && pip install " + " ".join(additional_packages)
+    
+    print(f"インストール対象: {', '.join(additional_packages)}")
+    response = input("インストールを実行しますか？ (y/N): ")
+    
+    if response.lower() == 'y':
+        result = run_ssh_command(install_cmd, use_tmux=False)
+        if result.returncode == 0:
+            print("✅ パッケージインストール完了")
+        else:
+            print("❌ パッケージインストール失敗")
+        return result.returncode == 0
+    else:
+        print("❌ インストールをキャンセルしました")
+        return False
+
+def run_validation_test():
+    """エンドツーエンド検証テスト"""
+    print("🧪 エンドツーエンド検証テストを実行中...")
+    
+    # まずコードを同期
+    if not sync_code():
+        print("❌ コード同期に失敗しました")
+        return False
+    
+    # 検証スクリプトを実行
+    test_commands = [
+        # GPU確認
+        "nvidia-smi",
+        
+        # 基本的なPythonテスト
+        f"cd {CODE_PATH} && source {VENV_PATH}/bin/activate && python -c \"import torch; print(f'PyTorch: {{torch.__version__}}'); print(f'CUDA available: {{torch.cuda.is_available()}}'); print(f'GPU count: {{torch.cuda.device_count()}}')\"",
+        
+        # 設定ファイルテスト
+        f"cd {CODE_PATH} && source {VENV_PATH}/bin/activate && python config_lambda_cloud.py",
+        
+        # 簡単なモデルテスト（利用可能な場合）
+        f"cd {CODE_PATH} && source {VENV_PATH}/bin/activate && python -c \"from transformers import AutoTokenizer; t = AutoTokenizer.from_pretrained('google/gemma-2-9b-it'); print('Tokenizer loaded successfully')\"" if os.path.exists("test_basic_model.py") else "echo 'Model test skipped'"
+    ]
+    
+    print("🧪 実行する検証テスト:")
+    for i, cmd in enumerate(test_commands, 1):
+        print(f"  {i}. {cmd[:60]}...")
+    
+    success_count = 0
+    for i, cmd in enumerate(test_commands, 1):
+        print(f"\n🧪 テスト {i}/{len(test_commands)}")
+        result = run_ssh_command(cmd, use_tmux=False)
+        if result.returncode == 0:
+            print(f"✅ テスト {i} 成功")
+            success_count += 1
+        else:
+            print(f"❌ テスト {i} 失敗")
+    
+    print(f"\n📊 検証結果: {success_count}/{len(test_commands)} テスト成功")
+    
+    if success_count == len(test_commands):
+        print("🎉 全ての検証テストが成功しました！")
+        print("🚀 Lambda Cloud環境は使用準備完了です")
+        return True
+    else:
+        print("⚠️  一部のテストが失敗しています。環境の確認が必要です。")
+        return False
+
+def setup_hf_token(token=None):
+    """Hugging Face Tokenを安全に設定"""
+    if token:
+        # ローカルにトークンファイルを作成（.gitignoreで除外済み）
+        with open(HF_TOKEN_FILE, 'w') as f:
+            f.write(token.strip())
+        print(f"✅ Hugging Face Tokenをローカルに保存しました: {HF_TOKEN_FILE}")
+        
+        # Lambda CloudでHugging Face CLIに直接ログイン
+        print("🔐 Lambda CloudでHugging Face CLIにログイン中...")
+        result = run_ssh_command(
+            f"source {VENV_PATH}/bin/activate && huggingface-cli login --token {token.strip()}",
+            use_tmux=False
+        )
+        if result.returncode == 0:
+            print("✅ Hugging Face CLIログイン成功")
+            return True
+        else:
+            print("❌ Hugging Face CLIログイン失敗")
+            print(f"エラー出力: {result.stderr}")
+            print(f"標準出力: {result.stdout}")
+            return False
+    else:
+        # 既存のトークンファイルから読み込み
+        if os.path.exists(HF_TOKEN_FILE):
+            with open(HF_TOKEN_FILE, 'r') as f:
+                token = f.read().strip()
+            return setup_hf_token(token)
+        else:
+            print(f"❌ Tokenファイルが見つかりません: {HF_TOKEN_FILE}")
+            print("使用方法: python lambda_dev_utils.py setup_hf <your_token>")
+            return False
+
+def check_hf_auth():
+    """Hugging Face認証状態をチェック"""
+    print("🔐 Hugging Face認証状態をチェック中...")
+    result = run_ssh_command(
+        f"source {VENV_PATH}/bin/activate && huggingface-cli whoami",
+        use_tmux=False
+    )
+    if result.returncode == 0:
+        print("✅ Hugging Face認証済み")
+        return True
+    else:
+        print("❌ Hugging Face未認証")
+        return False
+
 def main():
     """メイン関数"""
     if len(sys.argv) < 2:
-        print("""
-🚀 Lambda Cloud開発ユーティリティ
-
-使用方法:
-  python lambda_dev_utils.py <command> [options]
-
-コマンド:
-  sync              コードをLambda Cloudに同期
-  results           結果をローカルに取得
-  train <script>    学習開始 (tmuxセッション使用)
-  monitor           学習状況モニタリング
-  gpu               GPU使用状況確認
-  tmux-list         tmuxセッション一覧
-  attach [session]  tmuxセッションにアタッチ
-  kill [session]    tmuxセッション終了
-  emergency         緊急停止 (全Pythonプロセス終了)
-
-例:
-  python lambda_dev_utils.py sync
-  python lambda_dev_utils.py train train_ds.py
-  python lambda_dev_utils.py monitor
-  python lambda_dev_utils.py attach training_20241226_143022
-  python lambda_dev_utils.py emergency
-        """)
+        print("🚀 Lambda Cloud開発ユーティリティ")
+        print("=" * 50)
+        print("使用可能なコマンド:")
+        print("  sync        - ローカルコードをLambda Cloudに同期")
+        print("  train       - 学習スクリプトを実行 (tmux)")
+        print("  monitor     - GPU使用状況とトレーニング状況を監視")
+        print("  results     - 学習結果を取得")
+        print("  setup       - 新しいインスタンスのセットアップ")
+        print("  check       - 環境の健全性チェック")
+        print("  install     - 追加パッケージのインストール")
+        print("  validate    - エンドツーエンド検証テスト")
+        print("  emergency   - 緊急停止（全tmuxセッション終了）")
+        print("  setup_hf    - Hugging Face Tokenを設定")
+        print("")
+        print("例:")
+        print("  python lambda_dev_utils.py sync")
+        print("  python lambda_dev_utils.py train train_ds.py")
+        print("  python lambda_dev_utils.py setup_hf hf_xxxxxxx")
+        print("  python lambda_dev_utils.py check")
         return
     
     command = sys.argv[1]
@@ -213,6 +447,18 @@ def main():
     elif command == "gpu":
         check_gpu_status()
     
+    elif command == "setup":
+        setup_instance()
+    
+    elif command == "check":
+        check_cloud()
+    
+    elif command == "install":
+        install_missing_packages()
+    
+    elif command == "validate":
+        run_validation_test()
+    
     elif command == "tmux-list":
         list_tmux_sessions()
     
@@ -226,6 +472,13 @@ def main():
     
     elif command == "emergency":
         emergency_stop()
+    
+    elif command == "setup_hf":
+        if len(sys.argv) < 3:
+            print("❌ Hugging Face Tokenを指定してください")
+            return
+        token = sys.argv[2]
+        setup_hf_token(token)
     
     else:
         print(f"❌ 不明なコマンド: {command}")
