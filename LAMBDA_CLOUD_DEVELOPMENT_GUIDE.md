@@ -17,6 +17,25 @@
 
 ## 🚀 クイックスタート
 
+### 🆕 新しいAI Agentが最初に行うこと
+
+```bash
+# 1. 作業ディレクトリに移動
+cd ~/LISA-Gemma-Linux
+
+# 2. 環境の健全性チェック
+python lambda_dev_utils.py check
+
+# 3. Lambda Cloud接続テスト
+ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "echo 'Lambda Cloud接続OK'"
+
+# 4. 統一設定の確認
+python config_linux.py
+
+# 5. 検証スクリプトで環境確認（推奨）
+ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "cd /lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux && source ../../venvs/lisa_gemma_venv/bin/activate && python verify_config_and_setup.py"
+```
+
 ### 1. 基本セットアップ
 ```bash
 # 環境チェック（ローカルから実行）
@@ -34,10 +53,13 @@ python lambda_dev_utils.py setup_hf your_hf_token_here
 # 2. Lambda Cloudに同期
 python lambda_dev_utils.py sync
 
-# 3. Lambda上で学習実行（ローカルから指示）
+# 3. 環境検証（推奨）
+python lambda_dev_utils.py validate
+
+# 4. Lambda上で学習実行（ローカルから指示）
 python lambda_dev_utils.py train your_script.py
 
-# 4. 進捗監視（ローカルから確認）
+# 5. 進捗監視（ローカルから確認）
 python lambda_dev_utils.py monitor
 ```
 
@@ -48,6 +70,7 @@ python lambda_dev_utils.py monitor
 | `check` | ローカル | 環境の健全性チェック | `python lambda_dev_utils.py check` |
 | `setup_hf` | ローカル | Hugging Face Token設定 | `python lambda_dev_utils.py setup_hf hf_xxx` |
 | `sync` | ローカル | コード同期 | `python lambda_dev_utils.py sync` |
+| `validate` | ローカル | 検証スクリプト実行 | `python lambda_dev_utils.py validate` |
 | `train` | ローカル | 学習実行（tmux） | `python lambda_dev_utils.py train train_ds.py` |
 | `monitor` | ローカル | GPU・学習状況監視 | `python lambda_dev_utils.py monitor` |
 | `results` | ローカル | 結果取得 | `python lambda_dev_utils.py results` |
@@ -58,20 +81,69 @@ python lambda_dev_utils.py monitor
 ## 🔧 環境設定
 
 ### Lambda Cloud設定
-- **インスタンス**: 150.136.47.58 (1x A10 GPU)
+- **インスタンス**: 150.136.47.58 (1x A10 GPU, 24GB VRAM)
 - **SSH鍵**: `~/.ssh/lambda_cloud_key`
 - **Persistent Filesystem**: `/lambda/nfs/lisa-gemma-project-fs/`
+- **Python環境**: `lisa_gemma_venv` (最適化済み)
 
 ### ディレクトリ構造
 ```
 /lambda/nfs/lisa-gemma-project-fs/
-├── data/           # データセット
+├── data/           # データセット（全8種類）
+│   ├── dataset/    # LISA学習データ
+│   └── weights/    # SAM重み (sam_vit_h_4b8939.pth)
 ├── code/           # プロジェクトコード（rsyncで同期）
+│   └── LISA-Gemma-Linux/  # メインプロジェクト
 ├── artifacts/      # 学習結果
 │   ├── checkpoints/
 │   ├── logs/
 │   └── final_models/
 └── venvs/          # Python仮想環境
+    └── lisa_gemma_venv/  # 最適化済み環境
+```
+
+### 統一設定管理
+- **設定ファイル**: `config_linux.py` (全スクリプト共通)
+- **Lambda Cloud最適化**: A10 24GB制約対応済み
+- **TensorFlow回避**: パフォーマンス最適化適用済み
+
+## 🔍 検証スクリプト
+
+### 5つの最適化済み検証スクリプト
+新しい環境や重要な変更後に実行推奨：
+
+1. **`verify_config_and_setup.py`**: 設定・環境の完全性チェック
+   - 43項目の設定検証
+   - Lambda Cloud環境の健全性確認
+   - 実行時間: ~30秒
+
+2. **`verify_dataset_integrity.py`**: データセットの完全性検証
+   - 全8データセットの存在確認
+   - SAM重みファイルの検証
+   - 実行時間: ~60秒
+
+3. **`verify_input_formatting.py`**: 入力データ形式の検証
+   - 全12データセットの形式チェック
+   - トークン化・ラベル処理の確認
+   - 実行時間: ~4分
+
+4. **`verify_model_architecture.py`**: モデル構造の検証
+   - LISA-Gemmaアーキテクチャの完全性
+   - パラメータ数・学習率の確認
+   - 実行時間: ~2分
+
+5. **`verify_loss_and_gradients.py`**: 損失・勾配の検証
+   - フォワード・バックワードパスの確認
+   - A10メモリ最適化対応済み
+   - 実行時間: ~3分
+
+### 実行方法
+```bash
+# 個別実行（ローカルから）
+ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "cd /lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux && source ../../venvs/lisa_gemma_venv/bin/activate && python verify_config_and_setup.py"
+
+# 全検証実行（将来的に lambda_dev_utils.py に統合予定）
+# python lambda_dev_utils.py validate
 ```
 
 ## 🔐 セキュリティ
@@ -212,6 +284,23 @@ ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "source /lambda/nfs/lisa-gem
 2. **適切なインスタンス選択**: 開発はA10、本番はH100
 3. **使用後停止**: 不要時は速やかにインスタンス停止
 
+### A10メモリ制約対応
+Lambda Cloud A10 (24GB VRAM) での重要な制約と対処法：
+
+1. **バッチサイズ調整**: 通常2 → A10では1に自動調整
+2. **勾配累積**: `GRADIENT_ACCUMULATION_STEPS=8`で実効バッチサイズ維持
+3. **混合精度**: `MIXED_PRECISION=True`でBF16使用
+4. **勾配チェックポイント**: `GRADIENT_CHECKPOINTING=True`でメモリ削減
+5. **メモリ監視**: 検証スクリプトで使用量を自動確認
+
+```python
+# config_linux.py での A10 最適化設定
+BATCH_SIZE_PER_GPU = 2  # A10では自動的に1に調整
+GRADIENT_ACCUMULATION_STEPS = 8
+MIXED_PRECISION = True
+GRADIENT_CHECKPOINTING = True
+```
+
 ## 🔄 日常的な開発パターン
 
 ### 朝の作業開始
@@ -294,6 +383,31 @@ ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "nvidia-smi"
 
 ---
 
-**このガイドは`lambda_dev_utils.py`の機能に基づいています。最新の機能については`python lambda_dev_utils.py`でヘルプを確認してください。**
+## 🔑 新しいAI Agentへの重要な注意事項
+
+### 必須の理解事項
+1. **全ての操作はローカルから実行**: Lambda上への直接SSH接続は禁止
+2. **統一設定管理**: `config_linux.py`が全スクリプトの設定源
+3. **A10メモリ制約**: 24GB制約があり、自動最適化が適用済み
+4. **検証スクリプト活用**: 環境変更後は必ず検証を実行
+5. **TensorFlow回避**: パフォーマンス最適化のため、TF関連は遅延読み込み
+
+### 開発の基本フロー
+```
+ローカル編集 → sync → 検証 → train → monitor → results
+```
+
+### 緊急時の対応
+```bash
+# 即座の全停止
+python lambda_dev_utils.py emergency
+
+# 環境確認
+python lambda_dev_utils.py check
+```
+
+---
+
+**このガイドは`lambda_dev_utils.py`の機能と最適化済み検証スクリプトに基づいています。最新の機能については`python lambda_dev_utils.py`でヘルプを確認してください。**
 
 **重要**: 全ての操作はローカルディレクトリから実行し、Lambda上への直接ログインは避けてください。 
