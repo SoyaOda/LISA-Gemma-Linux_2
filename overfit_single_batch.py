@@ -56,13 +56,16 @@ def get_config():
         raise SystemExit("config_linux.pyが必須です。ファイルが存在することを確認してください。")
 
 def parse_args():
+    # config_linux.pyから設定を取得
+    config = get_config()
+    
     parser = argparse.ArgumentParser(description="単一バッチでの過学習テスト")
     parser.add_argument("--iterations", type=int, default=20, help="過学習テストのイテレーション数")
-    parser.add_argument("--learning_rate", type=float, default=1e-4, help="学習率")
+    parser.add_argument("--learning_rate", type=float, default=config.LEARNING_RATE, help="学習率")
     parser.add_argument("--dataset_type", type=str, default="reason_seg", 
                        choices=["sem_seg", "refer_seg", "vqa", "reason_seg", "all"],
                        help="テストに使用するデータセットタイプ（'all'で全データセット）")
-    parser.add_argument("--batch_size", type=int, default=2, help="バッチサイズ")
+    parser.add_argument("--batch_size", type=int, default=config.BATCH_SIZE_PER_GPU, help="バッチサイズ")
     parser.add_argument("--wait_between_iterations", type=float, default=0.0, 
                        help="各イテレーション間の待機時間（秒）")
     return parser.parse_args()

@@ -53,6 +53,12 @@ python lambda_dev_utils.py setup_hf your_hf_token_here
 # 2. Lambda Cloudに同期
 python lambda_dev_utils.py sync
 
+# 2-1. 同期失敗時の手動転送（個別ファイル）
+rsync -avz --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='.gitignore' -e "ssh -i ~/.ssh/lambda_cloud_key" your_file.py ubuntu@150.136.47.58:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/
+
+# 2-2. 手動転送（プロジェクト全体）
+rsync -avz --progress --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='lambda_results' --exclude='.gitignore' -e "ssh -i ~/.ssh/lambda_cloud_key" ./ ubuntu@150.136.47.58:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/
+
 # 3. 環境検証（推奨）
 python lambda_dev_utils.py validate
 
@@ -77,6 +83,44 @@ python lambda_dev_utils.py monitor
 | `emergency` | ローカル | 緊急停止 | `python lambda_dev_utils.py emergency` |
 
 **重要**: 全てのコマンドはローカルディレクトリから実行してください
+
+## 📤 手動ファイル転送コマンド
+
+### よく使用されるrsyncコマンド集
+
+```bash
+# 1. 個別ファイル転送（最も頻繁に使用）
+rsync -avz --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='.gitignore' -e "ssh -i ~/.ssh/lambda_cloud_key" your_file.py ubuntu@150.136.47.58:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/
+
+# 2. 複数ファイル転送
+rsync -avz --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='.gitignore' -e "ssh -i ~/.ssh/lambda_cloud_key" file1.py file2.py file3.py ubuntu@150.136.47.58:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/
+
+# 3. プロジェクト全体転送（進捗表示付き）
+rsync -avz --progress --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='lambda_results' --exclude='.gitignore' -e "ssh -i ~/.ssh/lambda_cloud_key" ./ ubuntu@150.136.47.58:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/
+
+# 4. 特定ディレクトリ転送
+rsync -avz --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' -e "ssh -i ~/.ssh/lambda_cloud_key" model/ ubuntu@150.136.47.58:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/model/
+
+# 5. 検証スクリプト一括転送
+rsync -avz --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' -e "ssh -i ~/.ssh/lambda_cloud_key" verify_*.py ubuntu@150.136.47.58:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/
+```
+
+### rsyncオプション説明
+- `-a`: アーカイブモード（パーミッション、タイムスタンプ保持）
+- `-v`: 詳細情報表示
+- `-z`: 転送時圧縮
+- `--progress`: 転送進捗表示
+- `--exclude`: 除外パターン指定
+- `-e "ssh -i ~/.ssh/lambda_cloud_key"`: SSH鍵指定
+
+### 使用例
+```bash
+# 例1: overfit_single_batch.pyを転送
+rsync -avz --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='.gitignore' -e "ssh -i ~/.ssh/lambda_cloud_key" overfit_single_batch.py ubuntu@150.136.47.58:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/
+
+# 例2: config_linux.pyを転送
+rsync -avz --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='.gitignore' -e "ssh -i ~/.ssh/lambda_cloud_key" config_linux.py ubuntu@150.136.47.58:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/
+```
 
 ## 🔧 環境設定
 
@@ -180,6 +224,13 @@ python lambda_dev_utils.py setup_hf your_token
 # 2. 変更をLambda Cloudに同期
 python lambda_dev_utils.py sync
 
+# 2-alt. lambda_dev_utils.py同期失敗時の手動転送
+# 個別ファイル転送
+rsync -avz --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='.gitignore' -e "ssh -i ~/.ssh/lambda_cloud_key" modified_file.py ubuntu@150.136.47.58:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/
+
+# プロジェクト全体転送
+rsync -avz --progress --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='lambda_results' --exclude='.gitignore' -e "ssh -i ~/.ssh/lambda_cloud_key" ./ ubuntu@150.136.47.58:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/
+
 # 3. 短いテスト実行（ローカルから指示）
 python lambda_dev_utils.py train test_basic_model.py
 
@@ -194,6 +245,9 @@ python lambda_dev_utils.py emergency
 ```bash
 # 1. 最新コードを同期
 python lambda_dev_utils.py sync
+
+# 1-alt. 手動同期（lambda_dev_utils.py失敗時）
+rsync -avz --progress --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='lambda_results' --exclude='.gitignore' -e "ssh -i ~/.ssh/lambda_cloud_key" ./ ubuntu@150.136.47.58:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/
 
 # 2. 本格学習開始（tmuxセッションで実行）
 python lambda_dev_utils.py train train_ds.py
@@ -232,8 +286,16 @@ ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "echo 'Connection OK'"
 
 #### コード同期失敗
 ```bash
-# 手動同期（ローカルで実行）
-rsync -avz --progress --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='lambda_results' ./ ubuntu@150.136.47.58:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/
+# lambda_dev_utils.py同期失敗時の対処法
+
+# 1. 個別ファイル手動転送（推奨）
+rsync -avz --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='.gitignore' -e "ssh -i ~/.ssh/lambda_cloud_key" your_modified_file.py ubuntu@150.136.47.58:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/
+
+# 2. プロジェクト全体手動転送（時間がかかる）
+rsync -avz --progress --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='lambda_results' --exclude='.gitignore' -e "ssh -i ~/.ssh/lambda_cloud_key" ./ ubuntu@150.136.47.58:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/
+
+# 3. 転送確認
+ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "ls -la /lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/your_modified_file.py"
 ```
 
 #### 学習が停止・異常終了
@@ -321,6 +383,9 @@ python lambda_dev_utils.py results
 # 2. 同期
 python lambda_dev_utils.py sync
 
+# 2-alt. 手動転送（lambda_dev_utils.py失敗時）
+rsync -avz --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='.gitignore' -e "ssh -i ~/.ssh/lambda_cloud_key" modified_file.py ubuntu@150.136.47.58:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/
+
 # 3. テスト実行
 python lambda_dev_utils.py train test_script.py
 
@@ -332,6 +397,9 @@ python lambda_dev_utils.py monitor
 ```bash
 # 1. 最新コード同期
 python lambda_dev_utils.py sync
+
+# 1-alt. 手動同期（lambda_dev_utils.py失敗時）
+rsync -avz --progress --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='lambda_results' --exclude='.gitignore' -e "ssh -i ~/.ssh/lambda_cloud_key" ./ ubuntu@150.136.47.58:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/
 
 # 2. 学習開始
 python lambda_dev_utils.py train train_ds.py
