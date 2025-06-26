@@ -52,11 +52,13 @@ def extract_config_dict(config_module) -> Dict[str, Any]:
     
     # 設定項目のカテゴリ別に分類
     categories = {
-        'model_config': ['GEMMA_MODEL_ID', 'GEMMA_MODEL_PATH', 'GEMMA_IMAGE_SIZE', 'SAM_CHECKPOINT_PATH'],
-        'dataset_config': ['DATASET_BASE_DIR', 'DATASET_STRUCTURE', 'SEM_SEG_DATA', 'REFER_SEG_DATA', 'VQA_DATA', 'REASON_SEG_DATA'],
-        'training_config': ['EPOCHS', 'STEPS_PER_EPOCH', 'BATCH_SIZE', 'LEARNING_RATE', 'WEIGHT_DECAY', 'GRADIENT_ACCUMULATION_STEPS'],
-        'optimization_config': ['OPTIMIZER', 'SCHEDULER', 'WARMUP_STEPS', 'WARMUP_RATIO'],
-        'system_config': ['DEVICE', 'MIXED_PRECISION', 'GRADIENT_CHECKPOINTING', 'DATALOADER_NUM_WORKERS']
+        'model_config': ['GEMMA_MODEL_ID', 'GEMMA_MODEL_PATH', 'GEMMA_IMAGE_SIZE', 'SAM_CHECKPOINT_PATH', 'GEMMA_HIDDEN_SIZE', 'SAM_IMAGE_SIZE', 'MODEL_MAX_LENGTH', 'SEG_PROJECTION_DIM', 'SEG_TOKEN'],
+        'dataset_config': ['DATASET_BASE_DIR', 'DATASET_STRUCTURE', 'SEM_SEG_DATA', 'REFER_SEG_DATA', 'VQA_DATA', 'REASON_SEG_DATA', 'VAL_DATASET', 'DATASET_SAMPLE_RATES'],
+        'training_config': ['EPOCHS', 'STEPS_PER_EPOCH', 'BATCH_SIZE_PER_GPU', 'LEARNING_RATE', 'WEIGHT_DECAY', 'GRADIENT_ACCUMULATION_STEPS', 'BETA1', 'BETA2'],
+        'optimization_config': ['WARMUP_STEPS', 'WARMUP_RATIO', 'SAVE_STEPS', 'LOGGING_STEPS', 'EVAL_STEPS'],
+        'system_config': ['MIXED_PRECISION', 'GRADIENT_CHECKPOINTING', 'DATALOADER_NUM_WORKERS'],
+        'lora_config': ['LORA_R', 'LORA_ALPHA', 'LORA_DROPOUT', 'LORA_TARGET_MODULES'],
+        'loss_config': ['CE_LOSS_WEIGHT', 'DICE_LOSS_WEIGHT', 'BCE_LOSS_WEIGHT']
     }
     
     for category, attrs in categories.items():
@@ -130,13 +132,56 @@ def validate_hyperparameters(config_dict: Dict[str, Any]) -> List[str]:
                 warnings.append(f"学習率が低すぎる可能性があります: {lr} (推奨: 1e-4～1e-5)")
     
     # バッチサイズの妥当性チェック
-    if 'training_config' in config_dict and 'BATCH_SIZE' in config_dict['training_config']:
-        batch_size = config_dict['training_config']['BATCH_SIZE']
+    if 'training_config' in config_dict and 'BATCH_SIZE_PER_GPU' in config_dict['training_config']:
+        batch_size = config_dict['training_config']['BATCH_SIZE_PER_GPU']
         if isinstance(batch_size, int):
-            if batch_size > 32:
-                warnings.append(f"バッチサイズが大きすぎる可能性があります: {batch_size} (LISA-Gemmaでは4-8推奨)")
+            if batch_size > 8:
+                warnings.append(f"GPU毎バッチサイズが大きすぎる可能性があります: {batch_size} (LISA-Gemmaでは1-4推奨)")
             elif batch_size < 1:
-                warnings.append(f"バッチサイズが無効です: {batch_size}")
+                warnings.append(f"GPU毎バッチサイズが無効です: {batch_size}")
+    
+    # 勾配蓄積ステップの妥当性チェック
+    if 'training_config' in config_dict and 'GRADIENT_ACCUMULATION_STEPS' in config_dict['training_config']:
+        grad_acc = config_dict['training_config']['GRADIENT_ACCUMULATION_STEPS']
+        if isinstance(grad_acc, int):
+            if grad_acc > 32:
+                warnings.append(f"勾配蓄積ステップが大きすぎる可能性があります: {grad_acc} (推奨: 4-16)")
+            elif grad_acc < 1:
+                warnings.append(f"勾配蓄積ステップが無効です: {grad_acc}")
+    
+    # システム設定の妥当性チェック
+    if 'system_config' in config_dict:
+        system_config = config_dict['system_config']
+        
+        # データローダーワーカー数のチェック
+        if 'DATALOADER_NUM_WORKERS' in system_config:
+            num_workers = system_config['DATALOADER_NUM_WORKERS']
+            if isinstance(num_workers, int):
+                if num_workers > 16:
+                    warnings.append(f"データローダーワーカー数が多すぎる可能性があります: {num_workers} (推奨: 4-8)")
+                elif num_workers < 0:
+                    warnings.append(f"データローダーワーカー数が無効です: {num_workers}")
+    
+    # LoRA設定の妥当性チェック
+    if 'lora_config' in config_dict:
+        lora_config = config_dict['lora_config']
+        
+        if 'LORA_R' in lora_config and 'LORA_ALPHA' in lora_config:
+            lora_r = lora_config['LORA_R']
+            lora_alpha = lora_config['LORA_ALPHA']
+            if isinstance(lora_r, int) and isinstance(lora_alpha, int):
+                if lora_alpha < lora_r:
+                    warnings.append(f"LoRA ALPHA({lora_alpha})がR({lora_r})より小さいです (推奨: ALPHA ≥ R)")
+                if lora_r > 64:
+                    warnings.append(f"LoRA Rが大きすぎる可能性があります: {lora_r} (推奨: 8-32)")
+        
+        if 'LORA_DROPOUT' in lora_config:
+            lora_dropout = lora_config['LORA_DROPOUT']
+            if isinstance(lora_dropout, (int, float)):
+                if lora_dropout > 0.3:
+                    warnings.append(f"LoRAドロップアウトが高すぎる可能性があります: {lora_dropout} (推奨: 0.05-0.1)")
+                elif lora_dropout < 0:
+                    warnings.append(f"LoRAドロップアウトが無効です: {lora_dropout}")
     
     # 重みの減衰率チェック
     if 'training_config' in config_dict and 'WEIGHT_DECAY' in config_dict['training_config']:
@@ -145,28 +190,29 @@ def validate_hyperparameters(config_dict: Dict[str, Any]) -> List[str]:
             if wd > 0.1:
                 warnings.append(f"重み減衰が大きすぎる可能性があります: {wd} (推奨: 0.01～0.05)")
     
-    # LISA-Gemma固有パラメータのチェック
-    if 'other_config' in config_dict:
-        other_config = config_dict['other_config']
+    # モデル設定の妥当性チェック
+    if 'model_config' in config_dict:
+        model_config = config_dict['model_config']
         
         # 画像サイズのチェック
-        if 'GEMMA_IMAGE_SIZE' in other_config:
-            gemma_size = other_config['GEMMA_IMAGE_SIZE']
+        if 'GEMMA_IMAGE_SIZE' in model_config:
+            gemma_size = model_config['GEMMA_IMAGE_SIZE']
             if isinstance(gemma_size, int) and gemma_size != 896:
                 warnings.append(f"Gemma画像サイズが標準と異なります: {gemma_size} (推奨: 896)")
         
-        if 'SAM_IMAGE_SIZE' in other_config:
-            sam_size = other_config['SAM_IMAGE_SIZE']
+        if 'SAM_IMAGE_SIZE' in model_config:
+            sam_size = model_config['SAM_IMAGE_SIZE']
             if isinstance(sam_size, int) and sam_size != 1024:
                 warnings.append(f"SAM画像サイズが標準と異なります: {sam_size} (推奨: 1024)")
         
-        # LoRAパラメータのチェック
-        if 'LORA_R' in other_config and 'LORA_ALPHA' in other_config:
-            lora_r = other_config['LORA_R']
-            lora_alpha = other_config['LORA_ALPHA']
-            if isinstance(lora_r, int) and isinstance(lora_alpha, int):
-                if lora_alpha < lora_r:
-                    warnings.append(f"LoRA ALPHA({lora_alpha})がR({lora_r})より小さいです (推奨: ALPHA ≥ R)")
+        # モデル最大長のチェック
+        if 'MODEL_MAX_LENGTH' in model_config:
+            max_length = model_config['MODEL_MAX_LENGTH']
+            if isinstance(max_length, int):
+                if max_length < 1024:
+                    warnings.append(f"モデル最大長が短すぎる可能性があります: {max_length} (推奨: 2048以上)")
+                elif max_length > 8192:
+                    warnings.append(f"モデル最大長が長すぎる可能性があります: {max_length} (メモリ使用量に注意)")
     
     return warnings
 
@@ -210,18 +256,22 @@ def create_hyperparameter_table(config_dict: Dict[str, Any]) -> str:
     # 重要なパラメータを定義（仕様書準拠 + LISA-Gemma固有設定）
     important_params = [
         ('LEARNING_RATE', 'training_config', '学習率'),
-        ('BATCH_SIZE', 'training_config', 'バッチサイズ'),
+        ('BATCH_SIZE_PER_GPU', 'training_config', 'GPU毎バッチサイズ'),
         ('WEIGHT_DECAY', 'training_config', '重み減衰'),
         ('EPOCHS', 'training_config', 'エポック数'),
         ('STEPS_PER_EPOCH', 'training_config', 'エポック当たりステップ数'),
         ('GRADIENT_ACCUMULATION_STEPS', 'training_config', '勾配蓄積ステップ'),
         ('GEMMA_IMAGE_SIZE', 'model_config', 'Gemma画像サイズ'),
-        ('SAM_IMAGE_SIZE', 'other_config', 'SAM画像サイズ'),
-        ('MODEL_MAX_LENGTH', 'other_config', 'モデル最大長'),
-        ('LORA_R', 'other_config', 'LoRA-R値'),
-        ('LORA_ALPHA', 'other_config', 'LoRA-Alpha値'),
+        ('SAM_IMAGE_SIZE', 'model_config', 'SAM画像サイズ'),
+        ('MODEL_MAX_LENGTH', 'model_config', 'モデル最大長'),
+        ('LORA_R', 'lora_config', 'LoRA-R値'),
+        ('LORA_ALPHA', 'lora_config', 'LoRA-Alpha値'),
+        ('LORA_DROPOUT', 'lora_config', 'LoRAドロップアウト'),
         ('MIXED_PRECISION', 'system_config', '混合精度'),
         ('GRADIENT_CHECKPOINTING', 'system_config', '勾配チェックポイント'),
+        ('DATALOADER_NUM_WORKERS', 'system_config', 'データローダーワーカー数'),
+        ('WARMUP_STEPS', 'optimization_config', 'ウォームアップステップ'),
+        ('SAVE_STEPS', 'optimization_config', 'チェックポイント保存間隔'),
     ]
     
     for param_key, category, description in important_params:
@@ -233,7 +283,10 @@ def create_hyperparameter_table(config_dict: Dict[str, Any]) -> str:
             if param_key == 'LEARNING_RATE' and isinstance(value, (int, float)):
                 if value > 1e-2 or value < 1e-6:
                     status = "⚠ 要確認"
-            elif param_key == 'BATCH_SIZE' and isinstance(value, int):
+            elif param_key == 'BATCH_SIZE_PER_GPU' and isinstance(value, int):
+                if value > 8 or value < 1:
+                    status = "⚠ 要確認"
+            elif param_key == 'GRADIENT_ACCUMULATION_STEPS' and isinstance(value, int):
                 if value > 32 or value < 1:
                     status = "⚠ 要確認"
             elif param_key == 'WEIGHT_DECAY' and isinstance(value, (int, float)):
@@ -246,13 +299,25 @@ def create_hyperparameter_table(config_dict: Dict[str, Any]) -> str:
                 if value != 1024:
                     status = "⚠ 要確認"
             elif param_key == 'MODEL_MAX_LENGTH' and isinstance(value, int):
-                if value < 1024 or value > 4096:
+                if value < 1024 or value > 8192:
                     status = "⚠ 要確認"
             elif param_key == 'LORA_R' and isinstance(value, int):
                 if value < 4 or value > 64:
                     status = "⚠ 要確認"
             elif param_key == 'LORA_ALPHA' and isinstance(value, int):
                 if value < 8 or value > 128:
+                    status = "⚠ 要確認"
+            elif param_key == 'LORA_DROPOUT' and isinstance(value, (int, float)):
+                if value > 0.3 or value < 0:
+                    status = "⚠ 要確認"
+            elif param_key == 'DATALOADER_NUM_WORKERS' and isinstance(value, int):
+                if value > 16 or value < 0:
+                    status = "⚠ 要確認"
+            elif param_key == 'WARMUP_STEPS' and isinstance(value, int):
+                if value > 1000 or value < 0:
+                    status = "⚠ 要確認"
+            elif param_key == 'SAVE_STEPS' and isinstance(value, int):
+                if value > 5000 or value < 10:
                     status = "⚠ 要確認"
             
             table.append(f"{description:<30} | {str(value):<25} | {status:<20}")

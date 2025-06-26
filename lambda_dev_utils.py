@@ -21,22 +21,24 @@ VENV_PATH = "/lambda/nfs/lisa-gemma-project-fs/venvs/lisa_gemma_venv"
 # Hugging Face Token設定
 HF_TOKEN_FILE = "hf_token.txt"
 
-def run_ssh_command(command, use_tmux=False, session_name=None, detach=False):
+def run_ssh_command(command, use_tmux=False, session_name=None, detach=False, timeout=None):
     """SSH経由でコマンドを実行"""
+    # TensorFlow初期化を無効化する環境変数を追加
+    tf_disable_env = "export TF_CPP_MIN_LOG_LEVEL=3 && export TF_ENABLE_ONEDNN_OPTS=0 && "
     ssh_base = f"ssh -i {SSH_KEY} {LAMBDA_USER}@{LAMBDA_IP}"
     
     if use_tmux:
         session_name = session_name or "lisa_dev"
         if detach:
             # バックグラウンドで tmux セッションを作成し、コマンドを実行
-            tmux_cmd = f"tmux new-session -d -s {session_name} 'cd {CODE_PATH} && source {VENV_PATH}/bin/activate && {command}'"
+            tmux_cmd = f"tmux new-session -d -s {session_name} 'cd {CODE_PATH} && source {VENV_PATH}/bin/activate && {tf_disable_env}{command}'"
         else:
             # tmux セッションにアタッチ
-            tmux_cmd = f"tmux attach-session -t {session_name} || tmux new-session -s {session_name} 'cd {CODE_PATH} && source {VENV_PATH}/bin/activate && {command}'"
+            tmux_cmd = f"tmux attach-session -t {session_name} || tmux new-session -s {session_name} 'cd {CODE_PATH} && source {VENV_PATH}/bin/activate && {tf_disable_env}{command}'"
         
         full_command = f"{ssh_base} \"{tmux_cmd}\""
     else:
-        full_command = f"{ssh_base} \"cd {CODE_PATH} && source {VENV_PATH}/bin/activate && {command}\""
+        full_command = f"{ssh_base} \"cd {CODE_PATH} && source {VENV_PATH}/bin/activate && {tf_disable_env}{command}\""
     
     print(f"🚀 実行中: {full_command}")
     
@@ -47,7 +49,16 @@ def run_ssh_command(command, use_tmux=False, session_name=None, detach=False):
         return process
     else:
         # 前景実行
-        return subprocess.run(full_command, shell=True)
+        try:
+            if timeout:
+                result = subprocess.run(full_command, shell=True, capture_output=True, text=True, timeout=timeout)
+            else:
+                result = subprocess.run(full_command, shell=True, capture_output=True, text=True)
+            return result.returncode == 0, result.stdout, result.stderr
+        except subprocess.TimeoutExpired:
+            return False, "", "Command timed out"
+        except Exception as e:
+            return False, "", str(e)
 
 def sync_code():
     """ローカルコードをLambda Cloudに同期"""

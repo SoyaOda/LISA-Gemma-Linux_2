@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 第2節：Gemma向けマルチモーダル入力フォーマットの検証
-全データセット・全サブタイプ対応版
+全データセット・全サブタイプ対応版 (Lambda Cloud最適化)
 
 論理的根拠:
 - データが正しく準備されても、モデルが解釈できる形式に変換する過程でエラーが発生すれば学習は失敗
@@ -18,14 +18,43 @@ from datetime import datetime
 from typing import Dict, List, Any, Optional, Tuple
 from collections import defaultdict
 
-import torch
-from torch.utils.data import DataLoader
-from transformers import AutoProcessor
+print("🚀 LISA-Gemma Input Formatting Verification (Lambda Cloud Optimized)")
+
+# 重いライブラリは遅延読み込み
+# import torch  # 遅延読み込み
+# from torch.utils.data import DataLoader  # 遅延読み込み
+# from transformers import AutoProcessor  # 遅延読み込み
 
 # プロジェクトのルートディレクトリをsys.pathに追加
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from utils.dataset import HybridDataset, get_config, collate_fn
+def get_config():
+    """
+    config_linux.pyを必須として読み込む
+    読み込めない場合はエラーで停止
+    """
+    try:
+        import config_linux as config
+        print(f"✅ 設定ファイルを読み込み: config_linux.py")
+        return config
+    except ImportError as e:
+        print(f"❌ ERROR: config_linux.pyが見つかりません")
+        print(f"   詳細: {e}")
+        print(f"   現在のディレクトリ: {os.getcwd()}")
+        print(f"   ファイル存在確認: {os.path.exists('config_linux.py')}")
+        raise SystemExit("config_linux.pyが必須です。ファイルが存在することを確認してください。")
+
+def load_heavy_libraries():
+    """重いライブラリを必要時に読み込む"""
+    print("📦 重いライブラリを読み込み中...")
+    global torch, DataLoader, AutoProcessor, HybridDataset, collate_fn
+    
+    import torch
+    from torch.utils.data import DataLoader
+    from transformers import AutoProcessor
+    from utils.dataset import HybridDataset, collate_fn
+    
+    print("✅ PyTorch, Transformers, Dataset読み込み完了")
 
 def get_all_dataset_configs() -> List[Dict[str, Any]]:
     """
@@ -128,7 +157,7 @@ def get_all_dataset_configs() -> List[Dict[str, Any]]:
     
     return configs
 
-def analyze_sample_tokens(input_ids: torch.Tensor, labels: torch.Tensor, 
+def analyze_sample_tokens(input_ids: "torch.Tensor", labels: "torch.Tensor", 
                          processor, sample_idx: int = 0) -> Dict[str, Any]:
     """
     サンプルのトークン分析（詳細版）
@@ -185,7 +214,7 @@ def analyze_sample_tokens(input_ids: torch.Tensor, labels: torch.Tensor,
         'label_masking_ratio': labeled_tokens / non_pad_tokens if non_pad_tokens > 0 else 0
     }
 
-def verify_label_masking(input_ids: torch.Tensor, labels: torch.Tensor, 
+def verify_label_masking(input_ids: "torch.Tensor", labels: "torch.Tensor", 
                         processor, sample_idx: int = 0) -> Tuple[bool, Dict[str, Any]]:
     """
     ラベルマスキングの正確性を検証
@@ -289,10 +318,15 @@ def run_comprehensive_verification(samples_per_dataset: int = 25) -> Dict[str, A
     print("第2節: 全データセット・全サブタイプ対応マルチモーダル入力フォーマット検証")
     print("=" * 80)
     
+    # 重いライブラリを読み込み
+    load_heavy_libraries()
+    
     # 設定読み込み
     config = get_config()
     print(f"✅ 設定読み込み完了")
+    print(f"  データセットベースディレクトリ: {config.DATASET_BASE_DIR}")
     print(f"  モデル: {config.GEMMA_MODEL_ID}")
+    print(f"  バッチサイズ: {config.BATCH_SIZE_PER_GPU}")
     print(f"  各データセットサンプル数: {samples_per_dataset}")
     
     # セッション情報
@@ -349,10 +383,10 @@ def run_comprehensive_verification(samples_per_dataset: int = 25) -> Dict[str, A
                 **{dataset_config['config_attr'].lower(): sub_dataset}
             )
             
-            # DataLoader作成
+            # DataLoader作成（config_linux.pyのバッチサイズを使用）
             dataloader = DataLoader(
                 dataset,
-                batch_size=8,
+                batch_size=config.BATCH_SIZE_PER_GPU,
                 collate_fn=collate_fn,
                 shuffle=False
             )
