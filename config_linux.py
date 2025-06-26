@@ -106,6 +106,8 @@ LORA_TARGET_MODULES = [
 DATASET_SAMPLE_RATES = "9,3,3,1"  # sem_seg, refer_seg, vqa, reason_seg
 # 各データセットのエポック毎サンプル数
 SAMPLES_PER_EPOCH = 500  # 検証・デバッグ用のサンプル数
+# 推論時の最大生成トークン数
+MAX_NEW_TOKENS = 100
 # 使用するデータセットの指定
 SEM_SEG_DATA = "ade20k||cocostuff||mapillary||pascal_part||paco_lvis"
 REFER_SEG_DATA = "refclef||refcoco||refcoco+||refcocog"

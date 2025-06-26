@@ -57,13 +57,17 @@ def get_config():
         raise SystemExit("config_linux.pyが必須です。ファイルが存在することを確認してください。")
 
 def parse_args():
+    # config_linux.pyから設定を取得
+    config = get_config()
+    
     parser = argparse.ArgumentParser(description="エンドツーエンド推論パイプライン検証")
     parser.add_argument("--dataset_type", type=str, default="reason_seg", 
                        choices=["sem_seg", "refer_seg", "vqa", "reason_seg"],
                        help="テストに使用するデータセットタイプ")
     parser.add_argument("--num_samples", type=int, default=3, 
                        help="テストするサンプル数")
-    parser.add_argument("--max_new_tokens", type=int, default=100,
+    parser.add_argument("--max_new_tokens", type=int, 
+                       default=getattr(config, 'MAX_NEW_TOKENS', 100),
                        help="生成する最大トークン数")
     parser.add_argument("--pretrained_from_overfit", action="store_true",
                        help="過学習テストで学習したモデル状態を使用")
@@ -191,12 +195,20 @@ def load_single_sample(config, dataset_type: str, sample_idx: int = 0):
         getattr(config, 'GEMMA_MODEL_ID', 'google/gemma-3-4b-it')
     )
     
+    # A10 24GB制約対応: サンプル数調整
+    samples_per_epoch = 10
+    if torch.cuda.is_available():
+        gpu_memory_gb = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+        if gpu_memory_gb < 25:  # A10 (24GB) 検出
+            samples_per_epoch = 5  # A10では少なめに設定
+            print(f"  ⚠️  A10 GPU検出 ({gpu_memory_gb:.1f}GB): サンプル数を調整")
+    
     # データセットの準備
     dataset = HybridDataset(
         base_image_dir=getattr(config, 'DATASET_BASE_DIR', './dataset'),
         gemma_processor=processor,
         dataset=dataset_type,
-        samples_per_epoch=10  # 十分な数から選択
+        samples_per_epoch=samples_per_epoch
     )
     
     if sample_idx >= len(dataset):
@@ -236,6 +248,13 @@ def run_inference_pipeline(model, sample, device, max_new_tokens=100):
     print(f"  - max_new_tokens: {max_new_tokens}")
     print(f"  - デバイス: {device}")
     print(f"  - モデルモード: {'train' if model.training else 'eval'}")
+    
+    # A10 24GB制約対応: メモリクリーンアップ
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        gpu_memory_gb = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+        if gpu_memory_gb < 25:  # A10 (24GB) 検出
+            print(f"  ⚠️  A10 GPU検出: メモリクリーンアップ実行")
     
     start_time = time.time()
     
@@ -331,6 +350,12 @@ def run_inference_pipeline(model, sample, device, max_new_tokens=100):
         print(f"   推論時間: {inference_time:.2f}秒")
         print(f"   デバイス: {device}")
         print(f"   モデルモード: {'train' if model.training else 'eval'}")
+        
+        # A10対応: エラー時のメモリクリーンアップ
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            print(f"🧹 GPU メモリクリーンアップ実行")
+        
         raise SystemExit(f"推論エラー: {e}")
 
 def visualize_inference_result(original_data, pred_mask, image_path, sample_idx, session_timestamp):
@@ -491,7 +516,22 @@ def main():
     # デバイス設定
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"使用デバイス: {device}")
-    print(f"テスト設定:")
+    
+    # GPU情報表示（A10対応）
+    if torch.cuda.is_available():
+        gpu_name = torch.cuda.get_device_name(0)
+        gpu_memory_gb = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+        print(f"GPU情報: {gpu_name} ({gpu_memory_gb:.1f}GB)")
+        if gpu_memory_gb < 25:
+            print(f"  ⚠️  A10制約対応モード有効")
+    
+    print(f"📋 設定情報 (config_linux.py):")
+    print(f"  - データセットベースディレクトリ: {getattr(config, 'DATASET_BASE_DIR', 'N/A')}")
+    print(f"  - Gemmaモデル: {getattr(config, 'GEMMA_MODEL_ID', 'N/A')}")
+    print(f"  - SAMチェックポイント: {getattr(config, 'SAM_CHECKPOINT_PATH', 'N/A')}")
+    print(f"  - 最大シーケンス長: {getattr(config, 'MODEL_MAX_LENGTH', 'N/A')}")
+    
+    print(f"🎯 テスト設定:")
     print(f"  - データセットタイプ: {args.dataset_type}")
     print(f"  - テストサンプル数: {args.num_samples}")
     print(f"  - 最大生成トークン数: {args.max_new_tokens}")
