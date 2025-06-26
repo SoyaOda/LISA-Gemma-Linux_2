@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-第1節：データセット構築と完全性の検証 (HybridDataset)
+LISA-Gemma Dataset Integrity Verification
+Lambda Cloud最適化版 - 軽量化とライブラリ遅延読み込み
 
 HybridDatasetが各サブデータセットを正しく処理し、意図した通りの学習サンプルを生成しているかを
 目視で確認するための検証スクリプト。
@@ -11,38 +12,43 @@ HybridDatasetが各サブデータセットを正しく処理し、意図した�
 - 各データソースの「意味的意図」が最終的な学習サンプル形式で正しく保持されているかを保証
 """
 
-import argparse
 import os
 import sys
-import random
-import json
-from collections import defaultdict
+import argparse
 from datetime import datetime
+from pathlib import Path
 
-import torch
-from torchvision.transforms import ToPILImage
-from PIL import Image
-import matplotlib
-matplotlib.use('Agg')  # バックエンドを非対話型に設定
-import matplotlib.pyplot as plt
-import numpy as np
+# 軽量なライブラリのみ先に読み込み
+import json
+
+# 重いライブラリは遅延読み込み（必要時のみ）
+# import torch  # 遅延読み込み
+# import numpy as np  # 遅延読み込み
+# import matplotlib.pyplot as plt  # 遅延読み込み
+# from PIL import Image  # 遅延読み込み
+# from torchvision.transforms import ToPILImage  # 遅延読み込み
+
+print("🚀 LISA-Gemma Dataset Integrity Verification (Lambda Cloud Optimized)")
+print("📦 基本ライブラリ読み込み完了")
 
 # プロジェクトのルートディレクトリをsys.pathに追加
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 def get_config():
-    """動的設定読み込み"""
-    config_candidates = ['config_linux', 'config_small_test']
-    
-    for config_name in config_candidates:
-        try:
-            config_module = __import__(config_name)
-            print(f"✓ 設定ファイルを使用: {config_name}")
-            return config_module
-        except ImportError:
-            continue
-    
-    raise ImportError("利用可能な設定ファイルが見つかりません")
+    """
+    config_linux.pyを必須として読み込む
+    読み込めない場合はエラーで停止
+    """
+    try:
+        import config_linux as config
+        print(f"✅ 設定ファイルを読み込み: config_linux.py")
+        return config
+    except ImportError as e:
+        print(f"❌ ERROR: config_linux.pyが見つかりません")
+        print(f"   詳細: {e}")
+        print(f"   現在のディレクトリ: {os.getcwd()}")
+        print(f"   ファイル存在確認: {os.path.exists('config_linux.py')}")
+        raise SystemExit("config_linux.pyが必須です。ファイルが存在することを確認してください。")
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Verify HybridDataset Integrity")
@@ -112,8 +118,9 @@ def save_comparison_image(image_tensor, mask_tensor, dataset_name, sample_idx,
                 img_width, img_height = image.size
                 
                 # マスクをPILでリサイズ
-                mask_pil = Image.fromarray((mask * 255).astype(np.uint8), mode='L')
+                mask_pil = Image.fromarray((mask * 255).astype('uint8'), mode='L')
                 mask_resized = mask_pil.resize((img_width, img_height), Image.NEAREST)
+                import numpy as np
                 mask = np.array(mask_resized) / 255.0
         
         # 比較画像作成（画面表示なし）
@@ -139,6 +146,7 @@ def save_comparison_image(image_tensor, mask_tensor, dataset_name, sample_idx,
         if mask is not None and mask.ndim == 2:
             # マスクと画像のサイズが一致することを確認
             if mask.shape[:2] == (image.size[1], image.size[0]):
+                import numpy as np
                 mask_colored = np.zeros((*mask.shape, 4))
                 mask_colored[mask > 0.1] = [1, 0, 0, 0.6]  # 赤色半透明
                 axes[2].imshow(mask_colored)
@@ -173,7 +181,6 @@ def save_comparison_image(image_tensor, mask_tensor, dataset_name, sample_idx,
         }
         
         metadata_filename = os.path.join(output_dir, f"{base_filename}_metadata.json")
-        import json
         with open(metadata_filename, 'w', encoding='utf-8') as f:
             json.dump(metadata, f, ensure_ascii=False, indent=2)
         
@@ -185,7 +192,20 @@ def save_comparison_image(image_tensor, mask_tensor, dataset_name, sample_idx,
         traceback.print_exc()
         return None, None
 
-
+def load_heavy_libraries():
+    """重いライブラリを必要時に読み込む"""
+    print("📦 重いライブラリを読み込み中...")
+    global torch, np, plt, Image, ToPILImage
+    
+    import torch
+    import numpy as np
+    import matplotlib
+    matplotlib.use('Agg')  # バックエンドを非対話型に設定
+    import matplotlib.pyplot as plt
+    from PIL import Image
+    from torchvision.transforms import ToPILImage
+    
+    print("✅ PyTorch, NumPy, Matplotlib読み込み完了")
 
 def main():
     args = parse_args()
@@ -194,53 +214,64 @@ def main():
     # セッションタイムスタンプの生成
     session_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     
-    print("🔍 LISA-Gemma Dataset Integrity Verification")
+    print("\n🔍 LISA-Gemma Dataset Integrity Verification")
     print("=" * 60)
     print(f"🚀 検証セッション開始: {session_timestamp}")
     print(f"📁 出力ディレクトリ: verification_output/session_{session_timestamp}/")
     print("=" * 60)
     
+    # 重いライブラリを必要時に読み込み
+    load_heavy_libraries()
+    
     # 個別データセットクラスを使用した検証
     try:
+        print("📦 データセットクラスを読み込み中...")
         from utils.sem_seg_dataset import SemSegDataset
         from utils.refer_seg_dataset import ReferSegDataset
         from utils.vqa_dataset import VQADataset
         from utils.reason_seg_dataset import ReasonSegDataset
         
+        print("✅ データセットクラス読み込み完了")
         print(f"📦 個別データセット初期化中...")
         
-        # データセット設定
+        # データセット設定（config_linux.pyから統一管理）
+        print(f"📋 設定情報:")
+        print(f"   データセットベースディレクトリ: {config.DATASET_BASE_DIR}")
+        print(f"   SAMチェックポイント: {config.SAM_CHECKPOINT_PATH}")
+        print(f"   バッチサイズ: {config.BATCH_SIZE_PER_GPU}")
+        print(f"   勾配蓄積ステップ: {config.GRADIENT_ACCUMULATION_STEPS}")
+        
         dataset_configs = []
         if "sem_seg" in args.datasets:
             dataset_configs.append(("sem_seg", SemSegDataset, {
                 "base_image_dir": config.DATASET_BASE_DIR,
                 "tokenizer": None,
-                "samples_per_epoch": 50,
-                "sem_seg_data": getattr(config, 'SEM_SEG_DATA', "ade20k")
+                "samples_per_epoch": getattr(config, 'SAMPLES_PER_EPOCH', 50),
+                "sem_seg_data": config.SEM_SEG_DATA
             }))
         
         if "refer_seg" in args.datasets:
             dataset_configs.append(("refer_seg", ReferSegDataset, {
                 "base_image_dir": config.DATASET_BASE_DIR,
                 "tokenizer": None,
-                "samples_per_epoch": 50,
-                "refer_seg_data": getattr(config, 'REFER_SEG_DATA', "refcoco")
+                "samples_per_epoch": getattr(config, 'SAMPLES_PER_EPOCH', 50),
+                "refer_seg_data": config.REFER_SEG_DATA
             }))
         
         if "vqa" in args.datasets:
             dataset_configs.append(("vqa", VQADataset, {
                 "base_image_dir": config.DATASET_BASE_DIR,
                 "tokenizer": None,
-                "samples_per_epoch": 50,
-                "vqa_data": getattr(config, 'VQA_DATA', "llava_instruct_150k")
+                "samples_per_epoch": getattr(config, 'SAMPLES_PER_EPOCH', 50),
+                "vqa_data": config.VQA_DATA
             }))
         
         if "reason_seg" in args.datasets:
             dataset_configs.append(("reason_seg", ReasonSegDataset, {
                 "base_image_dir": config.DATASET_BASE_DIR,
                 "tokenizer": None,
-                "samples_per_epoch": 50,
-                "reason_seg_data": getattr(config, 'REASON_SEG_DATA', "ReasonSeg|train")
+                "samples_per_epoch": getattr(config, 'SAMPLES_PER_EPOCH', 50),
+                "reason_seg_data": config.REASON_SEG_DATA
             }))
         
         # 各データセットを初期化して検証

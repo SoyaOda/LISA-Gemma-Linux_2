@@ -2,16 +2,16 @@ import os
 from pathlib import Path
 
 # ==============================================================================
-# 1. PATHS AND IDENTIFIERS - 仕様書準拠ハードコーディング
+# 1. PATHS AND IDENTIFIERS - Lambda Cloud環境対応
 # ==============================================================================
 # プロジェクトのルートディレクトリ
 PROJECT_ROOT = Path(__file__).parent
 
-# データセットのベースディレクトリ（仕様書準拠: 実際のパスをハードコーディング）
-DATASET_BASE_DIR = "/mnt/h/download/LISA-dataset/dataset"
+# データセットのベースディレクトリ（Lambda Cloud環境対応）
+DATASET_BASE_DIR = "/lambda/nfs/lisa-gemma-project-fs/data/dataset"
 
-# SAMチェックポイントパス（仕様書準拠: 実際のパスをハードコーディング）
-SAM_CHECKPOINT_PATH = "/mnt/c/Users/oda/foodlmm-llama/weights/sam_vit_h_4b8939.pth"
+# SAMチェックポイントパス（Lambda Cloud環境対応）
+SAM_CHECKPOINT_PATH = "/lambda/nfs/lisa-gemma-project-fs/data/weights/sam_vit_h_4b8939.pth"
 
 # Hugging Faceキャッシュディレクトリ（必要に応じて）
 HF_CACHE_DIR = os.environ.get('HF_HOME', None)
@@ -48,16 +48,29 @@ GEMMA_HIDDEN_SIZE = 2560
 # ==============================================================================
 # 4. 訓練ハイパーパラメータ
 # ==============================================================================
-# DeepSpeed設定ファイルで "auto" を使用するため、ここではコメントアウト。
-# TrainingArgumentsまたはdeepspeed configで直接設定することを推奨。
-# BATCH_SIZE_PER_GPU = 2
-# GRADIENT_ACCUMULATION_STEPS = 8
+# 基本的な学習パラメータ
 LEARNING_RATE = 1e-4
 EPOCHS = 10
 STEPS_PER_EPOCH = 500
 WEIGHT_DECAY = 1e-2
 BETA1 = 0.9
 BETA2 = 0.95
+
+# バッチサイズとアキュムレーション設定
+BATCH_SIZE_PER_GPU = 2  # GPU毎のバッチサイズ（LISA-Gemmaに最適化）
+GRADIENT_ACCUMULATION_STEPS = 8  # 勾配蓄積ステップ（実効バッチサイズ = BATCH_SIZE_PER_GPU * GRADIENT_ACCUMULATION_STEPS * GPU数）
+
+# システム設定
+MIXED_PRECISION = True  # 混合精度学習を有効化（bf16）
+GRADIENT_CHECKPOINTING = True  # メモリ効率化のための勾配チェックポイント
+DATALOADER_NUM_WORKERS = 4  # データローダーのワーカー数
+
+# 最適化設定
+WARMUP_STEPS = 100  # ウォームアップステップ数
+WARMUP_RATIO = 0.1  # ウォームアップ比率（WARMUP_STEPSが未設定の場合）
+SAVE_STEPS = 500  # チェックポイント保存間隔
+LOGGING_STEPS = 10  # ログ出力間隔
+EVAL_STEPS = 500  # 評価実行間隔
 
 # 損失関数の重み
 CE_LOSS_WEIGHT = 1.0
@@ -89,6 +102,8 @@ LORA_TARGET_MODULES = [
 # ==============================================================================
 # データセットの混合比率
 DATASET_SAMPLE_RATES = "9,3,3,1"  # sem_seg, refer_seg, vqa, reason_seg
+# 各データセットのエポック毎サンプル数
+SAMPLES_PER_EPOCH = 500  # 検証・デバッグ用のサンプル数
 # 使用するデータセットの指定
 SEM_SEG_DATA = "ade20k||cocostuff||mapillary||pascal_part||paco_lvis"
 REFER_SEG_DATA = "refclef||refcoco||refcoco+||refcocog"
