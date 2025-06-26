@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-第4節：損失計算と勾配伝播の精査
+第4節：損失計算と勾配伝播の精査 (Lambda Cloud最適化)
 
 1回の完全な学習ステップ（フォワードパスとバックワードパス）を実行し、
 全ての学習可能パラメータグループの勾配を検査することで、
@@ -17,17 +17,16 @@ import os
 import sys
 from datetime import datetime
 
-import torch
-from torch.utils.data import DataLoader
-from torch.optim import AdamW
-from transformers import AutoProcessor
+print("🚀 LISA-Gemma Loss and Gradients Verification (Lambda Cloud Optimized)")
+
+# 重いライブラリは遅延読み込み
+# import torch  # 遅延読み込み
+# from torch.utils.data import DataLoader  # 遅延読み込み
+# from torch.optim import AdamW  # 遅延読み込み
+# from transformers import AutoProcessor  # 遅延読み込み
 
 # プロジェクトのルートディレクトリをsys.pathに追加
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
-from model.gemma_lisa import LisaGemmaForCausalLM
-from model.losses import CompositeLoss
-from utils.dataset import HybridDataset, collate_fn
 
 def get_config():
     """
@@ -36,7 +35,7 @@ def get_config():
     """
     try:
         import config_linux as config
-        print(f"設定: config_linux.py を使用")
+        print(f"✅ 設定ファイルを読み込み: config_linux.py")
         return config
     except ImportError as e:
         print(f"❌ ERROR: config_linux.pyが見つかりません")
@@ -44,6 +43,24 @@ def get_config():
         print(f"   現在のディレクトリ: {os.getcwd()}")
         print(f"   ファイル存在確認: {os.path.exists('config_linux.py')}")
         raise SystemExit("config_linux.pyが必須です。ファイルが存在することを確認してください。")
+
+def load_heavy_libraries():
+    """重いライブラリを必要時に読み込む"""
+    print("📦 重いライブラリを読み込み中...")
+    global torch, DataLoader, AdamW, AutoProcessor
+    global LisaGemmaForCausalLM, LisaGemmaConfig, CompositeLoss, HybridDataset, collate_fn
+    global LoraConfig, get_peft_model
+    
+    import torch
+    from torch.utils.data import DataLoader
+    from torch.optim import AdamW
+    from transformers import AutoProcessor
+    from model.gemma_lisa import LisaGemmaForCausalLM, LisaGemmaConfig
+    from model.losses import CompositeLoss
+    from utils.dataset import HybridDataset, collate_fn
+    from peft import LoraConfig, get_peft_model
+    
+    print("✅ PyTorch, Transformers, LISA-Gemma, PEFT読み込み完了")
 
 def parse_args():
     parser = argparse.ArgumentParser(description="損失計算と勾配伝播の検証")
@@ -90,11 +107,22 @@ def analyze_gradients(model, param_groups):
 
 def main():
     args = parse_args()
-    config = get_config()
     
     print("="*80)
     print("第4節: 損失計算と勾配伝播の精査")
     print("="*80)
+    
+    # 重いライブラリを読み込み
+    load_heavy_libraries()
+    
+    # 設定読み込み
+    config = get_config()
+    print(f"✅ 設定読み込み完了")
+    print(f"  Gemmaモデル: {config.GEMMA_MODEL_ID}")
+    print(f"  データセットベースディレクトリ: {config.DATASET_BASE_DIR}")
+    print(f"  バッチサイズ: {config.BATCH_SIZE_PER_GPU}")
+    print(f"  LoRA設定: r={config.LORA_R}, alpha={config.LORA_ALPHA}")
+    print(f"  損失重み: CE={getattr(config, 'CE_LOSS_WEIGHT', 1.0)}, DICE={getattr(config, 'DICE_LOSS_WEIGHT', 0.5)}, BCE={getattr(config, 'BCE_LOSS_WEIGHT', 2.0)}")
     
     # デバイス設定
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -104,18 +132,15 @@ def main():
         # 1. モデルの初期化
         print("\n📦 モデルを初期化中...")
         
-        # LisaGemmaモデルの初期化
-        from model.gemma_lisa import LisaGemmaConfig
-        
         lisa_config = LisaGemmaConfig(
-            gemma_model_id=getattr(config, 'GEMMA_MODEL_ID', 'google/gemma-3-4b-it'),
-            sam_checkpoint_path=getattr(config, 'SAM_CHECKPOINT_PATH', None),
-            seg_token=getattr(config, 'SEG_TOKEN', '[SEG]'),
-            gemma_hidden_size=getattr(config, 'GEMMA_HIDDEN_SIZE', 2560),
-            sam_prompt_embed_dim=getattr(config, 'SAM_PROMPT_EMBED_DIM', 256),
-            gemma_image_size=getattr(config, 'GEMMA_IMAGE_SIZE', 896),
-            sam_image_size=getattr(config, 'SAM_IMAGE_SIZE', 1024),
-            model_max_length=getattr(config, 'MODEL_MAX_LENGTH', 2048),
+            gemma_model_id=config.GEMMA_MODEL_ID,
+            sam_checkpoint_path=config.SAM_CHECKPOINT_PATH,
+            seg_token=config.SEG_TOKEN,
+            gemma_hidden_size=config.GEMMA_HIDDEN_SIZE,
+            sam_prompt_embed_dim=config.SEG_PROJECTION_DIM,
+            gemma_image_size=config.GEMMA_IMAGE_SIZE,
+            sam_image_size=config.SAM_IMAGE_SIZE,
+            model_max_length=config.MODEL_MAX_LENGTH,
         )
         
         model = LisaGemmaForCausalLM(lisa_config)
@@ -124,8 +149,6 @@ def main():
         # LoRA設定を適用（最適化後の設定で検証するため）
         print("\n🔧 LoRA設定を適用中...")
         try:
-            from peft import LoraConfig, get_peft_model
-            
             lora_config = LoraConfig(
                 r=config.LORA_R,
                 lora_alpha=config.LORA_ALPHA,
@@ -193,13 +216,17 @@ def main():
             base_image_dir=config.DATASET_BASE_DIR,
             gemma_processor=processor,
             dataset='reason_seg',  # セグメンテーションタスクを含むデータセット
-            samples_per_epoch=10  # 少数のサンプル
+            samples_per_epoch=4  # より少数のサンプル（メモリ最適化）
         )
         
-        # DataCollatorの準備
+        # DataCollatorの準備（メモリ最適化のため小さなバッチサイズ）
+        # A10 24GBでは通常のバッチサイズ（2）だと不足する可能性があるため1に削減
+        batch_size = 1 if torch.cuda.get_device_properties(0).total_memory < 25 * 1024**3 else config.BATCH_SIZE_PER_GPU
+        print(f"  メモリ最適化バッチサイズ: {batch_size}")
+        
         dataloader = DataLoader(
             dataset,
-            batch_size=2,
+            batch_size=batch_size,
             collate_fn=collate_fn,
             shuffle=False
         )
@@ -209,7 +236,7 @@ def main():
         # 3. オプティマイザーの準備
         optimizer = AdamW(model.parameters(), lr=1e-5)
         
-        # 4. 損失関数の準備
+        # 4. 損失関数の準備（config_linux.pyの重みを使用）
         loss_fn = CompositeLoss(
             ce_loss_weight=getattr(config, 'CE_LOSS_WEIGHT', 1.0),
             dice_loss_weight=getattr(config, 'DICE_LOSS_WEIGHT', 0.5),
@@ -244,6 +271,12 @@ def main():
         
         print("✅ フォワードパス完了")
         
+        # メモリ使用量の確認
+        if torch.cuda.is_available():
+            allocated_memory = torch.cuda.memory_allocated(device) / 1024**3
+            reserved_memory = torch.cuda.memory_reserved(device) / 1024**3
+            print(f"  GPU メモリ使用量: {allocated_memory:.2f}GB / {reserved_memory:.2f}GB (予約済み)")
+        
         # 6. 損失計算
         print("\n[損失計算チェック]:")
         
@@ -275,6 +308,12 @@ def main():
         total_loss.backward()
         
         print("✅ バックワードパス完了")
+        
+        # バックワードパス後のメモリ使用量確認
+        if torch.cuda.is_available():
+            allocated_memory = torch.cuda.memory_allocated(device) / 1024**3
+            reserved_memory = torch.cuda.memory_reserved(device) / 1024**3
+            print(f"  バックワードパス後 GPU メモリ使用量: {allocated_memory:.2f}GB / {reserved_memory:.2f}GB (予約済み)")
         
         # 8. 勾配の検査
         print("\n[パラメータグループごとの勾配検査]:")
@@ -351,6 +390,11 @@ def main():
             print(f"  - 正解マスクの形状: {batch['ground_truth_mask'].shape}")
         else:
             print("  - 正解マスク: なし")
+        
+        # メモリクリーンアップ
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            print(f"\n🧹 GPU メモリクリーンアップ完了")
         
         print("\n🎉 第4節検証完了: 損失計算と勾配伝播の精査")
         print(f"🕐 完了時刻: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
