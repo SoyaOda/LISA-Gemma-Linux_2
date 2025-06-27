@@ -26,14 +26,17 @@ cd ~/LISA-Gemma-Linux
 # 2. 環境の健全性チェック
 python lambda_dev_utils.py check
 
-# 3. Lambda Cloud接続テスト
-ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "echo 'Lambda Cloud接続OK'"
+# 3. 【必須】Hugging Face認証設定（初回必須）
+# ローカルにhf_token.txtがある場合（推奨）
+python lambda_dev_utils.py setup_hf --ip YOUR_LAMBDA_IP
+# Tokenを直接指定する場合
+# python lambda_dev_utils.py setup_hf hf_YOUR_TOKEN --ip YOUR_LAMBDA_IP
 
 # 4. 統一設定の確認
 python config_linux.py
 
 # 5. 検証スクリプトで環境確認（推奨）
-ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "cd /lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux && source ../../venvs/lisa_gemma_venv/bin/activate && python verify_config_and_setup.py"
+ssh -i ~/.ssh/lambda_cloud_key ubuntu@YOUR_LAMBDA_IP "cd /lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux && source ../../venvs/lisa_gemma_venv/bin/activate && python verify_config_and_setup.py"
 ```
 
 ### 1. 基本セットアップ
@@ -74,7 +77,8 @@ python lambda_dev_utils.py monitor
 | コマンド | 実行場所 | 説明 | 例 |
 |---------|---------|------|-----|
 | `check` | ローカル | 環境の健全性チェック | `python lambda_dev_utils.py check` |
-| `setup_hf` | ローカル | Hugging Face Token設定 | `python lambda_dev_utils.py setup_hf hf_xxx` |
+| `setup_hf` | ローカル | Hugging Face Token設定 | `python lambda_dev_utils.py setup_hf --ip IP` |
+| `sync_token` | ローカル | hf_token.txt転送 | `python lambda_dev_utils.py sync_token --ip IP` |
 | `sync` | ローカル | コード同期 | `python lambda_dev_utils.py sync` |
 | `validate` | ローカル | 検証スクリプト実行 | `python lambda_dev_utils.py validate` |
 | `train` | ローカル | 学習実行（tmux） | `python lambda_dev_utils.py train train_ds.py` |

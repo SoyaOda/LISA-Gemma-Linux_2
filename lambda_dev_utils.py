@@ -473,6 +473,30 @@ def check_hf_auth():
         print("❌ Hugging Face未認証")
         return False
 
+def sync_hf_token(lambda_ip=None):
+    """hf_token.txtファイルをLambda Cloudに転送"""
+    if lambda_ip is None:
+        lambda_ip = get_lambda_ip()
+    
+    if not os.path.exists(HF_TOKEN_FILE):
+        print(f"❌ Tokenファイルが見つかりません: {HF_TOKEN_FILE}")
+        print("💡 まず、Hugging Face Tokenをhf_token.txtファイルに保存してください")
+        return False
+    
+    print(f"📤 {HF_TOKEN_FILE}をLambda Cloudに転送中...")
+    
+    rsync_cmd = f"""rsync -avz -e "ssh -i {SSH_KEY}" {HF_TOKEN_FILE} {LAMBDA_USER}@{lambda_ip}:{CODE_PATH}/"""
+    
+    result = subprocess.run(rsync_cmd, shell=True)
+    if result.returncode == 0:
+        print("✅ Tokenファイル転送完了")
+        print("💡 次に以下のコマンドでHugging Face認証を設定してください：")
+        print(f"   python lambda_dev_utils.py setup_hf --ip {lambda_ip}")
+        return True
+    else:
+        print("❌ Tokenファイル転送失敗")
+        return False
+
 def main():
     """メイン関数"""
     if len(sys.argv) < 2:
@@ -489,6 +513,7 @@ def main():
         print("  validate    - エンドツーエンド検証テスト")
         print("  emergency   - 緊急停止（全tmuxセッション終了）")
         print("  setup_hf    - Hugging Face Tokenを設定")
+        print("  sync_token  - hf_token.txtをLambda Cloudに転送")
         print("")
         print("オプション:")
         print("  --ip IP_ADDRESS  - Lambda Cloud IPアドレスを指定")
@@ -498,6 +523,8 @@ def main():
         print("  python lambda_dev_utils.py check --ip 150.136.114.187")
         print("  python lambda_dev_utils.py train train_ds.py --ip 150.136.47.58")
         print("  python lambda_dev_utils.py setup_hf hf_xxxxxxx")
+        print("  python lambda_dev_utils.py setup_hf")
+        print("  python lambda_dev_utils.py sync_token --ip 129.213.22.187")
         return
     
     # IPアドレスの処理
@@ -570,11 +597,21 @@ def main():
         emergency_stop()
     
     elif command == "setup_hf":
-        if len(args) < 2:
-            print("❌ Hugging Face Tokenを指定してください")
-            return
-        token = args[1]
-        setup_hf_token(token)
+        if len(args) >= 2:
+            # コマンドライン引数からToken指定
+            token = args[1]
+            setup_hf_token(token)
+        else:
+            # hf_token.txtファイルから自動読取り
+            print("📄 hf_token.txtファイルから自動読取り中...")
+            if setup_hf_token():
+                print("✅ Hugging Face認証設定完了")
+            else:
+                print("❌ 認証設定に失敗しました")
+                print("💡 使用方法: python lambda_dev_utils.py setup_hf <your_token>")
+    
+    elif command == "sync_token":
+        sync_hf_token()
     
     else:
         print(f"❌ 不明なコマンド: {command}")
