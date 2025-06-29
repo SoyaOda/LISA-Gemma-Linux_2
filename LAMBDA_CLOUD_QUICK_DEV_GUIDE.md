@@ -8,10 +8,10 @@
 # お好みのエディタで編集
 
 # 2. Lambda Cloudに転送
-rsync -avz --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='.gitignore' -e "ssh -i ~/.ssh/lambda_cloud_key" your_file.py ubuntu@150.136.47.58:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/
+rsync -avz --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='.gitignore' -e "ssh -i ~/.ssh/lambda_cloud_key" your_file.py ubuntu@150.136.36.116:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/
 
 # 3. Lambda Cloud上で実行
-ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "cd /lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux && source ../../venvs/lisa_gemma_venv/bin/activate && export TF_CPP_MIN_LOG_LEVEL=3 && export TF_ENABLE_ONEDNN_OPTS=0 && timeout 600 python your_file.py"
+ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.36.116 "cd /lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux && source ../../venvs/lisa_gemma_venv/bin/activate && export TF_CPP_MIN_LOG_LEVEL=3 && export TF_ENABLE_ONEDNN_OPTS=0 && timeout 600 python your_file.py"
 ```
 
 ## 🚀 GPU借用後の初期セットアップ
@@ -19,18 +19,36 @@ ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "cd /lambda/nfs/lisa-gemma-p
 ### 1. Lambda Cloud GPU インスタンス起動
 - On-demand 1x NVIDIA A10 (24GB) を選択
 - **重要**: `lisa-gemma-project-fs` Persistent Filesystemを必ずアタッチ
-- IP: `150.136.47.58` (例)
+- IP: `150.136.36.116` (例)
 
 ### 2. SSH接続確認
 ```bash
 # 接続テスト
-ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "echo 'Lambda Cloud接続OK'"
+ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.36.116 "echo 'Lambda Cloud接続OK'"
 ```
 
 ### 3. 環境確認
 ```bash
 # Python環境とGPU確認
-ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "source /lambda/nfs/lisa-gemma-project-fs/venvs/lisa_gemma_venv/bin/activate && python --version && nvidia-smi"
+ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.36.116 "source /lambda/nfs/lisa-gemma-project-fs/venvs/lisa_gemma_venv/bin/activate && python --version && nvidia-smi"
+```
+
+### 4. Hugging Face認証設定（初回必須）
+```bash
+# lambda_dev_utils.pyを使用してHugging Face認証を設定（推奨）
+python lambda_dev_utils.py setup_hf --ip YOUR_LAMBDA_IP
+
+# 認証確認
+ssh -i ~/.ssh/lambda_cloud_key ubuntu@YOUR_LAMBDA_IP "cd /lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux && source ../../venvs/lisa_gemma_venv/bin/activate && huggingface-cli whoami"
+```
+
+### 5. WandB認証設定（初回必須）
+```bash
+# lambda_dev_utils.pyを使用してWandB認証を設定（推奨）
+python lambda_dev_utils.py setup_wandb --ip YOUR_LAMBDA_IP
+
+# 認証確認
+ssh -i ~/.ssh/lambda_cloud_key ubuntu@YOUR_LAMBDA_IP "cd /lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux && source ../../venvs/lisa_gemma_venv/bin/activate && wandb status"
 ```
 
 ## 📝 実践的な開発例
@@ -41,10 +59,10 @@ ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "source /lambda/nfs/lisa-gem
 # VSCode、Cursor等で編集
 
 # 2. 転送
-rsync -avz --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='.gitignore' -e "ssh -i ~/.ssh/lambda_cloud_key" verify_loss_and_gradients.py ubuntu@150.136.47.58:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/
+rsync -avz --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='.gitignore' -e "ssh -i ~/.ssh/lambda_cloud_key" verify_loss_and_gradients.py ubuntu@150.136.36.116:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/
 
 # 3. 実行（タイムアウト付き）
-ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "cd /lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux && source ../../venvs/lisa_gemma_venv/bin/activate && export TF_CPP_MIN_LOG_LEVEL=3 && export TF_ENABLE_ONEDNN_OPTS=0 && timeout 600 python verify_loss_and_gradients.py"
+ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.36.116 "cd /lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux && source ../../venvs/lisa_gemma_venv/bin/activate && export TF_CPP_MIN_LOG_LEVEL=3 && export TF_ENABLE_ONEDNN_OPTS=0 && timeout 600 python verify_loss_and_gradients.py"
 ```
 
 ### 例2: 学習スクリプトの開発・実行
@@ -52,16 +70,16 @@ ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "cd /lambda/nfs/lisa-gemma-p
 # 1. ローカルでtrain_ds.pyを編集
 
 # 2. 転送
-rsync -avz --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='.gitignore' -e "ssh -i ~/.ssh/lambda_cloud_key" train_ds.py ubuntu@150.136.47.58:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/
+rsync -avz --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='.gitignore' -e "ssh -i ~/.ssh/lambda_cloud_key" train_ds.py ubuntu@150.136.36.116:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/
 
 # 3. tmuxセッションで長時間実行
-ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "cd /lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux && source ../../venvs/lisa_gemma_venv/bin/activate && tmux new-session -d -s training 'export TF_CPP_MIN_LOG_LEVEL=3 && export TF_ENABLE_ONEDNN_OPTS=0 && python train_ds.py'"
+ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.36.116 "cd /lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux && source ../../venvs/lisa_gemma_venv/bin/activate && tmux new-session -d -s training 'export TF_CPP_MIN_LOG_LEVEL=3 && export TF_ENABLE_ONEDNN_OPTS=0 && python train_ds.py'"
 ```
 
 ### 例3: 複数ファイル同時転送
 ```bash
 # 複数ファイルを一度に転送
-rsync -avz --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='.gitignore' -e "ssh -i ~/.ssh/lambda_cloud_key" config_linux.py train_ds.py model/gemma_lisa.py ubuntu@150.136.47.58:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/
+rsync -avz --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='.gitignore' -e "ssh -i ~/.ssh/lambda_cloud_key" config_linux.py train_ds.py model/gemma_lisa.py ubuntu@150.136.36.116:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/
 ```
 
 ## 🔧 よく使うコマンド集
@@ -69,40 +87,40 @@ rsync -avz --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude=
 ### ファイル転送パターン
 ```bash
 # 個別ファイル
-rsync -avz --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='.gitignore' -e "ssh -i ~/.ssh/lambda_cloud_key" file.py ubuntu@150.136.47.58:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/
+rsync -avz --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='.gitignore' -e "ssh -i ~/.ssh/lambda_cloud_key" file.py ubuntu@150.136.36.116:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/
 
 # 複数ファイル
-rsync -avz --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='.gitignore' -e "ssh -i ~/.ssh/lambda_cloud_key" file1.py file2.py ubuntu@150.136.47.58:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/
+rsync -avz --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='.gitignore' -e "ssh -i ~/.ssh/lambda_cloud_key" file1.py file2.py ubuntu@150.136.36.116:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/
 
 # プロジェクト全体（時間がかかる）
-rsync -avz --progress --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='lambda_results' --exclude='.gitignore' -e "ssh -i ~/.ssh/lambda_cloud_key" ./ ubuntu@150.136.47.58:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/
+rsync -avz --progress --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='lambda_results' --exclude='.gitignore' -e "ssh -i ~/.ssh/lambda_cloud_key" ./ ubuntu@150.136.36.116:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/
 ```
 
 ### 実行パターン
 ```bash
 # 短時間実行（タイムアウト付き）
-ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "cd /lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux && source ../../venvs/lisa_gemma_venv/bin/activate && export TF_CPP_MIN_LOG_LEVEL=3 && export TF_ENABLE_ONEDNN_OPTS=0 && timeout 600 python script.py"
+ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.36.116 "cd /lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux && source ../../venvs/lisa_gemma_venv/bin/activate && export TF_CPP_MIN_LOG_LEVEL=3 && export TF_ENABLE_ONEDNN_OPTS=0 && timeout 600 python script.py"
 
 # 長時間実行（tmux使用）
-ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "cd /lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux && source ../../venvs/lisa_gemma_venv/bin/activate && tmux new-session -d -s training 'export TF_CPP_MIN_LOG_LEVEL=3 && export TF_ENABLE_ONEDNN_OPTS=0 && python long_script.py'"
+ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.36.116 "cd /lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux && source ../../venvs/lisa_gemma_venv/bin/activate && tmux new-session -d -s training 'export TF_CPP_MIN_LOG_LEVEL=3 && export TF_ENABLE_ONEDNN_OPTS=0 && python long_script.py'"
 
 # tmuxセッション確認
-ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "tmux list-sessions"
+ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.36.116 "tmux list-sessions"
 
 # tmuxセッション接続
-ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 -t "tmux attach-session -t training"
+ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.36.116 -t "tmux attach-session -t training"
 ```
 
 ### 監視・確認パターン
 ```bash
 # GPU使用状況
-ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "nvidia-smi"
+ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.36.116 "nvidia-smi"
 
 # ファイル存在確認
-ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "ls -la /lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/your_file.py"
+ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.36.116 "ls -la /lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/your_file.py"
 
 # プロセス確認
-ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "ps aux | grep python"
+ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.36.116 "ps aux | grep python"
 ```
 
 ## ⚡ 高速開発のコツ
@@ -111,17 +129,17 @@ ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "ps aux | grep python"
 ```bash
 # ~/.bashrcに追加
 alias lc-sync='rsync -avz --exclude=".git" --exclude="__pycache__" --exclude="*.pyc" --exclude=".gitignore" -e "ssh -i ~/.ssh/lambda_cloud_key"'
-alias lc-run='ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "cd /lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux && source ../../venvs/lisa_gemma_venv/bin/activate && export TF_CPP_MIN_LOG_LEVEL=3 && export TF_ENABLE_ONEDNN_OPTS=0 &&"'
+alias lc-run='ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.36.116 "cd /lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux && source ../../venvs/lisa_gemma_venv/bin/activate && export TF_CPP_MIN_LOG_LEVEL=3 && export TF_ENABLE_ONEDNN_OPTS=0 &&"'
 
 # 使用例
-lc-sync your_file.py ubuntu@150.136.47.58:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/
+lc-sync your_file.py ubuntu@150.136.36.116:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/
 lc-run timeout 600 python your_file.py
 ```
 
 ### 2. 開発サイクル最適化
 ```bash
 # 1回のコマンドで転送→実行
-rsync -avz --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='.gitignore' -e "ssh -i ~/.ssh/lambda_cloud_key" script.py ubuntu@150.136.47.58:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/ && ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.47.58 "cd /lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux && source ../../venvs/lisa_gemma_venv/bin/activate && export TF_CPP_MIN_LOG_LEVEL=3 && export TF_ENABLE_ONEDNN_OPTS=0 && python script.py"
+rsync -avz --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='.gitignore' -e "ssh -i ~/.ssh/lambda_cloud_key" script.py ubuntu@150.136.36.116:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/ && ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.36.116 "cd /lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux && source ../../venvs/lisa_gemma_venv/bin/activate && export TF_CPP_MIN_LOG_LEVEL=3 && export TF_ENABLE_ONEDNN_OPTS=0 && python script.py"
 ```
 
 ## 🚨 重要な注意点

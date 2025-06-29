@@ -70,6 +70,9 @@ def set_lambda_ip(ip):
 # Hugging Face Token設定
 HF_TOKEN_FILE = "hf_token.txt"
 
+# WandB API Key設定
+WANDB_API_KEY_FILE = "wandb_api_key.txt"
+
 def run_ssh_command(command, use_tmux=False, session_name=None, detach=False, timeout=None, lambda_ip=None):
     """SSH経由でコマンドを実行"""
     # IPアドレスの取得
@@ -334,6 +337,15 @@ def check_cloud():
     checks["HF認証"] = success
     print(f"   {'✅' if checks['HF認証'] else '❌'} Hugging Face認証")
     
+    # WandB認証をチェック
+    print("📋 WandB認証をチェック中...")
+    success, stdout, stderr = run_ssh_command(
+        f"source {VENV_PATH}/bin/activate && wandb status",
+        use_tmux=False
+    )
+    checks["WandB認証"] = success
+    print(f"   {'✅' if checks['WandB認証'] else '❌'} WandB認証")
+    
     print("\n📊 環境チェック結果:")
     print("=" * 30)
     for check_name, status in checks.items():
@@ -346,6 +358,8 @@ def check_cloud():
         print("\n⚠️  一部のチェックが失敗しています。修正が必要です。")
         if not checks.get("HF認証", False):
             print("💡 Hugging Face認証が必要です: python lambda_dev_utils.py setup_hf <your_token>")
+        if not checks.get("WandB認証", False):
+            print("💡 WandB認証が必要です: python lambda_dev_utils.py setup_wandb <your_api_key>")
         
     return all_passed
 
@@ -497,6 +511,77 @@ def sync_hf_token(lambda_ip=None):
         print("❌ Tokenファイル転送失敗")
         return False
 
+def setup_wandb_key(api_key=None):
+    """WandB API Keyを安全に設定"""
+    if api_key:
+        # ローカルにAPIキーファイルを作成（.gitignoreで除外済み）
+        with open(WANDB_API_KEY_FILE, 'w') as f:
+            f.write(api_key.strip())
+        print(f"✅ WandB API Keyをローカルに保存しました: {WANDB_API_KEY_FILE}")
+        
+        # Lambda CloudでWandBにログイン
+        print("🔐 Lambda CloudでWandBにログイン中...")
+        success, stdout, stderr = run_ssh_command(
+            f"source {VENV_PATH}/bin/activate && wandb login {api_key.strip()}",
+            use_tmux=False
+        )
+        if success:
+            print("✅ WandBログイン成功")
+            return True
+        else:
+            print("❌ WandBログイン失敗")
+            print(f"エラー出力: {stderr}")
+            print(f"標準出力: {stdout}")
+            return False
+    else:
+        # 既存のAPIキーファイルから読み込み
+        if os.path.exists(WANDB_API_KEY_FILE):
+            with open(WANDB_API_KEY_FILE, 'r') as f:
+                api_key = f.read().strip()
+            return setup_wandb_key(api_key)
+        else:
+            print(f"❌ API Keyファイルが見つかりません: {WANDB_API_KEY_FILE}")
+            print("使用方法: python lambda_dev_utils.py setup_wandb <your_api_key>")
+            return False
+
+def check_wandb_auth():
+    """WandB認証状態をチェック"""
+    print("🔐 WandB認証状態をチェック中...")
+    success, stdout, stderr = run_ssh_command(
+        f"source {VENV_PATH}/bin/activate && wandb status",
+        use_tmux=False
+    )
+    if success:
+        print("✅ WandB認証済み")
+        return True
+    else:
+        print("❌ WandB未認証")
+        return False
+
+def sync_wandb_token(lambda_ip=None):
+    """wandb_api_key.txtファイルをLambda Cloudに転送"""
+    if lambda_ip is None:
+        lambda_ip = get_lambda_ip()
+    
+    if not os.path.exists(WANDB_API_KEY_FILE):
+        print(f"❌ API Keyファイルが見つかりません: {WANDB_API_KEY_FILE}")
+        print("💡 まず、WandB API Keyをwandb_api_key.txtファイルに保存してください")
+        return False
+    
+    print(f"📤 {WANDB_API_KEY_FILE}をLambda Cloudに転送中...")
+    
+    rsync_cmd = f"""rsync -avz -e "ssh -i {SSH_KEY}" {WANDB_API_KEY_FILE} {LAMBDA_USER}@{lambda_ip}:{CODE_PATH}/"""
+    
+    result = subprocess.run(rsync_cmd, shell=True)
+    if result.returncode == 0:
+        print("✅ API Keyファイル転送完了")
+        print("💡 次に以下のコマンドでWandB認証を設定してください：")
+        print(f"   python lambda_dev_utils.py setup_wandb --ip {lambda_ip}")
+        return True
+    else:
+        print("❌ API Keyファイル転送失敗")
+        return False
+
 def main():
     """メイン関数"""
     if len(sys.argv) < 2:
@@ -514,6 +599,8 @@ def main():
         print("  emergency   - 緊急停止（全tmuxセッション終了）")
         print("  setup_hf    - Hugging Face Tokenを設定")
         print("  sync_token  - hf_token.txtをLambda Cloudに転送")
+        print("  setup_wandb - WandB API Keyを設定")
+        print("  sync_wandb  - wandb_api_key.txtをLambda Cloudに転送")
         print("")
         print("オプション:")
         print("  --ip IP_ADDRESS  - Lambda Cloud IPアドレスを指定")
@@ -525,6 +612,9 @@ def main():
         print("  python lambda_dev_utils.py setup_hf hf_xxxxxxx")
         print("  python lambda_dev_utils.py setup_hf")
         print("  python lambda_dev_utils.py sync_token --ip 129.213.22.187")
+        print("  python lambda_dev_utils.py setup_wandb a389f0xxxxxxx")
+        print("  python lambda_dev_utils.py setup_wandb")
+        print("  python lambda_dev_utils.py sync_wandb --ip 150.136.36.116")
         return
     
     # IPアドレスの処理
@@ -612,6 +702,23 @@ def main():
     
     elif command == "sync_token":
         sync_hf_token()
+    
+    elif command == "setup_wandb":
+        if len(args) >= 2:
+            # コマンドライン引数からAPI Key指定
+            api_key = args[1]
+            setup_wandb_key(api_key)
+        else:
+            # wandb_api_key.txtファイルから自動読取り
+            print("📄 wandb_api_key.txtファイルから自動読取り中...")
+            if setup_wandb_key():
+                print("✅ WandB認証設定完了")
+            else:
+                print("❌ 認証設定に失敗しました")
+                print("💡 使用方法: python lambda_dev_utils.py setup_wandb <your_api_key>")
+    
+    elif command == "sync_wandb":
+        sync_wandb_token()
     
     else:
         print(f"❌ 不明なコマンド: {command}")

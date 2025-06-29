@@ -147,6 +147,7 @@ wandb/
 
 # Sensitive files - DO NOT COMMIT
 hf_token.txt
+wandb_api_key.txt
 .hf_token
 *.token
 secrets/
