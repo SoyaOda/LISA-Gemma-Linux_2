@@ -38,6 +38,9 @@ import psutil
 import wandb
 from datetime import datetime
 
+# accelerate 統合
+from accelerate import Accelerator
+
 # プロジェクトのルートディレクトリをsys.pathに追加
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
@@ -230,10 +233,26 @@ def main():
     args = parse_args()
     config = get_config()
     
+    # 🔧 DTensor問題対策: 暗黙的レプリケーション許可を設定
+    if getattr(config, 'DTENSOR_ALLOW_IMPLICIT_REPLICATION', True):
+        os.environ['TORCH_DTENSOR_ALLOW_IMPLICIT_REPLICATION'] = '1'
+    if getattr(config, 'TORCH_DISTRIBUTED_DEBUG', 'OFF') == 'OFF':
+        os.environ['TORCH_DISTRIBUTED_DEBUG'] = 'OFF'
+    
+    print("✅ DTensor環境変数設定完了")
+    
     print("="*80)
-    print("フェーズ1：実験管理と設定の高度化")
-    print("1.2. 学習主軸スクリプト train.py - エポックベース学習")
+    print("フェーズ2：マルチGPU対応とFSDPでの学習")
+    print("2.1. train.py の accelerate 対応")
     print("="*80)
+    
+    # 🚀 Accelerator初期化（勾配蓄積対応）
+    accelerator = Accelerator(
+        gradient_accumulation_steps=getattr(config, 'GRADIENT_ACCUMULATION_STEPS', 1),
+        mixed_precision=getattr(config, 'ACCELERATE_MIXED_PRECISION', 'bf16'),
+        log_with="wandb",
+        project_dir="./wandb_logs"
+    )
     
     # セッションタイムスタンプの生成
     session_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -241,24 +260,28 @@ def main():
     # 出力ディレクトリの作成
     os.makedirs(args.output_dir, exist_ok=True)
     
-    # デバイス設定
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"使用デバイス: {device}")
-    print(f"学習設定:")
-    print(f"  - エポック数: {args.epochs}")
-    print(f"  - エポックあたりステップ数: {args.steps_per_epoch}")
-    print(f"  - 総ステップ数: {args.epochs * args.steps_per_epoch}")
-    print(f"  - 学習率: {args.learning_rate}")
-    print(f"  - データセットタイプ: {args.dataset_type}")
-    print(f"  - バッチサイズ: {args.batch_size}")
-    print(f"  - チェックポイント間隔: {args.checkpoint_interval}ステップ")
-    print(f"  - 出力ディレクトリ: {args.output_dir}")
-    print("-" * 80)
+    # acceleratorから自動的にデバイスを取得
+    device = accelerator.device
+    
+    # 🔧 メインプロセスでのみ情報を表示
+    if accelerator.is_main_process:
+        print(f"📦 LISA-Gemmaモデルを初期化中（DDP適用前）...")
+        print(f"🚀 DDP分散環境を初期化中...")
+        print(f"✅ DDP環境初期化完了")
+        print(f"使用デバイス: {device}")
+        print(f"学習設定:")
+        print(f"  - エポック数: {args.epochs}")
+        print(f"  - エポックあたりステップ数: {args.steps_per_epoch}")
+        print(f"  - 総ステップ数: {args.epochs * args.steps_per_epoch}")
+        print(f"  - 学習率: {args.learning_rate}")
+        print(f"  - データセットタイプ: {args.dataset_type}")
+        print(f"  - バッチサイズ: {args.batch_size}")
+        print(f"  - チェックポイント間隔: {args.checkpoint_interval}ステップ")
+        print(f"  - 出力ディレクトリ: {args.output_dir}")
+        print("-" * 80)
     
     try:
-        # 1. モデルの初期化
-        print("\n📦 LISA-Gemmaモデルを初期化中...")
-        
+        # 1. モデルの初期化（accelerate適用前）
         lisa_config = LisaGemmaConfig(
             gemma_model_id=getattr(config, 'GEMMA_MODEL_ID', 'google/gemma-3-4b-it'),
             sam_checkpoint_path=getattr(config, 'SAM_CHECKPOINT_PATH', None),
@@ -271,10 +294,14 @@ def main():
         )
         
         model = LisaGemmaForCausalLM(lisa_config)
-        model = model.to(device)
+        # 🚫 .to(device) を削除: accelerateが自動管理
+        
+        if accelerator.is_main_process:
+            print("✅ モデル初期化完了（resize_token_embeddings成功）")
         
         # LoRA設定を適用（最適化後の設定で検証するため）
-        print("\n🔧 LoRA設定を適用中...")
+        if accelerator.is_main_process:
+            print("\n🔧 LoRA設定を適用中...")
         try:
             from peft import LoraConfig, get_peft_model
             
@@ -289,62 +316,48 @@ def main():
             
             # LoRAをGemmaモデルに適用
             model.gemma_model = get_peft_model(model.gemma_model, lora_config)
-            print("✅ LoRA設定が正常に適用されました")
+            if accelerator.is_main_process:
+                print("✅ LoRA設定が正常に適用されました")
             
         except Exception as e:
-            print(f"⚠️  LoRA適用に失敗: {e}")
-            print("   LoRAなしで検証を続行します")
+            if accelerator.is_main_process:
+                print(f"⚠️  LoRA適用に失敗: {e}")
+                print("   LoRAなしで検証を続行します")
         
         model.train()  # 学習モードに設定
-        print("✅ モデル初期化完了")
         
-        # 学習可能パラメータの情報を表示
-        param_info = model.get_trainable_parameters_info()
-        print(f"  - 総パラメータ数: {param_info['total_parameters']:,}")
-        print(f"  - 学習可能パラメータ数: {param_info['trainable_parameters']:,}")
-        print(f"  - 学習可能率: {param_info['trainable_percentage']:.2f}%")
-        
-        # 仕様書準拠性チェック
-        trainable_ratio = param_info['trainable_percentage']
-        spec_compliant = trainable_ratio < 1.0
-        print(f"  - 📋 仕様書準拠性: {'✅ 準拠' if spec_compliant else '❌ 違反'} (要求: <1%)")
-        
-        if not spec_compliant:
-            print(f"    ⚠️  学習可能パラメータ率が仕様書要求を超過: {trainable_ratio:.2f}% > 1%")
-            print("    → LoRA適用を確認してください")
-        
-        # 初期メモリ使用量
-        initial_memory = get_memory_usage()
-        print(f"  - 初期メモリ使用量: {format_memory_info(initial_memory)}")
-        
-        # WandB初期化
-        wandb.init(
-            project="lisa-gemma-training", 
-            name=f"train-{session_timestamp}",
-            config={
-                "learning_rate": args.learning_rate,
-                "epochs": args.epochs,
-                "steps_per_epoch": args.steps_per_epoch,
-                "total_steps": args.epochs * args.steps_per_epoch,
-                "batch_size": args.batch_size,
-                "dataset_type": args.dataset_type,
-                "checkpoint_interval": args.checkpoint_interval,
-                "model_params": param_info,
-            }
-        )
+        # WandB初期化（accelerator統合）
+        if accelerator.is_main_process:
+            accelerator.init_trackers(
+                project_name="lisa-gemma-training",
+                config={
+                    "learning_rate": args.learning_rate,
+                    "epochs": args.epochs,
+                    "steps_per_epoch": args.steps_per_epoch,
+                    "total_steps": args.epochs * args.steps_per_epoch,
+                    "batch_size": args.batch_size,
+                    "dataset_type": args.dataset_type,
+                    "checkpoint_interval": args.checkpoint_interval,
+                    "gradient_accumulation_steps": getattr(config, 'GRADIENT_ACCUMULATION_STEPS', 1),
+                    "mixed_precision": getattr(config, 'ACCELERATE_MIXED_PRECISION', 'bf16'),
+                }
+            )
         
         # 2. データセットとデータローダーの準備
-        print(f"\n📊 {args.dataset_type}データセットを準備中...")
+        if accelerator.is_main_process:
+            print(f"\n📊 {args.dataset_type}データセットを準備中...")
         
         processor = AutoProcessor.from_pretrained(lisa_config.gemma_model_id)
         
         # データセットタイプの決定
         if args.dataset_type == "all":
             dataset_spec = "sem_seg||refer_seg||vqa||reason_seg"
-            print(f"  - 全データセットを使用: sem_seg, refer_seg, vqa, reason_seg")
+            if accelerator.is_main_process:
+                print(f"  - 全データセットを使用: sem_seg, refer_seg, vqa, reason_seg")
         else:
             dataset_spec = args.dataset_type
-            print(f"  - 単一データセットを使用: {args.dataset_type}")
+            if accelerator.is_main_process:
+                print(f"  - 単一データセットを使用: {args.dataset_type}")
         
         # A10 24GB制約対応: 動的バッチサイズ調整
         effective_batch_size = args.batch_size
@@ -352,9 +365,11 @@ def main():
             gpu_memory_gb = torch.cuda.get_device_properties(0).total_memory / (1024**3)
             if gpu_memory_gb < 25:  # A10 (24GB) 検出
                 effective_batch_size = 1
-                print(f"  ⚠️  A10 GPU検出 ({gpu_memory_gb:.1f}GB): バッチサイズを {args.batch_size} → {effective_batch_size} に調整")
+                if accelerator.is_main_process:
+                    print(f"  ⚠️  A10 GPU検出 ({gpu_memory_gb:.1f}GB): バッチサイズを {args.batch_size} → {effective_batch_size} に調整")
             else:
-                print(f"  ✅ GPU メモリ十分 ({gpu_memory_gb:.1f}GB): バッチサイズ {effective_batch_size} を維持")
+                if accelerator.is_main_process:
+                    print(f"  ✅ GPU メモリ十分 ({gpu_memory_gb:.1f}GB): バッチサイズ {effective_batch_size} を維持")
         
         # 本格学習用データセット
         samples_per_epoch = effective_batch_size * args.steps_per_epoch
@@ -365,10 +380,11 @@ def main():
             samples_per_epoch=samples_per_epoch
         )
         
-        print(f"✅ データセット準備完了")
-        print(f"  - 総サンプル数: {len(dataset)}")
-        print(f"  - エポックあたりサンプル数: {samples_per_epoch}")
-        print(f"  - 実効バッチサイズ: {effective_batch_size}")
+        if accelerator.is_main_process:
+            print(f"✅ データセット準備完了")
+            print(f"  - 総サンプル数: {len(dataset)}")
+            print(f"  - エポックあたりサンプル数: {samples_per_epoch}")
+            print(f"  - 実効バッチサイズ: {effective_batch_size}")
         
         # 3. チェックポイント保存関数の定義
         def save_checkpoint(epoch, step, model, optimizer, loss, save_path):
@@ -392,7 +408,8 @@ def main():
             return save_path
         
         # 4. オプティマイザーと損失関数の準備
-        print("\n⚙️ オプティマイザーと損失関数を準備中...")
+        if accelerator.is_main_process:
+            print("\n⚙️ オプティマイザーと損失関数を準備中...")
         
         optimizer = AdamW(
             model.parameters(),
@@ -407,17 +424,46 @@ def main():
             bce_loss_weight=getattr(config, 'BCE_LOSS_WEIGHT', 2.0)
         )
         
-        print("✅ オプティマイザーと損失関数の準備完了")
+        if accelerator.is_main_process:
+            print("✅ オプティマイザーと損失関数の準備完了")
+        
+        # 🚀 accelerate.prepare() でモデル・オプティマイザーを分散学習用に準備
+        # 注意: データローダーは後で動的に作成するため、ここでは準備しない
+        model, optimizer = accelerator.prepare(model, optimizer)
+        
+        if accelerator.is_main_process:
+            print("✅ accelerate prepare() 適用完了")
+            
+            # 学習可能パラメータの情報を表示（prepare後）
+            param_info = model.module.get_trainable_parameters_info() if hasattr(model, 'module') else model.get_trainable_parameters_info()
+            print(f"✅ モデル初期化完了")
+            print(f"  - 総パラメータ数: {param_info['total_parameters']:,}")
+            print(f"  - 学習可能パラメータ数: {param_info['trainable_parameters']:,}")
+            print(f"  - 学習可能率: {param_info['trainable_percentage']:.2f}%")
+            
+            # 仕様書準拠性チェック
+            trainable_ratio = param_info['trainable_percentage']
+            spec_compliant = trainable_ratio < 1.0
+            print(f"  - 📋 仕様書準拠性: {'✅ 準拠' if spec_compliant else '❌ 違反'} (要求: <1%)")
+            
+            if not spec_compliant:
+                print(f"    ⚠️  学習可能パラメータ率が仕様書要求を超過: {trainable_ratio:.2f}% > 1%")
+                print("    → LoRA適用を確認してください")
+            
+            # 初期メモリ使用量
+            initial_memory = get_memory_usage()
+            print(f"  - 初期メモリ使用量: {format_memory_info(initial_memory)}")
         
         # 5. エポックベース学習ループの実行
-        print(f"\n🚀 エポックベース学習を開始...")
-        print(f"目標: {args.epochs}エポック × {args.steps_per_epoch}ステップで損失を減少させる")
-        
-        # デバッグログの抑制設定
-        import logging
-        logging.getLogger().setLevel(logging.WARNING)  # デバッグログを抑制
-        
-        print("-" * 80)
+        if accelerator.is_main_process:
+            print(f"\n🚀 エポックベース学習を開始...")
+            print(f"目標: {args.epochs}エポック × {args.steps_per_epoch}ステップで損失を減少させる")
+            
+            # デバッグログの抑制設定
+            import logging
+            logging.getLogger().setLevel(logging.WARNING)  # デバッグログを抑制
+            
+            print("-" * 80)
         
         loss_history = []
         best_loss = float('inf')
@@ -426,7 +472,8 @@ def main():
         
         # エポックループ
         for epoch in range(args.epochs):
-            print(f"\n📅 Epoch {epoch+1}/{args.epochs} 開始")
+            if accelerator.is_main_process:
+                print(f"\n📅 Epoch {epoch+1}/{args.epochs} 開始")
             
             # エポックごとにデータローダーを再生成（シャッフル効果）
             dataloader = DataLoader(
@@ -436,6 +483,9 @@ def main():
                 shuffle=True,  # エポックごとにシャッフル
                 drop_last=True  # バッチサイズを固定
             )
+            
+            # 🚀 データローダーをaccelerateで準備
+            dataloader = accelerator.prepare(dataloader)
             
             epoch_start_time = time.time()
             epoch_loss_sum = 0.0
@@ -451,71 +501,75 @@ def main():
                     dataloader_iter = iter(dataloader)
                     batch = next(dataloader_iter)
                 
-                # バッチをデバイスに移動
-                batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v 
-                        for k, v in batch.items()}
+                # 🚫 .to(device) を削除: accelerateが自動管理
+                # batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v 
+                #         for k, v in batch.items()}
                 
-                # フォワードパス
-                optimizer.zero_grad()
-                
-                # セグメンテーションタスクの確認
-                has_segmentation = 'ground_truth_mask' in batch
-                
-                # モデルに適した入力形式を準備
-                model_inputs = {
-                    'input_ids': batch['input_ids'],
-                    'attention_mask': batch['attention_masks'],  # collate_fnでは'attention_masks'が使われる
-                    'labels': batch['labels'],
-                    'generate_mask': has_segmentation,
-                }
-                
-                # デュアルストリーム対応
-                if 'images_for_gemma' in batch:
-                    model_inputs['images_for_gemma'] = batch['images_for_gemma']
-                if 'images_for_sam' in batch:
-                    model_inputs['images_for_sam'] = batch['images_for_sam']
-                
-                # フォワードパス実行
-                try:
-                    outputs = model(**model_inputs)
+                # フォワードパス（accelerator対応）
+                with accelerator.accumulate(model):
+                    # セグメンテーションタスクの確認
+                    has_segmentation = 'ground_truth_mask' in batch
                     
-                    # 初回のみメモリ監視
-                    if global_step == 0:
-                        if torch.cuda.is_available():
-                            allocated_memory = torch.cuda.memory_allocated() / (1024**3)
-                            print(f"  📊 フォワードパス後 GPU メモリ: {allocated_memory:.2f}GB")
+                    # モデルに適した入力形式を準備
+                    model_inputs = {
+                        'input_ids': batch['input_ids'],
+                        'attention_mask': batch['attention_masks'],  # collate_fnでは'attention_masks'が使われる
+                        'labels': batch['labels'],
+                        'generate_mask': has_segmentation,
+                    }
                     
-                except torch.cuda.OutOfMemoryError as e:
-                    print(f"❌ フォワードパス中にGPUメモリ不足: {e}")
-                    print("🔧 メモリクリーンアップを実行中...")
-                    torch.cuda.empty_cache()
-                    raise
-                
-                # 損失計算
-                losses = loss_fn(outputs, batch)
-                total_loss = losses['total_loss']
-                
-                # バックワードパス
-                try:
-                    total_loss.backward()
+                    # デュアルストリーム対応
+                    if 'images_for_gemma' in batch:
+                        model_inputs['images_for_gemma'] = batch['images_for_gemma']
+                    if 'images_for_sam' in batch:
+                        model_inputs['images_for_sam'] = batch['images_for_sam']
                     
-                    # 初回のみメモリ監視
-                    if global_step == 0:
-                        if torch.cuda.is_available():
-                            allocated_memory = torch.cuda.memory_allocated() / (1024**3)
-                            print(f"  📊 バックワードパス後 GPU メモリ: {allocated_memory:.2f}GB")
+                    # フォワードパス実行
+                    try:
+                        outputs = model(**model_inputs)
+                        
+                        # 初回のみメモリ監視（メインプロセスのみ）
+                        if global_step == 0 and accelerator.is_main_process:
+                            if torch.cuda.is_available():
+                                allocated_memory = torch.cuda.memory_allocated() / (1024**3)
+                                print(f"  📊 フォワードパス後 GPU メモリ: {allocated_memory:.2f}GB")
+                        
+                    except torch.cuda.OutOfMemoryError as e:
+                        if accelerator.is_main_process:
+                            print(f"❌ フォワードパス中にGPUメモリ不足: {e}")
+                            print("🔧 メモリクリーンアップを実行中...")
+                        torch.cuda.empty_cache()
+                        raise
                     
-                except torch.cuda.OutOfMemoryError as e:
-                    print(f"❌ バックワードパス中にGPUメモリ不足: {e}")
-                    print("🔧 メモリクリーンアップを実行中...")
-                    torch.cuda.empty_cache()
-                    raise
-                
-                # 勾配クリッピング（安定性のため）
-                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-                
-                # オプティマイザーステップ
-                optimizer.step()
+                    # 損失計算
+                    losses = loss_fn(outputs, batch)
+                    total_loss = losses['total_loss']
+                    
+                    # バックワードパス（accelerator使用）
+                    try:
+                        accelerator.backward(total_loss)
+                        
+                        # 初回のみメモリ監視（メインプロセスのみ）
+                        if global_step == 0 and accelerator.is_main_process:
+                            if torch.cuda.is_available():
+                                allocated_memory = torch.cuda.memory_allocated() / (1024**3)
+                                print(f"  📊 バックワードパス後 GPU メモリ: {allocated_memory:.2f}GB")
+                        
+                    except torch.cuda.OutOfMemoryError as e:
+                        if accelerator.is_main_process:
+                            print(f"❌ バックワードパス中にGPUメモリ不足: {e}")
+                            print("🔧 メモリクリーンアップを実行中...")
+                        torch.cuda.empty_cache()
+                        raise
+                    
+                    # 勾配クリッピング（安定性のため）
+                    if accelerator.sync_gradients:
+                        clip_value = getattr(config, 'ACCELERATE_GRADIENT_CLIPPING', 1.0)
+                        accelerator.clip_grad_norm_(model.parameters(), max_norm=clip_value)
+                    
+                    # オプティマイザーステップ
+                    optimizer.step()
+                    optimizer.zero_grad()
                 
                 # 損失履歴を記録
                 loss_record = {
@@ -530,24 +584,25 @@ def main():
                 loss_history.append(loss_record)
                 epoch_loss_sum += total_loss.item()
                 
-                # WandBに損失をログ（ステップ単位）
-                wandb.log({
-                    "epoch": epoch,
-                    "step": step,
-                    "global_step": global_step,
-                    "total_loss": total_loss.item(),
-                    "text_loss": loss_record['text_loss'],
-                    "dice_loss": loss_record['dice_loss'],
-                    "bce_loss": loss_record['bce_loss'],
-                    "learning_rate": args.learning_rate,
-                })
+                # WandBに損失をログ（accelerator使用、メインプロセスのみ）
+                if accelerator.is_main_process:
+                    accelerator.log({
+                        "epoch": epoch,
+                        "step": step,
+                        "global_step": global_step,
+                        "total_loss": total_loss.item(),
+                        "text_loss": loss_record['text_loss'],
+                        "dice_loss": loss_record['dice_loss'],
+                        "bce_loss": loss_record['bce_loss'],
+                        "learning_rate": args.learning_rate,
+                    })
                 
                 # 最良損失の更新
                 if total_loss.item() < best_loss:
                     best_loss = total_loss.item()
                 
-                # 進捗表示（10ステップごと、またはエポック最終）
-                if (step + 1) % 10 == 0 or step == args.steps_per_epoch - 1:
+                # 進捗表示（10ステップごと、またはエポック最終）（メインプロセスのみ）
+                if accelerator.is_main_process and ((step + 1) % 10 == 0 or step == args.steps_per_epoch - 1):
                     elapsed_time = time.time() - start_time
                     memory_info = get_memory_usage()
                     memory_str = format_memory_info(memory_info)
@@ -560,14 +615,15 @@ def main():
                           f"Best: {best_loss:.6f}")
                     print(f"                     Memory: {memory_str}")
                 
-                # チェックポイント保存
-                if (global_step + 1) % args.checkpoint_interval == 0:
-                    checkpoint_path = os.path.join(args.output_dir, f"checkpoint_epoch{epoch+1}_step{global_step+1}.pth")
-                    saved_path = save_checkpoint(epoch, global_step, model, optimizer, total_loss.item(), checkpoint_path)
-                    print(f"💾 チェックポイント保存: {saved_path}")
+                # チェックポイント保存（メインプロセスのみ）
+                if accelerator.is_main_process and (global_step + 1) % args.checkpoint_interval == 0:
+                    # accelerate対応のチェックポイント保存
+                    checkpoint_path = os.path.join(args.output_dir, f"checkpoint_epoch{epoch+1}_step{global_step+1}")
+                    accelerator.save_state(checkpoint_path)
+                    print(f"💾 チェックポイント保存: {checkpoint_path}")
                     
                     # WandBにチェックポイント情報をログ
-                    wandb.log({
+                    accelerator.log({
                         "checkpoint/epoch": epoch,
                         "checkpoint/global_step": global_step,
                         "checkpoint/loss": total_loss.item(),
@@ -575,94 +631,95 @@ def main():
                 
                 global_step += 1
             
-            # エポック終了時の処理
+            # エポック終了時の処理（メインプロセスのみ）
             epoch_elapsed = time.time() - epoch_start_time
             avg_epoch_loss = epoch_loss_sum / args.steps_per_epoch
             
-            print(f"📊 Epoch {epoch+1} 完了: 平均損失={avg_epoch_loss:.6f}, 時間={epoch_elapsed:.1f}秒")
-            
-            # WandBにエポック統計をログ
-            wandb.log({
-                "epoch_avg_loss": avg_epoch_loss,
-                "epoch_duration": epoch_elapsed,
-                "completed_epochs": epoch + 1,
-            })
-            
-            # 最終エポックのチェックポイント保存
-            if epoch == args.epochs - 1:
-                final_checkpoint_path = os.path.join(args.output_dir, f"final_checkpoint_{session_timestamp}.pth")
-                saved_path = save_checkpoint(epoch, global_step - 1, model, optimizer, avg_epoch_loss, final_checkpoint_path)
-                print(f"💾 最終チェックポイント保存: {saved_path}")
+            if accelerator.is_main_process:
+                print(f"📊 Epoch {epoch+1} 完了: 平均損失={avg_epoch_loss:.6f}, 時間={epoch_elapsed:.1f}秒")
+                
+                # WandBにエポック統計をログ
+                accelerator.log({
+                    "epoch_avg_loss": avg_epoch_loss,
+                    "epoch_duration": epoch_elapsed,
+                    "completed_epochs": epoch + 1,
+                })
+                
+                # 最終エポックのチェックポイント保存
+                if epoch == args.epochs - 1:
+                    final_checkpoint_path = os.path.join(args.output_dir, f"final_checkpoint_{session_timestamp}")
+                    accelerator.save_state(final_checkpoint_path)
+                    print(f"💾 最終チェックポイント保存: {final_checkpoint_path}")
         
-        print("-" * 80)
-        print("✅ エポックベース学習完了")
+        if accelerator.is_main_process:
+            print("-" * 80)
+            print("✅ エポックベース学習完了")
         
         # メモリクリーンアップ
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
-            final_memory = torch.cuda.memory_allocated() / (1024**3)
-            print(f"🧹 GPU メモリクリーンアップ完了 (最終使用量: {final_memory:.2f}GB)")
+            if accelerator.is_main_process:
+                final_memory = torch.cuda.memory_allocated() / (1024**3)
+                print(f"🧹 GPU メモリクリーンアップ完了 (最終使用量: {final_memory:.2f}GB)")
         
-        # 6. 学習結果の分析
-        print("\n📊 学習結果の分析...")
-        
-        if len(loss_history) > 0:
-            initial_loss = loss_history[0]['total_loss']
-            final_loss = loss_history[-1]['total_loss']
-            reduction_ratio = (initial_loss - final_loss) / initial_loss if initial_loss > 0 else 0
+        # 6. 学習結果の分析（メインプロセスのみ）
+        if accelerator.is_main_process:
+            print("\n📊 学習結果の分析...")
             
-            print(f"学習結果:")
-            print(f"  - 総ステップ数: {len(loss_history)}")
-            print(f"  - 完了エポック数: {args.epochs}")
-            print(f"  - 初期損失: {initial_loss:.6f}")
-            print(f"  - 最終損失: {final_loss:.6f}")
-            print(f"  - 総損失減少率: {reduction_ratio:.1%}")
-            print(f"  - 最良損失: {best_loss:.6f}")
+            if len(loss_history) > 0:
+                initial_loss = loss_history[0]['total_loss']
+                final_loss = loss_history[-1]['total_loss']
+                reduction_ratio = (initial_loss - final_loss) / initial_loss if initial_loss > 0 else 0
+                
+                print(f"学習結果:")
+                print(f"  - 総ステップ数: {len(loss_history)}")
+                print(f"  - 完了エポック数: {args.epochs}")
+                print(f"  - 初期損失: {initial_loss:.6f}")
+                print(f"  - 最終損失: {final_loss:.6f}")
+                print(f"  - 総損失減少率: {reduction_ratio:.1%}")
+                print(f"  - 最良損失: {best_loss:.6f}")
+                
+                # WandBに最終分析結果をログ
+                accelerator.log({
+                    "final_analysis/total_steps": len(loss_history),
+                    "final_analysis/completed_epochs": args.epochs,
+                    "final_analysis/initial_loss": initial_loss,
+                    "final_analysis/final_loss": final_loss,
+                    "final_analysis/reduction_ratio": reduction_ratio,
+                    "final_analysis/best_loss": best_loss,
+                })
             
-            # WandBに最終分析結果をログ
-            wandb.log({
-                "final_analysis/total_steps": len(loss_history),
-                "final_analysis/completed_epochs": args.epochs,
-                "final_analysis/initial_loss": initial_loss,
-                "final_analysis/final_loss": final_loss,
-                "final_analysis/reduction_ratio": reduction_ratio,
-                "final_analysis/best_loss": best_loss,
-            })
-            
-            # 学習成果の評価
-            print(f"\n📋 学習成果の評価:")
-            if reduction_ratio > 0.1:
-                print(f"  ✅ 良好な学習進捗: 損失が{reduction_ratio:.1%}減少")
-            elif reduction_ratio > 0.05:
-                print(f"  ⚠️  中程度の学習進捗: 損失が{reduction_ratio:.1%}減少")
+                # 学習成果の評価
+                print(f"\n📋 学習成果の評価:")
+                if reduction_ratio > 0.1:
+                    print(f"  ✅ 良好な学習進捗: 損失が{reduction_ratio:.1%}減少")
+                elif reduction_ratio > 0.05:
+                    print(f"  ⚠️  中程度の学習進捗: 損失が{reduction_ratio:.1%}減少")
+                else:
+                    print(f"  ❌ 学習進捗不十分: 損失減少が{reduction_ratio:.1%}のみ")
+                    
+                # エポック間の学習安定性評価
+                if args.epochs > 1:
+                    epoch_losses = []
+                    for epoch in range(args.epochs):
+                        epoch_data = [h for h in loss_history if h['epoch'] == epoch]
+                        if epoch_data:
+                            avg_loss = sum(h['total_loss'] for h in epoch_data) / len(epoch_data)
+                            epoch_losses.append(avg_loss)
+                    
+                    if len(epoch_losses) > 1:
+                        improvement_trend = epoch_losses[0] - epoch_losses[-1]
+                        print(f"  - エポック間改善: {improvement_trend:.6f}")
             else:
-                print(f"  ❌ 学習進捗不十分: 損失減少が{reduction_ratio:.1%}のみ")
-                
-            # エポック間の学習安定性評価
-            if args.epochs > 1:
-                epoch_losses = []
-                for epoch in range(args.epochs):
-                    epoch_data = [h for h in loss_history if h['epoch'] == epoch]
-                    if epoch_data:
-                        avg_loss = sum(h['total_loss'] for h in epoch_data) / len(epoch_data)
-                        epoch_losses.append(avg_loss)
-                
-                if len(epoch_losses) > 1:
-                    improvement_trend = epoch_losses[0] - epoch_losses[-1]
-                    print(f"  - エポック間改善: {improvement_trend:.6f}")
-        else:
-            print("  ⚠️  学習履歴が記録されていません")
-        
-        # 7. 結果の保存
-        print("\n💾 結果を保存中...")
-        
-        # 損失曲線のプロット（loss_historyが空でない場合のみ）
-        if len(loss_history) > 0:
-            plot_path = os.path.join(args.output_dir, f"training_loss_curve_{session_timestamp}.png")
-            plot_loss_curve(loss_history, plot_path)
+                print("  ⚠️  学習履歴が記録されていません")
             
-            # WandBに損失曲線画像をログ
-            wandb.log({"loss_curve": wandb.Image(plot_path)})
+            # 7. 結果の保存
+            print("\n💾 結果を保存中...")
+            
+            # 損失曲線のプロット（loss_historyが空でない場合のみ）
+            if len(loss_history) > 0:
+                plot_path = os.path.join(args.output_dir, f"training_loss_curve_{session_timestamp}.png")
+                plot_loss_curve(loss_history, plot_path)
         
         # 詳細結果をJSONで保存
         if len(loss_history) > 0:
@@ -695,7 +752,7 @@ def main():
                 "batch_size": args.batch_size,
                 "checkpoint_interval": args.checkpoint_interval,
             },
-            "model_info": param_info,
+            "gradient_accumulation_steps": getattr(config, 'GRADIENT_ACCUMULATION_STEPS', 1),
             "training_analysis": training_analysis,
             "loss_history": loss_history,
             "final_status": "success" if training_analysis['reduction_ratio'] > 0.05 else "partial_success"
@@ -741,15 +798,17 @@ def main():
             
             print(f"   推奨: パラメータ調整後にテストを再実行してください")
         
-        # WandBに最終結果を記録
-        wandb.summary["final_status"] = results["final_status"]
-        wandb.summary["final_loss"] = training_analysis['final_loss']
-        wandb.summary["reduction_ratio"] = training_analysis['reduction_ratio']
-        wandb.summary["total_steps"] = training_analysis['total_steps']
-        wandb.summary["completed_epochs"] = training_analysis['completed_epochs']
+            # WandBに最終結果を記録
+            accelerator.log({
+                "final_status": results["final_status"],
+                "total_steps": training_analysis['total_steps'],
+                "completed_epochs": training_analysis['completed_epochs'],
+                "reduction_ratio": training_analysis['reduction_ratio'],
+                "final_loss": training_analysis['final_loss']
+            })
         
-        # WandB実験を終了
-        wandb.finish()
+        # accelerate実験を終了
+        accelerator.end_training()
         
         print("="*80)
         

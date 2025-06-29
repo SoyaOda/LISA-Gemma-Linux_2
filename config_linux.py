@@ -65,6 +65,18 @@ MIXED_PRECISION = True  # 混合精度学習を有効化（bf16）
 GRADIENT_CHECKPOINTING = True  # メモリ効率化のための勾配チェックポイント
 DATALOADER_NUM_WORKERS = 4  # データローダーのワーカー数
 
+# ==============================================================================
+# 8. accelerate & DTensor 設定
+# ==============================================================================
+# DTensor問題対策設定
+DTENSOR_ALLOW_IMPLICIT_REPLICATION = True  # DTensor暗黙的レプリケーション許可
+TORCH_DISTRIBUTED_DEBUG = "OFF"  # 分散デバッグログを抑制
+
+# accelerate設定
+ACCELERATE_MIXED_PRECISION = "bf16"  # 混合精度モード (bf16推奨)
+ACCELERATE_GRADIENT_CLIPPING = 1.0  # 勾配クリッピング閾値
+ACCELERATE_LOGGING_STEPS = 10  # ログ間隔
+
 # 最適化設定
 WARMUP_STEPS = 100  # ウォームアップステップ数
 WARMUP_RATIO = 0.1  # ウォームアップ比率（WARMUP_STEPSが未設定の場合）

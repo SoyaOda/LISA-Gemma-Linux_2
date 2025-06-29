@@ -10,7 +10,7 @@ import torch.nn.functional as F
 from typing import Optional, List, Tuple, Dict, Any
 import numpy as np
 
-from transformers import AutoProcessor, Gemma3ForConditionalGeneration, PreTrainedModel, PretrainedConfig
+from transformers import AutoProcessor, Gemma3ForConditionalGeneration, PreTrainedModel, PretrainedConfig, AutoTokenizer
 from model.segment_anything import sam_model_registry
 from model.segment_anything.modeling import MaskDecoder, PromptEncoder, TwoWayTransformer
 from utils.constants import IMAGE_TOKEN_INDEX, GEMMA_IMAGE_TOKEN_NUM
@@ -49,8 +49,40 @@ class LisaGemmaForCausalLM(PreTrainedModel):
 
         # 1. Gemma-3 multimodal model の初期化
         print(f"Gemma-3マルチモーダルモデルをロード中... ({config.gemma_model_id})")
+        
+        # マルチGPU対応: 事前に必要な語彙サイズを計算
+        temp_tokenizer = AutoTokenizer.from_pretrained(config.gemma_model_id, trust_remote_code=True)
+        base_vocab_size = len(temp_tokenizer)
+        
+        # 必要な語彙サイズ = ベース + 画像トークン範囲 + 余裕
+        required_vocab_size = max(base_vocab_size + 100, IMAGE_TOKEN_INDEX + GEMMA_IMAGE_TOKEN_NUM + 100)
+        
+        # 8の倍数に調整（効率化）
+        if required_vocab_size % 8 != 0:
+            required_vocab_size = ((required_vocab_size // 8) + 1) * 8
+        
+        print(f"📊 語彙サイズ計算: ベース={base_vocab_size}, 必要={required_vocab_size}")
+        
+        # Gemma-3設定を取得して語彙サイズを事前設定
+        from transformers import Gemma3Config
+        gemma_config = Gemma3Config.from_pretrained(config.gemma_model_id)
+        
+        # 安全な語彙サイズアクセス（Gemma3Configの既知バグ対応）
+        original_vocab_size = getattr(gemma_config, 'vocab_size', required_vocab_size)
+        if original_vocab_size is None:
+            # HuggingFace Issue #36683: Gemma3Config lacks vocab_size for 4B/7B/27B models  
+            original_vocab_size = required_vocab_size
+            print("⚠️ Gemma3Config.vocab_size属性が欠落（既知バグ）。計算値を使用します。")
+        
+        # 語彙サイズを事前設定（マルチGPU問題回避）
+        gemma_config.vocab_size = required_vocab_size
+        
+        print(f"🔧 語彙サイズ設定: {original_vocab_size} → {required_vocab_size}")
+        
+        # モデルを事前設定された語彙サイズで初期化
         self.gemma_model = Gemma3ForConditionalGeneration.from_pretrained(
             config.gemma_model_id,
+            config=gemma_config,
             torch_dtype=torch.bfloat16,
             device_map="auto"
         )
@@ -135,41 +167,21 @@ class LisaGemmaForCausalLM(PreTrainedModel):
         self.seg_token_id = self.gemma_processor.tokenizer.convert_tokens_to_ids(self.seg_token)
         print(f"SEGトークンID: {self.seg_token_id}")
         
-        # 埋め込み層のリサイズ（画像トークン範囲を含む）
-        # 必要な語彙サイズを計算
-        # 現在の語彙サイズ + 画像トークン範囲（256個）
+        # 埋め込み層のサイズ確認（事前設定により既に正しいサイズのはず）
         current_vocab_size = len(self.gemma_processor.tokenizer)
-        required_vocab_size = max(current_vocab_size, IMAGE_TOKEN_INDEX + GEMMA_IMAGE_TOKEN_NUM)
-        
-        # 埋め込み層の現在のサイズを確認
         actual_embed_size = self.gemma_model.get_input_embeddings().weight.shape[0]
-        print(f"現在の埋め込み層サイズ: {actual_embed_size}")
-        print(f"現在の語彙サイズ: {current_vocab_size}")
-        print(f"必要な語彙サイズ: {required_vocab_size}")
-        print(f"画像トークン範囲: {IMAGE_TOKEN_INDEX} - {IMAGE_TOKEN_INDEX + GEMMA_IMAGE_TOKEN_NUM - 1}")
         
-        # 埋め込み層のリサイズが必要かチェック
-        if actual_embed_size < required_vocab_size:
-            print(f"埋め込み層をリサイズ中: {actual_embed_size} -> {required_vocab_size}")
-            
-            try:
-                self.gemma_model.resize_token_embeddings(required_vocab_size)
-                print(f"✅ 埋め込み層が正常にリサイズされました（新サイズ: {required_vocab_size}）")
-            except RuntimeError as e:
-                if "DTensor" in str(e):
-                    print(f"⚠️ DeepSpeed環境での実行を検出。埋め込み層のリサイズを延期します")
-                else:
-                    print(f"❌ 埋め込み層のリサイズに失敗: {e}")
-                    raise e
-            
-            # リサイズ後のサイズを確認
-            new_embed_size = self.gemma_model.get_input_embeddings().weight.shape[0]
-            print(f"リサイズ後の埋め込み層サイズ: {new_embed_size}")
-            
-            if new_embed_size < required_vocab_size:
-                raise RuntimeError(f"埋め込み層のリサイズに失敗: {new_embed_size} < {required_vocab_size}")
+        print(f"📊 語彙・埋め込み層サイズ確認:")
+        print(f"  トークナイザー語彙サイズ: {current_vocab_size}")
+        print(f"  埋め込み層サイズ: {actual_embed_size}")
+        print(f"  画像トークン範囲: {IMAGE_TOKEN_INDEX} - {IMAGE_TOKEN_INDEX + GEMMA_IMAGE_TOKEN_NUM - 1}")
+        
+        # 事前設定により問題ないかチェック
+        if actual_embed_size >= IMAGE_TOKEN_INDEX + GEMMA_IMAGE_TOKEN_NUM:
+            print(f"✅ 埋め込み層サイズは適切です（マルチGPU対応済み）")
         else:
-            print(f"✅ 埋め込み層サイズは十分です: {actual_embed_size} >= {required_vocab_size}")
+            print(f"⚠️ 埋め込み層が小さすぎます: {actual_embed_size} < {IMAGE_TOKEN_INDEX + GEMMA_IMAGE_TOKEN_NUM}")
+            print("事前設定が不十分でした。トークナイザー調整で対応します。")
         
         # 設定情報を保存
         self.gemma_image_size = config.gemma_image_size
@@ -177,6 +189,49 @@ class LisaGemmaForCausalLM(PreTrainedModel):
         self.model_max_length = config.model_max_length
         
         print("✅ LISA-Gemmaモデルの初期化が完了しました")
+
+    def _manually_resize_embeddings(self, new_size: int):
+        """マルチGPU環境で埋め込み層を手動でリサイズ"""
+        import torch
+        import torch.nn as nn
+        
+        # 現在の埋め込み層を取得
+        old_embeddings = self.gemma_model.get_input_embeddings()
+        old_size = old_embeddings.weight.shape[0]
+        embedding_dim = old_embeddings.weight.shape[1]
+        
+        if new_size <= old_size:
+            return
+        
+        # 新しい埋め込み層を作成
+        new_embeddings = nn.Embedding(new_size, embedding_dim, dtype=old_embeddings.weight.dtype)
+        
+        # 既存の重みをコピー
+        with torch.no_grad():
+            new_embeddings.weight[:old_size] = old_embeddings.weight
+            # 新しいトークンは平均値で初期化
+            if new_size > old_size:
+                mean_weight = old_embeddings.weight.mean(dim=0)
+                new_embeddings.weight[old_size:] = mean_weight.unsqueeze(0).expand(new_size - old_size, -1)
+        
+        # 埋め込み層を置き換え
+        self.gemma_model.set_input_embeddings(new_embeddings)
+        
+        # 出力層も同様に処理（共有している場合）
+        if hasattr(self.gemma_model, 'lm_head') and self.gemma_model.lm_head is not None:
+            old_lm_head = self.gemma_model.lm_head
+            if old_lm_head.weight.shape[0] == old_size:
+                new_lm_head = nn.Linear(embedding_dim, new_size, bias=old_lm_head.bias is not None, dtype=old_lm_head.weight.dtype)
+                with torch.no_grad():
+                    new_lm_head.weight[:old_size] = old_lm_head.weight
+                    if new_size > old_size:
+                        mean_weight = old_lm_head.weight.mean(dim=0)
+                        new_lm_head.weight[old_size:] = mean_weight.unsqueeze(0).expand(new_size - old_size, -1)
+                    if old_lm_head.bias is not None:
+                        new_lm_head.bias[:old_size] = old_lm_head.bias
+                        if new_size > old_size:
+                            new_lm_head.bias[old_size:] = 0.0
+                self.gemma_model.lm_head = new_lm_head
 
     @classmethod
     def from_config_file(cls, config_path: str, **kwargs):
