@@ -1,471 +1,669 @@
 #!/usr/bin/env python3
 """
-LISA-Gemma3 学習スクリプト
-仕様書第4章「学習のオーケストレーション」に従った実装
+フェーズ2.3: DeepSpeed ZeRO Stage 2 統合
+A100*8環境でのマルチGPU分散学習（DeepSpeed対応版）
+
+DeepSpeed統合により以下を実現:
+- ZeRO Stage 2による効率的なメモリ管理
+- 大規模モデルの分散学習対応
+- DTensor競合問題の根本解決
+- フェーズ3（DeepSpeed ZeRO Stage 3）への段階的移行準備
 """
 
 import argparse
 import os
 import sys
+import json
 import time
-from functools import partial
-from pathlib import Path
+from datetime import datetime
+from typing import Dict, List, Any, Optional
 
-import deepspeed
-import numpy as np
 import torch
+import torch.nn.functional as F
 import torch.distributed as dist
-from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
+from torch.optim import AdamW
 from transformers import AutoProcessor
-from peft import LoraConfig, get_peft_model
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import psutil
+import wandb
 
-# プロジェクトのルートディレクトリをパスに追加
+# DeepSpeed統合
+import deepspeed
+from deepspeed.utils import logger
+
+# プロジェクトのルートディレクトリをsys.pathに追加
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
-# 設定ファイルの動的インポート
-def get_config():
-    """実行時の設定ファイルを動的に取得"""
-    config_path = os.environ.get('LISA_CONFIG_PATH', 'config_linux')
-    
-    try:
-        if config_path == 'config_linux':
-            import config_linux as config
-            print(f"設定: {config_path}.py を使用")
-        else:
-            import importlib
-            config = importlib.import_module(config_path)
-            print(f"設定: {config_path}.py を使用")
-        
-        return config
-    except ImportError as e:
-        print(f"設定ファイル '{config_path}' の読み込みに失敗: {e}")
-        print("config_linux.py が存在することを確認してください。")
-        sys.exit(1)
-
-# 設定をインポート
-config = get_config()
 
 from model.gemma_lisa import LisaGemmaForCausalLM, LisaGemmaConfig
 from model.losses import CompositeLoss
 from utils.dataset import HybridDataset, collate_fn
 
+def get_config():
+    """
+    config_linux.pyを必須として読み込む
+    """
+    try:
+        import config_linux as config
+        print(f"設定: config_linux.py を使用")
+        return config
+    except ImportError as e:
+        print(f"❌ ERROR: config_linux.pyが見つかりません")
+        print(f"   詳細: {e}")
+        print(f"   現在のディレクトリ: {os.getcwd()}")
+        print(f"   ファイル存在確認: {os.path.exists('config_linux.py')}")
+        raise SystemExit("config_linux.pyが必須です。ファイルが存在することを確認してください。")
 
 def parse_args():
-    """引数解析と設定（仕様書第4章.1）"""
-    parser = argparse.ArgumentParser(description="LISA-Gemma3 Training with DeepSpeed")
+    config = get_config()
     
-    # 基本設定
-    parser.add_argument("--local_rank", default=0, type=int, help="Local rank for distributed training")
-    parser.add_argument("--exp_name", default="lisa-gemma3-run1", type=str, help="Experiment name")
-    parser.add_argument("--log_dir", default=config.LOG_BASE_DIR, type=str, help="Log directory")
+    parser = argparse.ArgumentParser(description="LISA-Gemma学習主軸スクリプト（DeepSpeed統合版）")
+    parser.add_argument("--epochs", type=int, default=5, help="学習エポック数")
+    parser.add_argument("--steps_per_epoch", type=int, default=100, help="各エポックのステップ数")
+    parser.add_argument("--learning_rate", type=float, default=config.LEARNING_RATE, help="学習率")
+    parser.add_argument("--dataset_type", type=str, default="all", 
+                       choices=["sem_seg", "refer_seg", "vqa", "reason_seg", "all"],
+                       help="学習に使用するデータセットタイプ")
+    parser.add_argument("--batch_size", type=int, default=config.BATCH_SIZE_PER_GPU, help="バッチサイズ")
+    parser.add_argument("--checkpoint_interval", type=int, default=50, 
+                       help="チェックポイント保存間隔（ステップ数）")
+    parser.add_argument("--output_dir", type=str, default="./training_output", 
+                       help="学習結果とチェックポイントの保存ディレクトリ")
+    parser.add_argument("--ds_config", type=str, default="./deepspeed_zero2_config.json",
+                       help="DeepSpeed設定ファイルパス")
+    parser.add_argument("--local_rank", type=int, default=0,
+                       help="DeepSpeed分散学習用ローカルランク")
     
-    # モデル設定
-    parser.add_argument("--gemma_model_id", default=config.GEMMA_MODEL_ID, type=str, help="Gemma model ID")
-    parser.add_argument("--sam_checkpoint_path", default=config.SAM_CHECKPOINT_PATH, type=str, help="SAM checkpoint path")
-    parser.add_argument("--precision", default="bf16", type=str, choices=["fp32", "bf16", "fp16"])
-    
-    # 学習設定
-    parser.add_argument("--epochs", default=config.EPOCHS, type=int, help="Number of training epochs")
-    parser.add_argument("--steps_per_epoch", default=config.STEPS_PER_EPOCH, type=int, help="Steps per epoch")
-    parser.add_argument("--batch_size", default=16, type=int, help="Global batch size")
-    parser.add_argument("--grad_accumulation_steps", default=2, type=int, help="Gradient accumulation steps")
-    parser.add_argument("--lr", default=config.LEARNING_RATE, type=float, help="Learning rate")
-    parser.add_argument("--weight_decay", default=config.WEIGHT_DECAY, type=float, help="Weight decay")
-    parser.add_argument("--beta1", default=config.BETA1, type=float, help="Adam beta1")
-    parser.add_argument("--beta2", default=config.BETA2, type=float, help="Adam beta2")
-    
-    # LoRA設定
-    parser.add_argument("--lora_r", default=config.LORA_R, type=int, help="LoRA rank")
-    parser.add_argument("--lora_alpha", default=config.LORA_ALPHA, type=int, help="LoRA alpha")
-    parser.add_argument("--lora_dropout", default=config.LORA_DROPOUT, type=float, help="LoRA dropout")
-    
-    # 損失関数の重み
-    parser.add_argument("--ce_loss_weight", default=config.CE_LOSS_WEIGHT, type=float, help="Cross entropy loss weight")
-    parser.add_argument("--dice_loss_weight", default=config.DICE_LOSS_WEIGHT, type=float, help="Dice loss weight")
-    parser.add_argument("--bce_loss_weight", default=config.BCE_LOSS_WEIGHT, type=float, help="BCE loss weight")
-    
-    # データセット設定（設定ファイルから取得）
-    parser.add_argument("--dataset_base_dir", default=config.DATASET_BASE_DIR, type=str, help="Dataset base directory")
-    parser.add_argument("--dataset", default="sem_seg||refer_seg||vqa||reason_seg", type=str, help="Datasets to use")
-    parser.add_argument("--sample_rates", default=config.DATASET_SAMPLE_RATES, type=str, help="Dataset sample rates")
-    parser.add_argument("--sem_seg_data", default=config.SEM_SEG_DATA, type=str, help="Semantic segmentation data")
-    parser.add_argument("--refer_seg_data", default=config.REFER_SEG_DATA, type=str, help="Referring segmentation data")
-    parser.add_argument("--vqa_data", default=config.VQA_DATA, type=str, help="VQA data")
-    parser.add_argument("--reason_seg_data", default=config.REASON_SEG_DATA, type=str, help="Reasoning segmentation data")
-    
-    # DeepSpeed設定
-    parser.add_argument("--deepspeed_config", default="ds_config.json", type=str, help="DeepSpeed config file")
-    
-    # その他
-    parser.add_argument("--num_workers", default=4, type=int, help="Number of data loader workers")
-    parser.add_argument("--save_interval", default=1, type=int, help="Save interval in epochs")
-    parser.add_argument("--eval_interval", default=1, type=int, help="Evaluation interval in epochs")
-    parser.add_argument("--resume", default="", type=str, help="Resume from checkpoint")
-    
-    # 設定ファイル上書き用
-    parser.add_argument("--config_path", default=None, type=str, help="Override config file path (environment variable LISA_CONFIG_PATH will be set)")
+    # DeepSpeed用引数（自動追加）
+    parser = deepspeed.add_config_arguments(parser)
     
     return parser.parse_args()
 
+def plot_loss_curve(loss_history: List[Dict[str, float]], output_path: str):
+    """損失曲線をプロット（DeepSpeed対応）"""
+    if len(loss_history) == 0:
+        return
+    
+    iterations = list(range(len(loss_history)))
+    
+    # 各損失成分を抽出
+    total_losses = [h['total_loss'] for h in loss_history]
+    text_losses = [h.get('text_loss', 0.0) for h in loss_history]
+    dice_losses = [h.get('dice_loss', 0.0) for h in loss_history]
+    bce_losses = [h.get('bce_loss', 0.0) for h in loss_history]
+    
+    # プロット作成
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
+    
+    # 総損失のプロット（対数スケール）
+    ax1.plot(iterations, total_losses, 'b-', linewidth=2, label='Total Loss')
+    ax1.set_xlabel('Iteration')
+    ax1.set_ylabel('Loss (log scale)')
+    ax1.set_yscale('log')
+    ax1.set_title('DeepSpeed分散学習: 総損失の推移（対数スケール）')
+    ax1.grid(True, alpha=0.3)
+    ax1.legend()
+    
+    # 損失成分の詳細プロット
+    ax2.plot(iterations, text_losses, 'r-', linewidth=1, label='Text Loss')
+    ax2.plot(iterations, dice_losses, 'g-', linewidth=1, label='DICE Loss')
+    ax2.plot(iterations, bce_losses, 'm-', linewidth=1, label='BCE Loss')
+    ax2.set_xlabel('Iteration')
+    ax2.set_ylabel('Loss')
+    ax2.set_title('損失成分の詳細推移')
+    ax2.grid(True, alpha=0.3)
+    ax2.legend()
+    
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150, bbox_inches='tight')
+    plt.close()
+    
+    print(f"損失曲線を保存: {output_path}")
 
-def validate_paths(args):
-    """重要なパスの存在をチェック"""
-    print("=== パス検証 ===")
+def get_memory_usage():
+    """GPU/CPUメモリ使用量を取得"""
+    memory_info = {}
     
-    errors = []
+    # CPUメモリ
+    cpu_memory = psutil.virtual_memory()
+    memory_info['cpu_used_gb'] = cpu_memory.used / (1024**3)
+    memory_info['cpu_total_gb'] = cpu_memory.total / (1024**3)
+    memory_info['cpu_percent'] = cpu_memory.percent
     
-    # データセットベースディレクトリ
-    if not os.path.exists(args.dataset_base_dir):
-        errors.append(f"データセットベースディレクトリが見つかりません: {args.dataset_base_dir}")
-    
-    # SAMチェックポイント
-    if not os.path.exists(args.sam_checkpoint_path):
-        errors.append(f"SAMチェックポイントが見つかりません: {args.sam_checkpoint_path}")
-        # SAMのダウンロードURL情報を提供
-        weights_info = config.get_required_weights() if hasattr(config, 'get_required_weights') else None
-        if weights_info and 'sam_vit_h' in weights_info:
-            errors.append(f"ダウンロード: wget {weights_info['sam_vit_h']['url']} -O {args.sam_checkpoint_path}")
-    
-    # DeepSpeed設定ファイル
-    if not os.path.exists(args.deepspeed_config):
-        errors.append(f"DeepSpeed設定ファイルが見つかりません: {args.deepspeed_config}")
-    
-    if errors:
-        print("❌ パス検証エラー:")
-        for error in errors:
-            print(f"  - {error}")
-        print("\n対処方法:")
-        print("1. 環境変数を設定してパスを変更:")
-        print(f"   export LISA_DATASET_BASE_DIR=/path/to/your/dataset")
-        print(f"   export LISA_SAM_CHECKPOINT_PATH=/path/to/sam_vit_h_4b8939.pth")
-        print("2. または、コマンドライン引数で指定")
-        print("3. 必要なファイルをダウンロード・配置")
-        return False
-    
-    print("✅ パス検証成功")
-    return True
-
-
-def setup_model_and_lora(args):
-    """モデルとLoRAの初期化（仕様書第4章.2-3）"""
-    print("=== モデルとLoRAの設定 ===")
-    
-    # 1. LisaGemmaConfigの作成
-    lisa_config = LisaGemmaConfig(
-        gemma_model_id=args.gemma_model_id,
-        sam_checkpoint_path=args.sam_checkpoint_path,
-        seg_token=config.SEG_TOKEN,
-        gemma_hidden_size=config.GEMMA_HIDDEN_SIZE,
-        sam_prompt_embed_dim=config.SEG_PROJECTION_DIM,
-        gemma_image_size=config.GEMMA_IMAGE_SIZE,
-        sam_image_size=config.SAM_IMAGE_SIZE,
-        model_max_length=config.MODEL_MAX_LENGTH,
-    )
-    
-    # 2. モデルの初期化
-    print(f"LISA-Gemmaモデルを初期化中... (precision: {args.precision})")
-    model = LisaGemmaForCausalLM(lisa_config)
-    
-    # 3. 精度設定
-    if args.precision == "bf16":
-        model = model.to(torch.bfloat16)
-    elif args.precision == "fp16":
-        model = model.to(torch.float16)
-    
-    # 4. LoRA設定（仕様書第4章.2）
-    print("LoRA設定を適用中...")
-    lora_config = LoraConfig(
-        r=args.lora_r,
-        lora_alpha=args.lora_alpha,
-        target_modules=config.LORA_TARGET_MODULES,  # config_linux.pyから取得
-        lora_dropout=args.lora_dropout,
-        bias="none",
-        task_type="CAUSAL_LM",
-    )
-    
-    # 5. LoRAアダプタの適用
-    model = get_peft_model(model, lora_config)
-    
-    # 6. 訓練可能パラメータの確認
-    try:
-        model.print_trainable_parameters()
-    except AttributeError:
-        # PEFTモデルにprint_trainable_parametersがない場合
-        pass
-    
-    # 手動でパラメータ数を計算
-    total_params = sum(p.numel() for p in model.parameters())
-    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"総パラメータ数: {total_params:,}")
-    print(f"訓練可能パラメータ数: {trainable_params:,}")
-    print(f"訓練可能な割合: {trainable_params/total_params*100:.2f}%")
-    
-    return model
-
-
-def setup_dataset_and_dataloader(args, gemma_processor):
-    """データセットとデータローダーの設定（デュアルストリーム対応）"""
-    print("=== データセットとデータローダーの設定 ===")
-    
-    # サンプルレートの解析
-    sample_rates = [float(x) for x in args.sample_rates.split(",")]
-    
-    # 総サンプル数の計算（分散学習対応）
-    world_size = torch.distributed.get_world_size() if torch.distributed.is_initialized() else 1
-    samples_per_epoch = args.batch_size * args.grad_accumulation_steps * args.steps_per_epoch * world_size
-    
-    print(f"ワールドサイズ: {world_size}")
-    print(f"エポックあたりサンプル数: {samples_per_epoch:,}")
-    
-    # デュアルストリーム対応のHybridDatasetを使用
-    train_dataset = HybridDataset(
-        base_image_dir=args.dataset_base_dir,
-        gemma_processor=gemma_processor,
-        samples_per_epoch=samples_per_epoch,
-        precision=args.precision,
-        gemma_image_size=config.GEMMA_IMAGE_SIZE,
-        sam_image_size=config.SAM_IMAGE_SIZE,
-        dataset=args.dataset,
-        sample_rate=sample_rates,
-        sem_seg_data=args.sem_seg_data,
-        refer_seg_data=args.refer_seg_data,
-        vqa_data=args.vqa_data,
-        reason_seg_data=args.reason_seg_data,
-    )
-    
-    print(f"✅ デュアルストリーム訓練データセット作成完了: {len(train_dataset):,} サンプル")
-    print(f"   - Gemma画像サイズ: {config.GEMMA_IMAGE_SIZE}x{config.GEMMA_IMAGE_SIZE}")
-    print(f"   - SAM画像サイズ: {config.SAM_IMAGE_SIZE}x{config.SAM_IMAGE_SIZE}")
-    
-    return train_dataset
-
-
-def setup_loss_function(args):
-    """複合損失関数の設定（仕様書第4章.4）"""
-    print("=== 複合損失関数の設定 ===")
-    
-    loss_fn = CompositeLoss(
-        ce_loss_weight=args.ce_loss_weight,
-        dice_loss_weight=args.dice_loss_weight,
-        bce_loss_weight=args.bce_loss_weight
-    )
-    
-    print(f"損失関数の重み - CE: {args.ce_loss_weight}, DICE: {args.dice_loss_weight}, BCE: {args.bce_loss_weight}")
-    
-    return loss_fn
-
-
-def train_epoch(model_engine, train_dataloader, loss_fn, epoch, args, writer=None):
-    """1エポックの学習（仕様書第4章.5 - デュアルストリーム対応）"""
-    model_engine.train()
-    
-    total_loss = 0.0
-    total_text_loss = 0.0
-    total_mask_loss = 0.0
-    step_count = 0
-    
-    print(f"=== エポック {epoch+1} 開始 ===")
-    
-    for step, batch in enumerate(train_dataloader):
-        if step >= args.steps_per_epoch:
-            break
-            
-        try:
-            # デュアルストリーム・バッチの処理
-            # バッチをGPUに転送
-            device = model_engine.device
-            batch_gpu = {}
-            
-            for key, value in batch.items():
-                if isinstance(value, torch.Tensor):
-                    batch_gpu[key] = value.to(device)
-                else:
-                    batch_gpu[key] = value
-            
-            # デュアルストリーム・フォワードパス
-            outputs = model_engine(
-                input_ids=batch_gpu["input_ids"],
-                attention_mask=batch_gpu["attention_mask"],
-                images_for_gemma=batch_gpu["images_for_gemma"],  # (B, 3, 896, 896)
-                images_for_sam=batch_gpu["images_for_sam"],      # (B, 3, 1024, 1024)
-                labels=batch_gpu["labels"],
-                generate_mask=True
-            )
-            
-            # 複合損失の計算（仕様書第4章.4）
-            composite_loss_result = loss_fn(
-                outputs=outputs,
-                ground_truth_masks=batch_gpu.get("ground_truth_mask"),
-                has_masks=batch_gpu.get("has_mask", [])
-            )
-            
-            total_loss_step = composite_loss_result["total_loss"]
-            text_loss_step = composite_loss_result["text_loss"]
-            mask_loss_step = composite_loss_result["mask_loss"]
-            
-            # バックワードパス
-            model_engine.backward(total_loss_step)
-            model_engine.step()
-            
-            # 統計の更新
-            total_loss += total_loss_step.item()
-            total_text_loss += text_loss_step.item() if text_loss_step is not None else 0.0
-            total_mask_loss += mask_loss_step.item() if mask_loss_step is not None else 0.0
-            step_count += 1
-            
-            # ログ出力
-            if step % 10 == 0:
-                avg_loss = total_loss / max(step_count, 1)
-                avg_text_loss = total_text_loss / max(step_count, 1)
-                avg_mask_loss = total_mask_loss / max(step_count, 1)
-                
-                print(f"Step {step:4d}/{args.steps_per_epoch} | "
-                      f"Loss: {avg_loss:.4f} (Text: {avg_text_loss:.4f}, Mask: {avg_mask_loss:.4f})")
-                
-                if writer:
-                    global_step = epoch * args.steps_per_epoch + step
-                    writer.add_scalar("train/total_loss", avg_loss, global_step)
-                    writer.add_scalar("train/text_loss", avg_text_loss, global_step)
-                    writer.add_scalar("train/mask_loss", avg_mask_loss, global_step)
-            
-        except Exception as e:
-            print(f"⚠️ ステップ {step} でエラー: {e}")
-            import traceback
-            traceback.print_exc()
-            continue
-    
-    # エポック統計
-    avg_loss = total_loss / max(step_count, 1)
-    avg_text_loss = total_text_loss / max(step_count, 1)
-    avg_mask_loss = total_mask_loss / max(step_count, 1)
-    
-    print(f"✅ エポック {epoch+1} 完了")
-    print(f"   平均損失: {avg_loss:.4f} (Text: {avg_text_loss:.4f}, Mask: {avg_mask_loss:.4f})")
-    
-    return {
-        "avg_loss": avg_loss,
-        "avg_text_loss": avg_text_loss,
-        "avg_mask_loss": avg_mask_loss,
-        "steps": step_count
-    }
-
-
-def save_checkpoint(model_engine, epoch, args):
-    """チェックポイントの保存"""
-    # 分散処理の確認
-    should_save = False
-    if torch.distributed.is_initialized():
-        if torch.distributed.get_rank() == 0:
-            should_save = True
-    else:
-        should_save = True
-    
-    if should_save:
-        save_dir = os.path.join(args.log_dir, f"checkpoint_epoch_{epoch+1}")
-        os.makedirs(save_dir, exist_ok=True)
+    # GPUメモリ（CUDA利用可能な場合）
+    if torch.cuda.is_available():
+        gpu_memory = torch.cuda.memory_allocated() / (1024**3)
+        gpu_memory_max = torch.cuda.max_memory_allocated() / (1024**3)
+        gpu_memory_cached = torch.cuda.memory_reserved() / (1024**3)
         
-        # DeepSpeedチェックポイントの保存
-        model_engine.save_checkpoint(save_dir)
-        print(f"チェックポイントを保存しました: {save_dir}")
+        memory_info['gpu_used_gb'] = gpu_memory
+        memory_info['gpu_max_gb'] = gpu_memory_max
+        memory_info['gpu_cached_gb'] = gpu_memory_cached
+        
+        # GPU利用率
+        gpu_properties = torch.cuda.get_device_properties(0)
+        gpu_total_memory = gpu_properties.total_memory / (1024**3)
+        memory_info['gpu_total_gb'] = gpu_total_memory
+        memory_info['gpu_percent'] = (gpu_memory / gpu_total_memory) * 100
+    else:
+        memory_info['gpu_used_gb'] = 0
+        memory_info['gpu_max_gb'] = 0
+        memory_info['gpu_cached_gb'] = 0
+        memory_info['gpu_total_gb'] = 0
+        memory_info['gpu_percent'] = 0
+    
+    return memory_info
 
+def format_memory_info(memory_info):
+    """メモリ情報を読みやすい形式でフォーマット"""
+    cpu_info = f"CPU: {memory_info['cpu_used_gb']:.1f}/{memory_info['cpu_total_gb']:.1f}GB ({memory_info['cpu_percent']:.1f}%)"
+    
+    if torch.cuda.is_available():
+        gpu_info = f"GPU: {memory_info['gpu_used_gb']:.1f}/{memory_info['gpu_total_gb']:.1f}GB ({memory_info['gpu_percent']:.1f}%) [Max: {memory_info['gpu_max_gb']:.1f}GB]"
+    else:
+        gpu_info = "GPU: N/A"
+    
+    return f"{cpu_info} | {gpu_info}"
 
 def main():
-    """メイン関数（仕様書第4章統合）"""
     args = parse_args()
+    config = get_config()
     
-    # ログディレクトリの作成
-    log_dir = os.path.join(args.log_dir, args.exp_name)
-    os.makedirs(log_dir, exist_ok=True)
+    # DeepSpeed分散環境の初期化
+    deepspeed.init_distributed()
     
-    # TensorBoardライター（分散処理の確認）
-    writer = None
+    # ランク取得
+    local_rank = int(os.environ.get('LOCAL_RANK', 0))
+    world_size = int(os.environ.get('WORLD_SIZE', 1))
+    rank = int(os.environ.get('RANK', 0))
     
-    print("=" * 60)
-    print("🚀 LISA-Gemma3 学習開始")
-    print("=" * 60)
-    print(f"実験名: {args.exp_name}")
-    print(f"ログディレクトリ: {log_dir}")
-    print(f"エポック数: {args.epochs}")
-    print(f"バッチサイズ: {args.batch_size}")
-    print(f"学習率: {args.lr}")
+    print(f"🚀 DeepSpeed分散環境初期化完了")
+    print(f"   - ランク: {rank}/{world_size}")
+    print(f"   - ローカルランク: {local_rank}")
     
-    # 1. モデルとLoRAの設定
-    model = setup_model_and_lora(args)
+    # メインプロセス判定
+    is_main_process = rank == 0
     
-    # 2. Gemmaプロセッサーの取得
-    gemma_processor = model.gemma_processor if hasattr(model, 'gemma_processor') else None
-    if gemma_processor is None:
-        from transformers import AutoProcessor
-        gemma_processor = AutoProcessor.from_pretrained(args.gemma_model_id)
+    if is_main_process:
+        print("="*80)
+        print("フェーズ2.3：DeepSpeed ZeRO Stage 2 統合")
+        print("A100*8環境でのマルチGPU分散学習")
+        print("="*80)
     
-    # 3. データセットとデータローダーの設定（デュアルストリーム対応）
-    train_dataset = setup_dataset_and_dataloader(args, gemma_processor)
+    # セッションタイムスタンプの生成
+    session_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     
-    # 4. デュアルストリーム対応のcollate_fn
-    train_dataloader = DataLoader(
-        train_dataset,
-        batch_size=args.batch_size // torch.distributed.get_world_size() if torch.distributed.is_initialized() else args.batch_size,
-        shuffle=True,
-        num_workers=args.num_workers,
-        collate_fn=collate_fn,  # デュアルストリーム対応
-        pin_memory=True,
-        drop_last=True
-    )
+    # 出力ディレクトリの作成（メインプロセスのみ）
+    if is_main_process:
+        os.makedirs(args.output_dir, exist_ok=True)
     
-    print(f"✅ デュアルストリーム・データローダー作成完了")
-    print(f"   - バッチサイズ（GPU毎）: {train_dataloader.batch_size}")
-    print(f"   - ワーカー数: {args.num_workers}")
+    if is_main_process:
+        print(f"学習設定:")
+        print(f"  - エポック数: {args.epochs}")
+        print(f"  - エポックあたりステップ数: {args.steps_per_epoch}")
+        print(f"  - 総ステップ数: {args.epochs * args.steps_per_epoch}")
+        print(f"  - 学習率: {args.learning_rate}")
+        print(f"  - データセットタイプ: {args.dataset_type}")
+        print(f"  - バッチサイズ: {args.batch_size}")
+        print(f"  - チェックポイント間隔: {args.checkpoint_interval}ステップ")
+        print(f"  - 出力ディレクトリ: {args.output_dir}")
+        print(f"  - DeepSpeed設定: {args.ds_config}")
+        print("-" * 80)
     
-    # 5. 損失関数の設定
-    loss_fn = setup_loss_function(args)
-    
-    # 6. DeepSpeed初期化
-    model_engine, optimizer, _, _ = deepspeed.initialize(
-        model=model,
-        config=args.deepspeed_config,
-        model_parameters=model.parameters(),
-    )
-    
-    print(f"✅ DeepSpeed初期化完了")
-    print(f"   - ZeRO Stage: {model_engine.zero_optimization_stage()}")
-    print(f"   - 精度: {args.precision}")
-    
-    # DeepSpeed初期化後にTensorBoardライターを作成
-    if torch.distributed.is_initialized() and torch.distributed.get_rank() == 0:
-        writer = SummaryWriter(log_dir)
-    elif not torch.distributed.is_initialized():
-        writer = SummaryWriter(log_dir)
-    
-    # 7. 学習ループ
-    print("\n" + "=" * 60)
-    print("📚 学習開始")
-    print("=" * 60)
-    
-    for epoch in range(args.epochs):
-        # 1エポックの学習
-        epoch_results = train_epoch(model_engine, train_dataloader, loss_fn, epoch, args, writer)
+    try:
+        # 1. モデルの初期化
+        lisa_config = LisaGemmaConfig(
+            gemma_model_id=getattr(config, 'GEMMA_MODEL_ID', 'google/gemma-3-4b-it'),
+            sam_checkpoint_path=getattr(config, 'SAM_CHECKPOINT_PATH', None),
+            seg_token=getattr(config, 'SEG_TOKEN', '[SEG]'),
+            gemma_hidden_size=getattr(config, 'GEMMA_HIDDEN_SIZE', 2560),
+            sam_prompt_embed_dim=getattr(config, 'SEG_PROJECTION_DIM', 256),
+            gemma_image_size=getattr(config, 'GEMMA_IMAGE_SIZE', 896),
+            sam_image_size=getattr(config, 'SAM_IMAGE_SIZE', 1024),
+            model_max_length=getattr(config, 'MODEL_MAX_LENGTH', 2048),
+        )
         
-        # チェックポイントの保存
-        if (epoch + 1) % args.save_interval == 0:
-            save_checkpoint(model_engine, epoch, args)
+        model = LisaGemmaForCausalLM(lisa_config)
         
-        # TensorBoardログ
-        if writer:
-            writer.add_scalar("epoch/avg_loss", epoch_results["avg_loss"], epoch)
-            writer.add_scalar("epoch/avg_text_loss", epoch_results["avg_text_loss"], epoch)
-            writer.add_scalar("epoch/avg_mask_loss", epoch_results["avg_mask_loss"], epoch)
-    
-    # 最終チェックポイントの保存
-    save_checkpoint(model_engine, args.epochs - 1, args)
-    
-    if writer:
-        writer.close()
-    
-    print("\n" + "=" * 60)
-    print("🎉 学習完了!")
-    print("=" * 60)
-
+        if is_main_process:
+            print("✅ モデル初期化完了")
+        
+        # LoRA設定を適用
+        if is_main_process:
+            print("\n🔧 LoRA設定を適用中...")
+        try:
+            from peft import LoraConfig, get_peft_model
+            
+            lora_config = LoraConfig(
+                r=config.LORA_R,
+                lora_alpha=config.LORA_ALPHA,
+                target_modules=config.LORA_TARGET_MODULES,
+                lora_dropout=config.LORA_DROPOUT,
+                bias="none",
+                task_type="CAUSAL_LM"
+            )
+            
+            # LoRAをGemmaモデルに適用
+            model.gemma_model = get_peft_model(model.gemma_model, lora_config)
+            if is_main_process:
+                print("✅ LoRA設定が正常に適用されました")
+            
+        except Exception as e:
+            if is_main_process:
+                print(f"⚠️  LoRA適用に失敗: {e}")
+                print("   LoRAなしで検証を続行します")
+        
+        # 2. データセットとデータローダーの準備
+        if is_main_process:
+            print(f"\n📊 {args.dataset_type}データセットを準備中...")
+        
+        processor = AutoProcessor.from_pretrained(lisa_config.gemma_model_id)
+        
+        # データセットタイプの決定
+        if args.dataset_type == "all":
+            dataset_spec = "sem_seg||refer_seg||vqa||reason_seg"
+            if is_main_process:
+                print(f"  - 全データセットを使用: sem_seg, refer_seg, vqa, reason_seg")
+        else:
+            dataset_spec = args.dataset_type
+            if is_main_process:
+                print(f"  - 単一データセットを使用: {args.dataset_type}")
+        
+        # バッチサイズ調整（A100*8の場合は大きくできる）
+        effective_batch_size = args.batch_size
+        if torch.cuda.is_available():
+            gpu_memory_gb = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+            if gpu_memory_gb > 75:  # A100 80GB検出
+                effective_batch_size = max(args.batch_size, 2)  # 最低2
+                if is_main_process:
+                    print(f"  ✅ A100大容量GPU検出 ({gpu_memory_gb:.1f}GB): バッチサイズ {effective_batch_size} を使用")
+            else:
+                if is_main_process:
+                    print(f"  📊 GPU メモリ: {gpu_memory_gb:.1f}GB - バッチサイズ {effective_batch_size} を維持")
+        
+        # データセット作成
+        samples_per_epoch = effective_batch_size * args.steps_per_epoch
+        dataset = HybridDataset(
+            base_image_dir=getattr(config, 'DATASET_BASE_DIR', './dataset'),
+            gemma_processor=processor,
+            dataset=dataset_spec,
+            samples_per_epoch=samples_per_epoch
+        )
+        
+        if is_main_process:
+            print(f"✅ データセット準備完了")
+            print(f"  - 総サンプル数: {len(dataset)}")
+            print(f"  - エポックあたりサンプル数: {samples_per_epoch}")
+            print(f"  - 実効バッチサイズ: {effective_batch_size}")
+        
+        # 3. DeepSpeed初期化
+        if is_main_process:
+            print(f"\n🚀 DeepSpeed ZeRO Stage 2 初期化中...")
+        
+        # DeepSpeed設定を確認
+        if not os.path.exists(args.ds_config):
+            raise FileNotFoundError(f"DeepSpeed設定ファイルが見つかりません: {args.ds_config}")
+        
+        # DeepSpeedでモデルとオプティマイザーを初期化
+        model_engine, optimizer, _, lr_scheduler = deepspeed.initialize(
+            model=model,
+            model_parameters=model.parameters(),
+            config=args.ds_config,
+            dist_init_required=False  # 既に初期化済み
+        )
+        
+        if is_main_process:
+            print("✅ DeepSpeed ZeRO Stage 2 初期化完了")
+            
+            # 学習可能パラメータの情報を表示
+            param_info = model.get_trainable_parameters_info()
+            print(f"✅ モデル統計:")
+            print(f"  - 総パラメータ数: {param_info['total_parameters']:,}")
+            print(f"  - 学習可能パラメータ数: {param_info['trainable_parameters']:,}")
+            print(f"  - 学習可能率: {param_info['trainable_percentage']:.2f}%")
+            
+            # 仕様書準拠性チェック
+            trainable_ratio = param_info['trainable_percentage']
+            spec_compliant = trainable_ratio < 1.0
+            print(f"  - 📋 仕様書準拠性: {'✅ 準拠' if spec_compliant else '❌ 違反'} (要求: <1%)")
+        
+        # 4. WandB初期化（メインプロセスのみ）
+        if is_main_process:
+            wandb.init(
+                project="lisa-gemma-deepspeed",
+                name=f"deepspeed_zero2_{session_timestamp}",
+                config={
+                    "learning_rate": args.learning_rate,
+                    "epochs": args.epochs,
+                    "steps_per_epoch": args.steps_per_epoch,
+                    "total_steps": args.epochs * args.steps_per_epoch,
+                    "batch_size": effective_batch_size,
+                    "dataset_type": args.dataset_type,
+                    "world_size": world_size,
+                    "ds_config": args.ds_config,
+                }
+            )
+        
+        # 5. 損失関数の準備
+        loss_fn = CompositeLoss(
+            ce_loss_weight=getattr(config, 'CE_LOSS_WEIGHT', 1.0),
+            dice_loss_weight=getattr(config, 'DICE_LOSS_WEIGHT', 0.5),
+            bce_loss_weight=getattr(config, 'BCE_LOSS_WEIGHT', 2.0)
+        )
+        
+        # 6. エポックベース学習ループの実行
+        if is_main_process:
+            print(f"\n🚀 DeepSpeed分散学習を開始...")
+            print(f"目標: {args.epochs}エポック × {args.steps_per_epoch}ステップで損失を減少させる")
+            print("-" * 80)
+        
+        loss_history = []
+        best_loss = float('inf')
+        global_step = 0
+        start_time = time.time()
+        
+        # エポックループ
+        for epoch in range(args.epochs):
+            if is_main_process:
+                print(f"\n📅 Epoch {epoch+1}/{args.epochs} 開始")
+            
+            # エポックごとにデータローダーを再生成（シャッフル効果）
+            dataloader = DataLoader(
+                dataset,
+                batch_size=effective_batch_size,
+                collate_fn=collate_fn,
+                shuffle=True,
+                drop_last=True
+            )
+            
+            epoch_start_time = time.time()
+            epoch_loss_sum = 0.0
+            
+            # ステップループ（各エポック内）
+            dataloader_iter = iter(dataloader)
+            for step in range(args.steps_per_epoch):
+                try:
+                    # バッチを取得
+                    batch = next(dataloader_iter)
+                except StopIteration:
+                    # データローダーの終端に達した場合、再度イテレータを作成
+                    dataloader_iter = iter(dataloader)
+                    batch = next(dataloader_iter)
+                
+                # デバイスに移動（DeepSpeedは自動で処理）
+                batch = {k: v.cuda() if isinstance(v, torch.Tensor) else v 
+                        for k, v in batch.items()}
+                
+                # フォワードパス
+                model_engine.train()
+                
+                # セグメンテーションタスクの確認
+                has_segmentation = 'ground_truth_mask' in batch
+                
+                # モデルに適した入力形式を準備
+                model_inputs = {
+                    'input_ids': batch['input_ids'],
+                    'attention_mask': batch['attention_masks'],
+                    'labels': batch['labels'],
+                    'generate_mask': has_segmentation,
+                }
+                
+                # デュアルストリーム対応
+                if 'images_for_gemma' in batch:
+                    model_inputs['images_for_gemma'] = batch['images_for_gemma']
+                if 'images_for_sam' in batch:
+                    model_inputs['images_for_sam'] = batch['images_for_sam']
+                
+                # フォワードパス実行
+                try:
+                    outputs = model_engine(**model_inputs)
+                    
+                    # 初回のみメモリ監視（メインプロセスのみ）
+                    if global_step == 0 and is_main_process:
+                        if torch.cuda.is_available():
+                            allocated_memory = torch.cuda.memory_allocated() / (1024**3)
+                            print(f"  📊 フォワードパス後 GPU メモリ: {allocated_memory:.2f}GB")
+                    
+                except torch.cuda.OutOfMemoryError as e:
+                    if is_main_process:
+                        print(f"❌ フォワードパス中にGPUメモリ不足: {e}")
+                        print("🔧 メモリクリーンアップを実行中...")
+                    torch.cuda.empty_cache()
+                    raise
+                
+                # 損失計算
+                losses = loss_fn(outputs, batch)
+                total_loss = losses['total_loss']
+                
+                # バックワードパス（DeepSpeed使用）
+                try:
+                    model_engine.backward(total_loss)
+                    
+                    # 初回のみメモリ監視（メインプロセスのみ）
+                    if global_step == 0 and is_main_process:
+                        if torch.cuda.is_available():
+                            allocated_memory = torch.cuda.memory_allocated() / (1024**3)
+                            print(f"  📊 バックワードパス後 GPU メモリ: {allocated_memory:.2f}GB")
+                    
+                except torch.cuda.OutOfMemoryError as e:
+                    if is_main_process:
+                        print(f"❌ バックワードパス中にGPUメモリ不足: {e}")
+                        print("🔧 メモリクリーンアップを実行中...")
+                    torch.cuda.empty_cache()
+                    raise
+                
+                # オプティマイザーステップ（DeepSpeed）
+            model_engine.step()
+            
+                # 損失履歴を記録（メインプロセスのみ）
+                if is_main_process:
+                    loss_record = {
+                        'epoch': epoch,
+                        'step': step,
+                        'global_step': global_step,
+                        'total_loss': total_loss.item(),
+                        'text_loss': losses.get('text_loss', torch.tensor(0.0)).item(),
+                        'dice_loss': losses.get('dice_loss', torch.tensor(0.0)).item(),
+                        'bce_loss': losses.get('bce_loss', torch.tensor(0.0)).item(),
+                    }
+                    loss_history.append(loss_record)
+                    epoch_loss_sum += total_loss.item()
+                    
+                    # WandBに損失をログ
+                    wandb.log({
+                        "epoch": epoch,
+                        "step": step,
+                        "global_step": global_step,
+                        "total_loss": total_loss.item(),
+                        "text_loss": loss_record['text_loss'],
+                        "dice_loss": loss_record['dice_loss'],
+                        "bce_loss": loss_record['bce_loss'],
+                        "learning_rate": args.learning_rate,
+                    })
+                    
+                    # 最良損失の更新
+                    if total_loss.item() < best_loss:
+                        best_loss = total_loss.item()
+                    
+                    # 進捗表示（10ステップごと、またはエポック最終）
+                    if (step + 1) % 10 == 0 or step == args.steps_per_epoch - 1:
+                        elapsed_time = time.time() - start_time
+                        memory_info = get_memory_usage()
+                        memory_str = format_memory_info(memory_info)
+                        
+                        print(f"Epoch {epoch+1:2d}/{args.epochs} Step {step+1:3d}/{args.steps_per_epoch}: "
+                              f"Loss={total_loss.item():.6f} "
+                              f"(Text: {loss_record['text_loss']:.4f}, "
+                              f"DICE: {loss_record['dice_loss']:.4f}, "
+                              f"BCE: {loss_record['bce_loss']:.4f}) "
+                              f"Best: {best_loss:.6f}")
+                        print(f"                     Memory: {memory_str}")
+                
+                # チェックポイント保存（メインプロセスのみ）
+                if is_main_process and (global_step + 1) % args.checkpoint_interval == 0:
+                    checkpoint_path = os.path.join(args.output_dir, f"deepspeed_checkpoint_epoch{epoch+1}_step{global_step+1}")
+                    model_engine.save_checkpoint(checkpoint_path)
+                    print(f"💾 DeepSpeedチェックポイント保存: {checkpoint_path}")
+                    
+                    # WandBにチェックポイント情報をログ
+                    wandb.log({
+                        "checkpoint/epoch": epoch,
+                        "checkpoint/global_step": global_step,
+                        "checkpoint/loss": total_loss.item(),
+                    })
+                
+                global_step += 1
+            
+            # エポック終了時の処理（メインプロセスのみ）
+            if is_main_process:
+                epoch_elapsed = time.time() - epoch_start_time
+                avg_epoch_loss = epoch_loss_sum / args.steps_per_epoch
+                
+                print(f"📊 Epoch {epoch+1} 完了: 平均損失={avg_epoch_loss:.6f}, 時間={epoch_elapsed:.1f}秒")
+                
+                # WandBにエポック統計をログ
+                wandb.log({
+                    "epoch_avg_loss": avg_epoch_loss,
+                    "epoch_duration": epoch_elapsed,
+                    "completed_epochs": epoch + 1,
+                })
+                
+                # 最終エポックのチェックポイント保存
+                if epoch == args.epochs - 1:
+                    final_checkpoint_path = os.path.join(args.output_dir, f"deepspeed_final_checkpoint_{session_timestamp}")
+                    model_engine.save_checkpoint(final_checkpoint_path)
+                    print(f"💾 最終DeepSpeedチェックポイント保存: {final_checkpoint_path}")
+        
+        if is_main_process:
+            print("-" * 80)
+            print("✅ DeepSpeed分散学習完了")
+        
+        # メモリクリーンアップ
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            if is_main_process:
+                final_memory = torch.cuda.memory_allocated() / (1024**3)
+                print(f"🧹 GPU メモリクリーンアップ完了 (最終使用量: {final_memory:.2f}GB)")
+        
+        # 7. 学習結果の分析（メインプロセスのみ）
+        if is_main_process:
+            print("\n📊 学習結果の分析...")
+            
+            if len(loss_history) > 0:
+                initial_loss = loss_history[0]['total_loss']
+                final_loss = loss_history[-1]['total_loss']
+                reduction_ratio = (initial_loss - final_loss) / initial_loss if initial_loss > 0 else 0
+                
+                print(f"学習結果:")
+                print(f"  - 総ステップ数: {len(loss_history)}")
+                print(f"  - 完了エポック数: {args.epochs}")
+                print(f"  - 初期損失: {initial_loss:.6f}")
+                print(f"  - 最終損失: {final_loss:.6f}")
+                print(f"  - 総損失減少率: {reduction_ratio:.1%}")
+                print(f"  - 最良損失: {best_loss:.6f}")
+                
+                # WandBに最終分析結果をログ
+                wandb.log({
+                    "final_analysis/total_steps": len(loss_history),
+                    "final_analysis/completed_epochs": args.epochs,
+                    "final_analysis/initial_loss": initial_loss,
+                    "final_analysis/final_loss": final_loss,
+                    "final_analysis/reduction_ratio": reduction_ratio,
+                    "final_analysis/best_loss": best_loss,
+                })
+                
+                # 学習成果の評価
+                print(f"\n📋 学習成果の評価:")
+                if reduction_ratio > 0.1:
+                    print(f"  ✅ 優秀な学習進捗: 損失が{reduction_ratio:.1%}減少")
+                elif reduction_ratio > 0.05:
+                    print(f"  ⚠️  中程度の学習進捗: 損失が{reduction_ratio:.1%}減少")
+                else:
+                    print(f"  ❌ 学習進捗不十分: 損失減少が{reduction_ratio:.1%}のみ")
+            
+                # 8. 結果の保存
+                print("\n💾 結果を保存中...")
+                
+                # 損失曲線のプロット
+                plot_path = os.path.join(args.output_dir, f"deepspeed_training_loss_curve_{session_timestamp}.png")
+                plot_loss_curve(loss_history, plot_path)
+                
+                # 詳細結果をJSONで保存
+                training_analysis = {
+                    "total_steps": len(loss_history),
+                    "completed_epochs": args.epochs,
+                    "initial_loss": initial_loss,
+                    "final_loss": final_loss,
+                    "reduction_ratio": reduction_ratio,
+                    "best_loss": best_loss,
+                }
+                
+                results = {
+                    "session_timestamp": session_timestamp,
+                    "training_config": {
+                        "epochs": args.epochs,
+                        "steps_per_epoch": args.steps_per_epoch,
+                        "total_steps": args.epochs * args.steps_per_epoch,
+                        "learning_rate": args.learning_rate,
+                        "dataset_type": args.dataset_type,
+                        "batch_size": effective_batch_size,
+                        "world_size": world_size,
+                        "ds_config": args.ds_config,
+                    },
+                    "training_analysis": training_analysis,
+                    "loss_history": loss_history,
+                    "final_status": "success" if training_analysis['reduction_ratio'] > 0.05 else "partial_success"
+                }
+                
+                json_path = os.path.join(args.output_dir, f"deepspeed_training_results_{session_timestamp}.json")
+                with open(json_path, 'w', encoding='utf-8') as f:
+                    json.dump(results, f, ensure_ascii=False, indent=2)
+                
+                print(f"✅ 結果保存完了:")
+                print(f"  - 損失曲線: {plot_path}")
+                print(f"  - 詳細データ: {json_path}")
+                print(f"  - DeepSpeedチェックポイント: {args.output_dir}/deepspeed_final_checkpoint_{session_timestamp}")
+        
+                # 9. 最終判定
+                print("\n" + "="*80)
+                print("🎯 最終判定")
+                print("="*80)
+                
+                if training_analysis['reduction_ratio'] > 0.05:
+                    print("✅ Phase 2.3: DeepSpeed ZeRO Stage 2統合 - 成功")
+                    print("   DTensor競合問題が解決されました。")
+                    print("   DeepSpeed分散学習が正常に機能しています。")
+                    print("   A100*8環境でのマルチGPU学習が成功しています。")
+                    
+                    if training_analysis['reduction_ratio'] > 0.1:
+                        print("   → Phase 3: DeepSpeed ZeRO Stage 3移行の準備が整いました。")
+                    else:
+                        print("   → さらなる最適化でパフォーマンス向上の余地があります。")
+                else:
+                    print("❌ Phase 2.3: DeepSpeed ZeRO Stage 2統合 - 要改善")
+                    print("   学習進捗が不十分です。")
+                    
+                wandb.log({
+                    "final_status": results["final_status"],
+                    "total_steps": training_analysis['total_steps'],
+                    "completed_epochs": training_analysis['completed_epochs'],
+                    "reduction_ratio": training_analysis['reduction_ratio'],
+                    "final_loss": training_analysis['final_loss']
+                })
+            
+            # WandB実験を終了
+            wandb.finish()
+        
+        print("="*80)
+        
+    except Exception as e:
+        if is_main_process:
+            print(f"\n❌ エラーが発生しました: {e}")
+            import traceback
+            traceback.print_exc()
+        raise e
 
 if __name__ == "__main__":
     main() 

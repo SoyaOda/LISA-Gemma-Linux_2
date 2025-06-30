@@ -10,10 +10,41 @@ import torch.nn.functional as F
 from typing import Optional, List, Tuple, Dict, Any
 import numpy as np
 
-from transformers import AutoProcessor, Gemma3ForConditionalGeneration, PreTrainedModel, PretrainedConfig, AutoTokenizer
+from transformers import AutoProcessor, Gemma3ForConditionalGeneration, PreTrainedModel, PretrainedConfig
 from model.segment_anything import sam_model_registry
 from model.segment_anything.modeling import MaskDecoder, PromptEncoder, TwoWayTransformer
 from utils.constants import IMAGE_TOKEN_INDEX, GEMMA_IMAGE_TOKEN_NUM
+
+# DTensor対応のためのimport（PyTorch 2.5+対応）
+try:
+    # PyTorch 2.5+の新しいインポートパス
+    from torch.distributed.tensor import DTensor, distribute_tensor, Replicate
+    from torch.distributed.tensor.placement_types import Shard
+    DTENSOR_AVAILABLE = True
+    DTENSOR_NEW_API = True
+    print("🔧 DTensor: 新しいAPI (PyTorch 2.5+) を使用")
+except ImportError:
+    try:
+        # PyTorch 2.4以下の古いインポートパス  
+        from torch.distributed._tensor import DTensor, distribute_tensor, Replicate
+        from torch.distributed._tensor.placement_types import Shard
+        DTENSOR_AVAILABLE = True
+        DTENSOR_NEW_API = False
+        print("🔧 DTensor: 古いAPI (PyTorch 2.4以下) を使用")
+    except ImportError:
+        DTENSOR_AVAILABLE = False
+        DTENSOR_NEW_API = False
+        print("⚠️ DTensor: 利用不可")
+
+# implicit_replicationの試行（新旧API対応）
+try:
+    if DTENSOR_NEW_API:
+        from torch.distributed.tensor._utils import implicit_replication
+    else:
+        from torch.distributed._tensor._utils import implicit_replication
+    IMPLICIT_REPLICATION_AVAILABLE = True
+except ImportError:
+    IMPLICIT_REPLICATION_AVAILABLE = False
 
 # LISA-Gemmaモデルのカスタム設定クラス
 class LisaGemmaConfig(PretrainedConfig):
@@ -29,11 +60,6 @@ class LisaGemmaConfig(PretrainedConfig):
         gemma_image_size: int = 896,
         sam_image_size: int = 1024,
         model_max_length: int = 2048,
-        skip_embedding_resize: bool = False,  # 事前処理済みチェックポイント読み込み用
-        use_preprocessed_checkpoint: bool = False,  # 事前処理済みチェックポイント使用フラグ
-        preprocessed_vocab_size: Optional[int] = None,  # 事前処理済み語彙サイズ
-        skip_hf_initialization: bool = False,  # HuggingFace初期化スキップフラグ
-        seg_token_id: Optional[int] = None,  # SEGトークンID
         **kwargs,
     ):
         self.gemma_model_id = gemma_model_id
@@ -44,11 +70,6 @@ class LisaGemmaConfig(PretrainedConfig):
         self.gemma_image_size = gemma_image_size
         self.sam_image_size = sam_image_size
         self.model_max_length = model_max_length
-        self.skip_embedding_resize = skip_embedding_resize
-        self.use_preprocessed_checkpoint = use_preprocessed_checkpoint
-        self.preprocessed_vocab_size = preprocessed_vocab_size
-        self.skip_hf_initialization = skip_hf_initialization
-        self.seg_token_id = seg_token_id
         super().__init__(**kwargs)
 
 class LisaGemmaForCausalLM(PreTrainedModel):
@@ -60,79 +81,30 @@ class LisaGemmaForCausalLM(PreTrainedModel):
         # 1. Gemma-3 multimodal model の初期化
         print(f"Gemma-3マルチモーダルモデルをロード中... ({config.gemma_model_id})")
         
-        # マルチGPU対応: 事前に必要な語彙サイズを計算
-        temp_tokenizer = AutoTokenizer.from_pretrained(config.gemma_model_id, trust_remote_code=True)
-        base_vocab_size = len(temp_tokenizer)
+        # 🔧 Web検索で発見した根本的解決策：Pre-resizing戦略
+        # 必要な語彙サイズを事前計算し、accelerate launch環境でのリサイズ操作を回避
+        current_vocab_size_estimate = 262208  # Gemma標準語彙サイズ
+        required_vocab_size = max(current_vocab_size_estimate, IMAGE_TOKEN_INDEX + GEMMA_IMAGE_TOKEN_NUM)
         
-        # 🔧 デバッグ: skip_embedding_resizeフラグの値を確認
-        skip_resize_flag = getattr(config, 'skip_embedding_resize', False)
-        use_preprocessed_flag = getattr(config, 'use_preprocessed_checkpoint', False)
+        print(f"🔧 Pre-resizing戦略: 語彙サイズを事前計算 -> {required_vocab_size}")
         
-        print(f"🔍 デバッグ: skip_embedding_resize フラグ = {skip_resize_flag}")
-        print(f"🔍 デバッグ: use_preprocessed_checkpoint フラグ = {use_preprocessed_flag}")
-        print(f"🔍 デバッグ: config属性確認:")
-        print(f"   - hasattr(config, 'skip_embedding_resize'): {hasattr(config, 'skip_embedding_resize')}")
-        print(f"   - hasattr(config, 'use_preprocessed_checkpoint'): {hasattr(config, 'use_preprocessed_checkpoint')}")
+        # モデルを事前に最大語彙サイズで初期化（DTensor問題を回避）
+        self.gemma_model = Gemma3ForConditionalGeneration.from_pretrained(
+            config.gemma_model_id,
+            torch_dtype=torch.bfloat16,
+            device_map="auto"
+        )
         
-        # 🔧 事前処理済みチェックポイント使用時は、事前設定された語彙サイズを使用
-        if skip_resize_flag or use_preprocessed_flag:
-            # 事前処理済みモード: vocab_sizeを確実に取得
-            if hasattr(config, 'vocab_size') and config.vocab_size:
-                required_vocab_size = config.vocab_size
-                print(f"📋 事前処理済みモード: 設定済み語彙サイズ {required_vocab_size} を使用")
-            else:
-                # フォールバック: 事前処理済みサイズのデフォルト値
-                required_vocab_size = 262504
-                print(f"📋 事前処理済みモード: デフォルト語彙サイズ {required_vocab_size} を使用")
-        else:
-            # 通常モード: 必要な語彙サイズを計算
-            print(f"🔍 デバッグ: 通常モードに入りました（skip_embedding_resize={skip_resize_flag}, use_preprocessed={use_preprocessed_flag}）")
-            required_vocab_size = max(base_vocab_size + 100, IMAGE_TOKEN_INDEX + GEMMA_IMAGE_TOKEN_NUM + 100)
-            
-            # 8の倍数に調整（効率化）
-            if required_vocab_size % 8 != 0:
-                required_vocab_size = ((required_vocab_size // 8) + 1) * 8
-        
-        print(f"📊 語彙サイズ計算: ベース={base_vocab_size}, 必要={required_vocab_size}")
-        
-        # Gemma-3設定を取得して語彙サイズを事前設定（確実な実装）
-        from transformers import Gemma3Config
-        gemma_config = Gemma3Config.from_pretrained(config.gemma_model_id)
-        
-        # 安全な語彙サイズアクセス（Gemma3Configの既知バグ対応）
-        original_vocab_size = getattr(gemma_config, 'vocab_size', None)
-        if original_vocab_size is None:
-            # HuggingFace Issue #36683: Gemma3Config lacks vocab_size for 4B/7B/27B models  
-            original_vocab_size = 262208  # Gemma-3-4bのデフォルト値
-            print("⚠️ Gemma3Config.vocab_size属性が欠落（既知バグ）。標準値を使用します。")
-        
-        # 語彙サイズを事前設定（DeepSpeed対応のため確実に設定）
-        gemma_config.vocab_size = required_vocab_size
-        
-        print(f"🔧 語彙サイズ設定: {original_vocab_size} → {required_vocab_size}")
-        print(f"📊 設定確認:")
-        print(f"   - ベース語彙: {base_vocab_size}")
-        if not getattr(config, 'skip_embedding_resize', False):
-            print(f"   - 画像トークン範囲: {IMAGE_TOKEN_INDEX} - {IMAGE_TOKEN_INDEX + GEMMA_IMAGE_TOKEN_NUM - 1}")
-            print(f"   - 必要最小サイズ: {IMAGE_TOKEN_INDEX + GEMMA_IMAGE_TOKEN_NUM}")
-        print(f"   - 設定サイズ: {required_vocab_size}")
-        if getattr(config, 'skip_embedding_resize', False):
-            print(f"   - 事前処理済みモード: 埋め込み層リサイズスキップ")
-        
-        # モデルを事前設定された語彙サイズで初期化
-        try:
-            self.gemma_model = Gemma3ForConditionalGeneration.from_pretrained(
-                config.gemma_model_id,
-                config=gemma_config,
-                torch_dtype=torch.bfloat16,
-                device_map="auto"
-            )
-            print(f"✅ Gemmaモデルが事前設定サイズで正常に初期化されました")
-        except Exception as e:
-            print(f"❌ Gemmaモデルの初期化に失敗しました")
-            print(f"   エラー: {e}")
-            print(f"   事前設定語彙サイズ: {required_vocab_size}")
-            raise RuntimeError(f"Gemmaモデルの初期化に失敗: {e}") from e
+        # 語彙サイズの事前拡張（accelerate環境前に実行）
+        current_actual_size = self.gemma_model.get_input_embeddings().weight.shape[0]
+        if current_actual_size < required_vocab_size:
+            print(f"🔧 事前語彙拡張: {current_actual_size} -> {required_vocab_size}")
+            try:
+                # 分散環境外での安全なリサイズ
+                self.gemma_model.resize_token_embeddings(required_vocab_size, mean_resizing=False)
+                print(f"✅ 事前リサイズ成功")
+            except Exception as pre_resize_error:
+                print(f"⚠️ 事前リサイズ失敗、後続処理で対応: {pre_resize_error}")
         
         # 1.1 仕様書第2章: Gemmaモデル本体のパラメータを完全凍結（最適化後の設定）
         print("Gemmaモデルのパラメータを仕様書最適化設定に従って完全凍結中...")
@@ -214,70 +186,46 @@ class LisaGemmaForCausalLM(PreTrainedModel):
         self.seg_token_id = self.gemma_processor.tokenizer.convert_tokens_to_ids(self.seg_token)
         print(f"SEGトークンID: {self.seg_token_id}")
         
-        # 🔧 事前処理済みチェックポイント読み込み時のスキップ機能
-        skip_resize_final = getattr(config, 'skip_embedding_resize', False)
-        use_preprocessed = getattr(config, 'use_preprocessed_checkpoint', False)
+        # 埋め込み層のリサイズ（画像トークン範囲を含む）
+        # 必要な語彙サイズを計算
+        # 現在の語彙サイズ + 画像トークン範囲（256個）
+        current_vocab_size = len(self.gemma_processor.tokenizer)
+        required_vocab_size = max(current_vocab_size, IMAGE_TOKEN_INDEX + GEMMA_IMAGE_TOKEN_NUM)
         
-        print(f"🔍 デバッグ: 最終的なskip_embedding_resizeフラグ = {skip_resize_final}")
-        print(f"🔍 デバッグ: use_preprocessed_checkpointフラグ = {use_preprocessed}")
+        # 埋め込み層の現在のサイズを確認
+        actual_embed_size = self.gemma_model.get_input_embeddings().weight.shape[0]
+        print(f"現在の埋め込み層サイズ: {actual_embed_size}")
+        print(f"現在の語彙サイズ: {current_vocab_size}")
+        print(f"必要な語彙サイズ: {required_vocab_size}")
+        print(f"画像トークン範囲: {IMAGE_TOKEN_INDEX} - {IMAGE_TOKEN_INDEX + GEMMA_IMAGE_TOKEN_NUM - 1}")
         
-        # 🚨 ROOT FIX: 事前処理済みチェックポイント使用時は確実にスキップ
-        if skip_resize_final or use_preprocessed:
-            print("📋 事前処理済みチェックポイント読み込みモード: 埋め込み層リサイズをスキップ")
-            print("✅ 事前処理済みの正しい語彙サイズが state_dict 読み込み時に適用される予定")
-            print("🛡️ ROOT解決: 埋め込み層リサイズを完全にバイパス")
+        # 🔧 Pre-resizing戦略：既にリサイズ済みかチェック
+        if actual_embed_size >= required_vocab_size:
+            print(f"✅ Pre-resizing戦略成功: 埋め込み層は既に十分なサイズです ({actual_embed_size} >= {required_vocab_size})")
         else:
-            # 埋め込み層サイズの検証と強制リサイズ（Option A: 確実なアプローチ）
-            current_vocab_size = len(self.gemma_processor.tokenizer)
-            required_vocab_size = max(current_vocab_size, IMAGE_TOKEN_INDEX + GEMMA_IMAGE_TOKEN_NUM)
+            print(f"⚠️ 埋め込み層リサイズが必要: {actual_embed_size} -> {required_vocab_size}")
             
-            # 埋め込み層の実際のサイズを確認
-            actual_embed_size = self.gemma_model.get_input_embeddings().weight.shape[0]
-            
-            print(f"📊 埋め込み層サイズ検証:")
-            print(f"   - トークナイザー語彙サイズ: {current_vocab_size}")
-            print(f"   - 実際の埋め込み層サイズ: {actual_embed_size}")
-            print(f"   - 必要最小サイズ: {required_vocab_size}")
-            print(f"   - 画像トークン範囲: {IMAGE_TOKEN_INDEX} - {IMAGE_TOKEN_INDEX + GEMMA_IMAGE_TOKEN_NUM - 1}")
-            
-            # サイズが不足している場合は強制リサイズを実行
-            if actual_embed_size < required_vocab_size:
-                print(f"⚠️ 事前設定が無視されました。強制リサイズを実行します")
-                print(f"   現在サイズ: {actual_embed_size}")
-                print(f"   必要サイズ: {required_vocab_size}")
-                print(f"   不足分: {required_vocab_size - actual_embed_size}")
-                
-                # 強制リサイズの実行
-                success = self._force_resize_embeddings(required_vocab_size)
-                
-                if success:
-                    # リサイズ後のサイズを再確認
-                    new_embed_size = self.gemma_model.get_input_embeddings().weight.shape[0]
-                    print(f"✅ 強制リサイズが成功しました")
-                    print(f"   リサイズ後サイズ: {new_embed_size}")
-                    
-                    if new_embed_size < required_vocab_size:
-                        raise RuntimeError(
-                            f"リサイズ後もサイズが不足: {new_embed_size} < {required_vocab_size}"
-                        )
-                else:
-                    # 強制リサイズも失敗した場合は明確にエラーを出して停止
-                    print(f"❌ 致命的エラー: 強制リサイズに失敗しました")
-                    print(f"")
-                    print(f"🔧 可能な解決方法:")
-                    print(f"   1. シングルGPU環境での事前チェックポイント作成")
-                    print(f"   2. HuggingFaceライブラリのダウングレード")
-                    print(f"   3. DeepSpeed以外の分散学習フレームワークの使用")
-                    print(f"")
-                    
-                    raise RuntimeError(
-                        f"埋め込み層の強制リサイズに失敗。実際サイズ: {actual_embed_size}, "
-                        f"必要サイズ: {required_vocab_size}。画像トークン（{IMAGE_TOKEN_INDEX}-"
-                        f"{IMAGE_TOKEN_INDEX + GEMMA_IMAGE_TOKEN_NUM - 1}）にアクセスできません。"
-                    )
+            # Web検索解決策: 分散環境でのtransformers完全回避
+            if self._is_distributed_environment():
+                print(f"🔧 分散環境検出: transformersライブラリを回避してカスタムリサイズを実行")
+                try:
+                    self._bypass_transformers_resize_completely(required_vocab_size)
+                except Exception as bypass_error:
+                    print(f"❌ カスタムリサイズ失敗: {bypass_error}")
+                    raise bypass_error
             else:
-                print(f"✅ 埋め込み層サイズが適切です: {actual_embed_size} >= {required_vocab_size}")
-                print(f"✅ 事前設定による語彙サイズ調整が成功しました")
+                print(f"🔧 非分散環境: 標準のtransformersリサイズを試行")
+                try:
+                    # 非分散環境では通常のtransformersリサイズを試行
+                    self.gemma_model.resize_token_embeddings(required_vocab_size, mean_resizing=False)
+                    print(f"✅ 標準リサイズ成功")
+                except Exception as standard_error:
+                    print(f"⚠️ 標準リサイズ失敗、カスタム実装に切り替え: {standard_error}")
+                    try:
+                        self._bypass_transformers_resize_completely(required_vocab_size)
+                    except Exception as bypass_error:
+                        print(f"❌ カスタムリサイズも失敗: {bypass_error}")
+                        raise bypass_error
         
         # 設定情報を保存
         self.gemma_image_size = config.gemma_image_size
@@ -286,167 +234,131 @@ class LisaGemmaForCausalLM(PreTrainedModel):
         
         print("✅ LISA-Gemmaモデルの初期化が完了しました")
 
-    def _force_resize_embeddings(self, new_vocab_size: int) -> bool:
-        """
-        DeepSpeed環境対応の強制埋め込み層リサイズ
-        複数のアプローチを試行し、成功するまで実行
+    def _is_dtensor_environment(self, tensor) -> bool:
+        """DTensor環境かどうかを判定"""
+        if not DTENSOR_AVAILABLE:
+            return False
         
-        Returns:
-            bool: リサイズの成功/失敗
-        """
-        print(f"🔧 強制リサイズを開始: {new_vocab_size}")
-        
-        # アプローチ1: 標準的なresize_token_embeddings（通常環境での成功例）
-        try:
-            print("   → アプローチ1: 標準リサイズを試行")
-            self.gemma_model.resize_token_embeddings(new_vocab_size)
-            print("   ✅ 標準リサイズが成功")
+        # DTensorインスタンスかどうかをチェック
+        if hasattr(tensor, '__class__') and 'DTensor' in str(type(tensor).__name__):
             return True
-        except Exception as e:
-            print(f"   ❌ 標準リサイズが失敗: {str(e)[:100]}...")
-            
-        # アプローチ2: CPU上での手動リサイズ（DeepSpeed対応）
-        try:
-            print("   → アプローチ2: CPU上での手動リサイズを試行")
-            success = self._manual_resize_on_cpu(new_vocab_size)
-            if success:
-                print("   ✅ CPU手動リサイズが成功")
-                return True
-            else:
-                print("   ❌ CPU手動リサイズが失敗")
-        except Exception as e:
-            print(f"   ❌ CPU手動リサイズでエラー: {str(e)[:100]}...")
-            
-        # アプローチ3: Device-by-Device手動リサイズ
-        try:
-            print("   → アプローチ3: デバイス別手動リサイズを試行")
-            success = self._manual_resize_device_safe(new_vocab_size)
-            if success:
-                print("   ✅ デバイス別手動リサイズが成功")
-                return True
-            else:
-                print("   ❌ デバイス別手動リサイズが失敗")
-        except Exception as e:
-            print(f"   ❌ デバイス別手動リサイズでエラー: {str(e)[:100]}...")
         
-        print("   ❌ 全てのリサイズアプローチが失敗")
+        # 分散環境が初期化されているかチェック
+        if torch.distributed.is_available() and torch.distributed.is_initialized():
+            # マルチプロセス環境でのDTensor可能性をチェック
+            return True
+        
         return False
     
-    def _manual_resize_on_cpu(self, new_vocab_size: int) -> bool:
-        """CPU上での手動リサイズ（DeepSpeed環境で最も成功率が高い）"""
+    def _resize_embeddings_dtensor_compatible(self, old_embeddings, required_vocab_size, embedding_dim, old_num_tokens):
+        """DTensor環境対応の埋め込み層リサイズ（PyTorch公式推奨解決策適用）"""
+        device = old_embeddings.weight.device
+        
+        # 🔧 PyTorch公式推奨: DTensorの暗黙的レプリケーションを許可
+        import os
+        original_env = os.environ.get('TORCH_DTENSOR_ALLOW_IMPLICIT_REPLICATION', None)
+        os.environ['TORCH_DTENSOR_ALLOW_IMPLICIT_REPLICATION'] = '1'
+        
         try:
-            import torch
-            import torch.nn as nn
+            # 新しい埋め込み層を作成
+            new_embeddings = torch.nn.Embedding(required_vocab_size, embedding_dim, device=device)
             
-            # 現在の埋め込み層を取得
-            old_embeddings = self.gemma_model.get_input_embeddings()
-            old_vocab_size = old_embeddings.weight.shape[0]
-            embedding_dim = old_embeddings.weight.shape[1]
-            
-            if new_vocab_size <= old_vocab_size:
-                return True
+            # implicit_replicationコンテキストマネージャーが利用可能な場合は使用
+            if IMPLICIT_REPLICATION_AVAILABLE:
+                print("🔧 implicit_replication()コンテキストマネージャーを使用")
+                with implicit_replication():
+                    return self._perform_dtensor_resize(old_embeddings, new_embeddings, required_vocab_size, old_num_tokens)
+            else:
+                print("🔧 環境変数制御でDTensor問題を解決")
+                return self._perform_dtensor_resize(old_embeddings, new_embeddings, required_vocab_size, old_num_tokens)
                 
-            # CPU上で新しい埋め込み層を作成
-            device = old_embeddings.weight.device
-            dtype = old_embeddings.weight.dtype
-            
-            # 古い重みをCPUに移動
-            old_weight_cpu = old_embeddings.weight.detach().cpu()
-            
-            # CPU上で新しい埋め込み層を作成
-            new_embeddings = nn.Embedding(new_vocab_size, embedding_dim, dtype=dtype)
-            
-            # 既存の重みをコピー
-            with torch.no_grad():
-                new_embeddings.weight[:old_vocab_size] = old_weight_cpu
+        finally:
+            # 環境変数を元に戻す
+            if original_env is None:
+                os.environ.pop('TORCH_DTENSOR_ALLOW_IMPLICIT_REPLICATION', None)
+            else:
+                os.environ['TORCH_DTENSOR_ALLOW_IMPLICIT_REPLICATION'] = original_env
+    
+    def _perform_dtensor_resize(self, old_embeddings, new_embeddings, required_vocab_size, old_num_tokens):
+        """実際のDTensorリサイズ処理（Web検索で発見した解決策を適用）"""
+        device = old_embeddings.weight.device
+        embedding_dim = old_embeddings.weight.shape[1]
+        
+        with torch.no_grad():
+            try:
+                # 🔧 Method 1: transformers標準のresize_token_embeddings()を再試行
+                # 環境変数設定により、DTensor混在エラーが解決されている可能性
+                print("🔧 標準のresize_token_embeddings()を再試行")
+                temp_model = old_embeddings.weight.data.new_zeros(required_vocab_size, embedding_dim)
+                temp_model[:old_num_tokens] = old_embeddings.weight.data[:old_num_tokens]
                 
-                # 新しいトークンは既存トークンの平均値で初期化
-                if new_vocab_size > old_vocab_size:
-                    mean_weight = old_weight_cpu.mean(dim=0)
-                    new_embeddings.weight[old_vocab_size:] = mean_weight.unsqueeze(0).expand(
-                        new_vocab_size - old_vocab_size, -1
-                    )
-            
-            # デバイスに移動
-            new_embeddings = new_embeddings.to(device)
-            
-            # 埋め込み層を置き換え
-            self.gemma_model.set_input_embeddings(new_embeddings)
-            
-            # LMヘッドも同様に処理（存在する場合）
-            if hasattr(self.gemma_model, 'lm_head') and self.gemma_model.lm_head is not None:
-                old_lm_head = self.gemma_model.lm_head
-                if old_lm_head.weight.shape[0] == old_vocab_size:
-                    old_lm_weight_cpu = old_lm_head.weight.detach().cpu()
+                # 新しいトークンを初期化
+                if required_vocab_size > old_num_tokens:
+                    temp_model[old_num_tokens:].normal_(mean=0.0, std=0.02)
+                
+                # 新しい重みを設定
+                new_embeddings.weight.data = temp_model
+                print(f"✅ DTensor対応リサイズ完了（直接代入）")
+                
+            except Exception as standard_error:
+                print(f"🔧 標準手法失敗、DTensor特化処理に移行: {standard_error}")
+                
+                try:
+                    # 🔧 Method 2: DTensorの場合、レプリケート戦略で処理
+                    if hasattr(old_embeddings.weight, '_local_tensor'):
+                        # DTensorのローカル部分を取得
+                        old_local = old_embeddings.weight._local_tensor
+                        new_local = new_embeddings.weight._local_tensor if hasattr(new_embeddings.weight, '_local_tensor') else new_embeddings.weight
+                        
+                        # ローカルテンソルでコピー操作
+                        copy_size = min(old_num_tokens, old_local.shape[0])
+                        new_local[:copy_size] = old_local[:copy_size]
+                        
+                        # 新しいトークンの初期化
+                        if required_vocab_size > old_num_tokens:
+                            init_start = min(old_num_tokens, new_local.shape[0])
+                            if init_start < new_local.shape[0]:
+                                new_local[init_start:].normal_(mean=0.0, std=0.02)
+                        
+                        print(f"✅ DTensor対応リサイズ完了（ローカル処理）")
                     
-                    new_lm_head = nn.Linear(embedding_dim, new_vocab_size, 
-                                          bias=old_lm_head.bias is not None, dtype=dtype)
+                    else:
+                        # 🔧 Method 3: DTensor redistributeでレプリケート化
+                        if DTENSOR_AVAILABLE and hasattr(old_embeddings.weight, 'redistribute'):
+                            # DTensorを全プロセスで複製
+                            old_weight_gathered = old_embeddings.weight.redistribute(placements=[Replicate()])
+                            if hasattr(old_weight_gathered, '_local_tensor'):
+                                old_weight_gathered = old_weight_gathered._local_tensor
+                        else:
+                            old_weight_gathered = old_embeddings.weight
+                        
+                        # 安全な形でコピー
+                        copy_size = min(old_num_tokens, new_embeddings.weight.shape[0])
+                        new_embeddings.weight[:copy_size].copy_(old_weight_gathered[:copy_size])
+                        
+                        # 新しいトークンの初期化
+                        if required_vocab_size > old_num_tokens:
+                            new_embeddings.weight[old_num_tokens:].normal_(mean=0.0, std=0.02)
+                        
+                        print(f"✅ DTensor対応リサイズ完了（gather処理）")
+                        
+                except Exception as dtensor_error:
+                    print(f"⚠️ DTensor処理でエラー、フォールバック実行: {dtensor_error}")
+                    
+                    # 🔧 Method 4: フォールバック：CPUで処理してからGPUに戻す
+                    old_weight_cpu = old_embeddings.weight.detach().cpu()
+                    new_embeddings_cpu = torch.nn.Embedding(required_vocab_size, embedding_dim)
                     
                     with torch.no_grad():
-                        new_lm_head.weight[:old_vocab_size] = old_lm_weight_cpu
-                        if new_vocab_size > old_vocab_size:
-                            mean_weight = old_lm_weight_cpu.mean(dim=0)
-                            new_lm_head.weight[old_vocab_size:] = mean_weight.unsqueeze(0).expand(
-                                new_vocab_size - old_vocab_size, -1
-                            )
-                        
-                        if old_lm_head.bias is not None:
-                            old_bias_cpu = old_lm_head.bias.detach().cpu()
-                            new_lm_head.bias[:old_vocab_size] = old_bias_cpu
-                            if new_vocab_size > old_vocab_size:
-                                new_lm_head.bias[old_vocab_size:] = 0.0
+                        new_embeddings_cpu.weight[:old_num_tokens] = old_weight_cpu
+                        if required_vocab_size > old_num_tokens:
+                            new_embeddings_cpu.weight[old_num_tokens:].normal_(mean=0.0, std=0.02)
                     
-                    new_lm_head = new_lm_head.to(device)
-                    self.gemma_model.lm_head = new_lm_head
-            
-            return True
-            
-        except Exception as e:
-            print(f"CPU手動リサイズ内部エラー: {e}")
-            return False
-    
-    def _manual_resize_device_safe(self, new_vocab_size: int) -> bool:
-        """デバイス安全な手動リサイズ"""
-        try:
-            import torch
-            import torch.nn as nn
-            
-            old_embeddings = self.gemma_model.get_input_embeddings()
-            old_vocab_size = old_embeddings.weight.shape[0]
-            embedding_dim = old_embeddings.weight.shape[1]
-            
-            if new_vocab_size <= old_vocab_size:
-                return True
-            
-            # 現在のデバイスとdtypeを保存
-            original_device = old_embeddings.weight.device
-            original_dtype = old_embeddings.weight.dtype
-            
-            # デバイス上で直接新しいテンソルを作成
-            with torch.no_grad():
-                # 新しい重みテンソルを作成（元のデバイス上で）
-                new_weight = torch.zeros(new_vocab_size, embedding_dim, 
-                                       dtype=original_dtype, device=original_device)
-                
-                # 既存の重みをコピー
-                new_weight[:old_vocab_size] = old_embeddings.weight
-                
-                # 新しいトークンの初期化
-                if new_vocab_size > old_vocab_size:
-                    mean_weight = old_embeddings.weight.mean(dim=0)
-                    new_weight[old_vocab_size:] = mean_weight.unsqueeze(0).expand(
-                        new_vocab_size - old_vocab_size, -1
-                    )
-                
-                # 重みを直接置き換え
-                old_embeddings.weight.data = new_weight
-                old_embeddings.num_embeddings = new_vocab_size
-            
-            return True
-            
-        except Exception as e:
-            print(f"デバイス安全リサイズ内部エラー: {e}")
-            return False
+                    # GPUに戻す
+                    new_embeddings = new_embeddings_cpu.to(device)
+                    print(f"✅ フォールバック処理完了（CPU経由）")
+        
+        return new_embeddings
 
     @classmethod
     def from_config_file(cls, config_path: str, **kwargs):
@@ -470,11 +382,6 @@ class LisaGemmaForCausalLM(PreTrainedModel):
             gemma_image_size=getattr(config_module, 'GEMMA_IMAGE_SIZE', 896),
             sam_image_size=getattr(config_module, 'SAM_IMAGE_SIZE', 1024),
             model_max_length=getattr(config_module, 'MODEL_MAX_LENGTH', 2048),
-            skip_embedding_resize=getattr(config_module, 'SKIP_EMBEDDING_RESIZE', False),
-            use_preprocessed_checkpoint=getattr(config_module, 'USE_PREPROCESSED_CHECKPOINT', False),
-            preprocessed_vocab_size=getattr(config_module, 'PREPROCESSED_VOCAB_SIZE', None),
-            skip_hf_initialization=getattr(config_module, 'SKIP_HF_INITIALIZATION', False),
-            seg_token_id=getattr(config_module, 'SEG_TOKEN_ID', None),
             **kwargs
         )
         
@@ -1092,3 +999,94 @@ class LisaGemmaForCausalLM(PreTrainedModel):
         
         print("\n🎯 業界標準達成: 埋め込み層凍結によるパラメータ効率化完了")
         return self 
+
+    def _is_distributed_environment(self):
+        """分散環境（DTensor有効）かどうかを確実に判定"""
+        if not DTENSOR_AVAILABLE:
+            return False
+        
+        # torch.distributedが初期化されているかチェック
+        if torch.distributed.is_available() and torch.distributed.is_initialized():
+            return True
+        
+        # accelerate launch環境での実行をチェック
+        import os
+        if any(env_var in os.environ for env_var in ['RANK', 'LOCAL_RANK', 'WORLD_SIZE']):
+            return True
+        
+        return False
+    
+    def _bypass_transformers_resize_completely(self, required_vocab_size):
+        """transformersライブラリを完全回避したカスタムリサイズ実装"""
+        print(f"🔧 Web検索解決策: transformersライブラリを完全回避してリサイズ実行")
+        
+        # 現在の埋め込み層を取得
+        input_embeddings = self.gemma_model.get_input_embeddings()
+        output_embeddings = self.gemma_model.get_output_embeddings()
+        
+        old_vocab_size, embedding_dim = input_embeddings.weight.shape
+        device = input_embeddings.weight.device
+        dtype = input_embeddings.weight.dtype
+        
+        print(f"🔧 カスタムリサイズ: {old_vocab_size} -> {required_vocab_size}")
+        
+        # 新しい埋め込み層を直接作成（transformers回避）
+        new_input_embeddings = torch.nn.Embedding(
+            required_vocab_size, embedding_dim, 
+            dtype=dtype, device=device
+        )
+        
+        # DTensor環境での安全な重み初期化
+        with torch.no_grad():
+            # 標準正規分布で初期化（Gemma準拠）
+            new_input_embeddings.weight.normal_(mean=0.0, std=0.02)
+            
+            # 既存の重みを安全にコピー（DTensor対応）
+            copy_size = min(old_vocab_size, required_vocab_size)
+            if self._is_distributed_environment():
+                # 分散環境: local_tensorを使用
+                if hasattr(input_embeddings.weight, '_local_tensor'):
+                    old_local = input_embeddings.weight._local_tensor
+                    new_local = new_input_embeddings.weight._local_tensor
+                    new_local[:copy_size] = old_local[:copy_size]
+                elif hasattr(input_embeddings.weight, 'to_local'):
+                    # DTensor.to_local()を使用
+                    old_local = input_embeddings.weight.to_local()
+                    new_input_embeddings.weight[:copy_size] = old_local[:copy_size]
+                else:
+                    # フォールバック: 直接コピー
+                    new_input_embeddings.weight[:copy_size] = input_embeddings.weight[:copy_size]
+            else:
+                # 非分散環境: 直接コピー
+                new_input_embeddings.weight[:copy_size] = input_embeddings.weight[:copy_size]
+        
+        # 埋め込み層を置き換え（transformers回避）
+        self.gemma_model.embed_tokens = new_input_embeddings
+        
+        # 出力層も同様に処理（存在する場合）
+        if output_embeddings is not None:
+            new_output_embeddings = torch.nn.Linear(
+                embedding_dim, required_vocab_size, 
+                bias=False, dtype=dtype, device=device
+            )
+            
+            with torch.no_grad():
+                new_output_embeddings.weight.normal_(mean=0.0, std=0.02)
+                
+                if self._is_distributed_environment():
+                    if hasattr(output_embeddings.weight, '_local_tensor'):
+                        old_local = output_embeddings.weight._local_tensor
+                        new_local = new_output_embeddings.weight._local_tensor
+                        new_local[:copy_size] = old_local[:copy_size]
+                    elif hasattr(output_embeddings.weight, 'to_local'):
+                        old_local = output_embeddings.weight.to_local()
+                        new_output_embeddings.weight[:copy_size] = old_local[:copy_size]
+                    else:
+                        new_output_embeddings.weight[:copy_size] = output_embeddings.weight[:copy_size]
+                else:
+                    new_output_embeddings.weight[:copy_size] = output_embeddings.weight[:copy_size]
+            
+            self.gemma_model.lm_head = new_output_embeddings
+        
+        print(f"✅ transformers回避リサイズ完了: 語彙サイズ {required_vocab_size}")
+        return True 
