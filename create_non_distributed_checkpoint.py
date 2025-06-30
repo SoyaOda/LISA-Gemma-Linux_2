@@ -303,12 +303,12 @@ def create_non_distributed_checkpoint():
         gemma_hidden_size = config.GEMMA_HIDDEN_SIZE
         
         mlp_projector = nn.Sequential(
-            nn.Linear(sam_prompt_embed_dim, gemma_hidden_size),
+            nn.Linear(gemma_hidden_size, gemma_hidden_size),
             nn.GELU(),
-            nn.Linear(gemma_hidden_size, gemma_hidden_size)
+            nn.Linear(gemma_hidden_size, sam_prompt_embed_dim)
         ).to(device)
         
-        print(f"   プロジェクション: {sam_prompt_embed_dim} → {gemma_hidden_size}")
+        print(f"   プロジェクション: {gemma_hidden_size} → {gemma_hidden_size} → {sam_prompt_embed_dim}")
         print("   ✅ MLPプロジェクタ作成完了")
         
         # Step 7: LoRA設定の適用
