@@ -293,6 +293,27 @@ ssh -i ~/.ssh/lambda_cloud_key ubuntu@$LAMBDA_IP "ls -la /lambda/nfs/lisa-gemma-
 ssh -i ~/.ssh/lambda_cloud_key ubuntu@$LAMBDA_IP "mkdir -p /lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux"
 ```
 
+### 🔥 分散学習（DeepSpeed）時のWandB認証
+```bash
+# 🚨 重要: DeepSpeed実行前に必須
+# 一括セットアップ後でも、分散学習時は追加認証が必要
+
+# 1. Lambda Cloud上で直接WandBログイン実行
+ssh -i ~/.ssh/lambda_cloud_key ubuntu@$LAMBDA_IP "cd /lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux && source ../../venvs/lisa_gemma_venv/bin/activate && wandb login \$(cat wandb_api_key.txt)"
+
+# 2. 認証確認
+ssh -i ~/.ssh/lambda_cloud_key ubuntu@$LAMBDA_IP "cd /lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux && source ../../venvs/lisa_gemma_venv/bin/activate && wandb status"
+
+# 3. その後DeepSpeed実行
+lc-deepspeed train_deepspeed_with_preprocessed.py --preprocessed_checkpoint YOUR_CHECKPOINT --epochs 1 --steps_per_epoch 1 --dataset_type sem_seg --samples_per_epoch 1
+```
+
+**📝 分散学習WandB認証のポイント:**
+- ✅ 一括セットアップ後でも、DeepSpeed実行前に**追加認証必須**
+- ✅ `wandb_api_key.txt`のAPIキーを使用して直接Lambda Cloud上でログイン
+- ✅ 認証完了確認: "W&B API key is configured" メッセージが表示される
+- ⚠️ 認証せずDeepSpeed実行すると: `api_key not configured (no-tty)` エラー発生
+
 ---
 
 **🎉 このガイドで95%の開発作業をカバーできます。迷ったらプロジェクト全体同期から始めてください。**
