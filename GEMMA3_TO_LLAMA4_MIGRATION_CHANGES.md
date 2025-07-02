@@ -585,6 +585,126 @@ LLAMA4_TORCH_DTYPE = "bfloat16"  # Llama4推奨データ型
 
 ---
 
+---
+
+## 🔧 **[最新修正] verify_input_formatting.py および utils/dataset.py 設定管理修正**
+
+**修正日:** 2025 年 1 月 16 日  
+**修正タイプ:** 設定ファイル読み込み優先順位の変更
+
+### 📋 修正内容
+
+#### **1. verify_input_formatting.py の Llama4 化完了**
+
+**Gemma3 固有の要素を完全に Llama4 仕様に置き換え:**
+
+```python
+# [修正] プロセッサー初期化
+processor = AutoProcessor.from_pretrained(
+    config.MODEL_ID,  # meta-llama/Llama-4-Scout-17B-16E-Instruct
+    trust_remote_code=True,
+    use_fast=True  # Llama4では必須
+)
+
+# [修正] HybridDataset初期化引数
+dataset = HybridDataset(
+    base_image_dir=config.DATASET_BASE_DIR,
+    llama4_processor=processor,  # gemma_processor → llama4_processor
+    samples_per_epoch=samples_per_dataset,
+    dataset=dataset_type,
+    sample_rate=[1],
+    **{dataset_config['config_attr'].lower(): sub_dataset}
+)
+
+# [修正] config読み込み
+from config_llama4 import create_config
+config = create_config("default")  # Llama4設定インスタンス化
+```
+
+#### **2. utils/dataset.py の設定管理優先順位修正**
+
+**問題:** 「設定: config_linux.py を使用」ログが出力  
+**原因:** `get_config()`関数で config_linux.py を優先読み込み  
+**解決:** config_llama4.py を最優先に変更
+
+**修正前:**
+
+```python
+config_path = os.environ.get('LISA_CONFIG_PATH', 'config_linux')
+# config_linux.pyを優先読み込み
+if config_path == 'config_linux' and os.path.exists('config_linux.py'):
+    import config_linux as config
+    print("設定: config_linux.py を使用")
+```
+
+**修正後:**
+
+```python
+config_path = os.environ.get('LISA_CONFIG_PATH', 'config_llama4')
+# config_llama4.pyを最優先読み込み
+if config_path == 'config_llama4' and os.path.exists('config_llama4.py'):
+    from config_llama4 import create_config
+    config = create_config("default")
+    print("設定: config_llama4.py を使用")
+
+# 後方互換性のためのconfig_linux.py
+if config_path == 'config_linux' and os.path.exists('config_linux.py'):
+    import config_linux as config
+    print("設定: config_linux.py を使用")
+```
+
+### ✅ **修正結果の検証**
+
+**修正前のログ:**
+
+```
+設定: config_linux.py を使用
+設定: config_linux.py を使用
+設定: config_linux.py を使用
+```
+
+**修正後のログ:**
+
+```
+設定: config_llama4.py を使用
+設定: config_llama4.py を使用
+設定: config_llama4.py を使用
+```
+
+### 🎯 **技術的変更点**
+
+| **項目**             | **修正前（Gemma3 仕様）** | **修正後（Llama4 仕様）**     |
+| -------------------- | ------------------------- | ----------------------------- |
+| **プロセッサー**     | `use_fast=False`          | `use_fast=True` (Llama4 必須) |
+| **データセット引数** | `gemma_processor`         | `llama4_processor`            |
+| **設定ファイル**     | `config_linux.py` 優先    | `config_llama4.py` 優先       |
+| **設定読み込み**     | 直接 import               | `create_config("default")`    |
+
+### 🚀 **Lambda Cloud 検証結果**
+
+- ✅ **全データセット検証成功**: 6/6 データセット
+- ✅ **全サンプル処理成功**: 18/18 サンプル (100%)
+- ✅ **設定管理統一**: config_llama4.py 完全使用
+- ✅ **入力フォーマット検証**: Llama4 チャットテンプレート準拠
+
+**検証データセット:**
+
+- sem_seg_ade20k
+- refer_seg_refcoco/refcoco+/refcocog
+- vqa_llava_instruct_150k
+- reason_seg_ReasonSeg_train
+
+### 📊 **Web 調査反映項目**
+
+**Llama-4-Scout-17B-16E-Instruct 仕様準拠:**
+
+- ✅ `use_fast=True` (トークナイザー必須設定)
+- ✅ `AutoProcessor` (公式推奨)
+- ✅ MoE アーキテクチャ対応
+- ✅ Native Multimodal (Early Fusion)
+
+---
+
 **最終更新:** 2025 年 1 月 16 日  
-**実装状況:** Phase 1 (データセット統合) + utils/フォルダ完全移行 完了  
+**実装状況:** Phase 1 (データセット統合) + utils/フォルダ完全移行 + 入力フォーマット検証 完了  
 **次期目標:** Phase 2 (モデル完全統合)

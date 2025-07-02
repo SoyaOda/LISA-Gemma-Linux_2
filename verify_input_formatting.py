@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-第2節：Gemma向けマルチモーダル入力フォーマットの検証
+第2節：Llama4向けマルチモーダル入力フォーマットの検証
 全データセット・全サブタイプ対応版 (Lambda Cloud最適化)
 
 論理的根拠:
 - データが正しく準備されても、モデルが解釈できる形式に変換する過程でエラーが発生すれば学習は失敗
-- Gemmaの特殊トークン配置、ラベルマスキング、バッチ処理の検証が必要
+- Llama4-Scout-17B-16E-Instructの特殊トークン配置、ラベルマスキング、バッチ処理の検証が必要
 - 各データセットのサブタイプごとに異なる処理ロジックを検証する必要がある
 """
 
@@ -18,7 +18,7 @@ from datetime import datetime
 from typing import Dict, List, Any, Optional, Tuple
 from collections import defaultdict
 
-print("🚀 LISA-Gemma Input Formatting Verification (Lambda Cloud Optimized)")
+print("🚀 LISA-Llama4 Input Formatting Verification (Lambda Cloud Optimized)")
 
 # 重いライブラリは遅延読み込み
 # import torch  # 遅延読み込み
@@ -30,19 +30,20 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 def get_config():
     """
-    config_linux.pyを必須として読み込む
+    config_llama4.pyを必須として読み込む
     読み込めない場合はエラーで停止
     """
     try:
-        import config_linux as config
-        print(f"✅ 設定ファイルを読み込み: config_linux.py")
+        from config_llama4 import create_config
+        config = create_config("default")
+        print(f"✅ 設定ファイルを読み込み: config_llama4.py")
         return config
     except ImportError as e:
-        print(f"❌ ERROR: config_linux.pyが見つかりません")
+        print(f"❌ ERROR: config_llama4.pyが見つかりません")
         print(f"   詳細: {e}")
         print(f"   現在のディレクトリ: {os.getcwd()}")
-        print(f"   ファイル存在確認: {os.path.exists('config_linux.py')}")
-        raise SystemExit("config_linux.pyが必須です。ファイルが存在することを確認してください。")
+        print(f"   ファイル存在確認: {os.path.exists('config_llama4.py')}")
+        raise SystemExit("config_llama4.pyが必須です。ファイルが存在することを確認してください。")
 
 def load_heavy_libraries():
     """重いライブラリを必要時に読み込む"""
@@ -179,29 +180,32 @@ def analyze_sample_tokens(input_ids: "torch.Tensor", labels: "torch.Tensor",
     
     # ラベルマスキング分析
     user_turn_tokens = 0
-    model_turn_tokens = 0
+    assistant_turn_tokens = 0
     
-    # Gemma-3のターン開始/終了トークンを検出
-    start_of_turn = processor.tokenizer.convert_tokens_to_ids("<start_of_turn>")
-    end_of_turn = processor.tokenizer.convert_tokens_to_ids("<end_of_turn>")
+    # Llama4のターン開始/終了トークンを検出
+    start_header = processor.tokenizer.convert_tokens_to_ids("<|start_header_id|>")
+    end_header = processor.tokenizer.convert_tokens_to_ids("<|end_header_id|>")
+    eot_id = processor.tokenizer.convert_tokens_to_ids("<|eot_id|>")
     
     current_turn = None
     for i, (input_id, label) in enumerate(zip(input_list, labels_list)):
-        if input_id == start_of_turn and i + 1 < len(input_list):
+        if input_id == start_header and i + 1 < len(input_list):
             # 次のトークンでターンの種類を判定
             next_token = input_list[i + 1]
             user_token = processor.tokenizer.convert_tokens_to_ids("user")
-            model_token = processor.tokenizer.convert_tokens_to_ids("model")
+            assistant_token = processor.tokenizer.convert_tokens_to_ids("assistant")
             
             if next_token == user_token:
                 current_turn = "user"
-            elif next_token == model_token:
-                current_turn = "model"
+            elif next_token == assistant_token:
+                current_turn = "assistant"
+        elif input_id == eot_id:
+            current_turn = None
         
         if current_turn == "user":
             user_turn_tokens += 1
-        elif current_turn == "model":
-            model_turn_tokens += 1
+        elif current_turn == "assistant":
+            assistant_turn_tokens += 1
     
     return {
         'sample_idx': sample_idx,
@@ -209,7 +213,7 @@ def analyze_sample_tokens(input_ids: "torch.Tensor", labels: "torch.Tensor",
         'non_pad_tokens': non_pad_tokens,
         'labeled_tokens': labeled_tokens,
         'user_turn_tokens': user_turn_tokens,
-        'model_turn_tokens': model_turn_tokens,
+        'assistant_turn_tokens': assistant_turn_tokens,
         'special_tokens': special_tokens,
         'label_masking_ratio': labeled_tokens / non_pad_tokens if non_pad_tokens > 0 else 0
     }
@@ -222,11 +226,12 @@ def verify_label_masking(input_ids: "torch.Tensor", labels: "torch.Tensor",
     input_list = input_ids.tolist()
     labels_list = labels.tolist()
     
-    # Gemma-3のターン制御トークン
-    start_of_turn = processor.tokenizer.convert_tokens_to_ids("<start_of_turn>")
-    end_of_turn = processor.tokenizer.convert_tokens_to_ids("<end_of_turn>")
+    # Llama4のターン制御トークン
+    start_header = processor.tokenizer.convert_tokens_to_ids("<|start_header_id|>")
+    end_header = processor.tokenizer.convert_tokens_to_ids("<|end_header_id|>")
+    eot_id = processor.tokenizer.convert_tokens_to_ids("<|eot_id|>")
     user_token = processor.tokenizer.convert_tokens_to_ids("user")
-    model_token = processor.tokenizer.convert_tokens_to_ids("model")
+    assistant_token = processor.tokenizer.convert_tokens_to_ids("assistant")
     
     errors = []
     current_turn = None
@@ -238,17 +243,17 @@ def verify_label_masking(input_ids: "torch.Tensor", labels: "torch.Tensor",
             continue
             
         # ターン開始の検出
-        if input_id == start_of_turn and i + 1 < len(input_list):
+        if input_id == start_header and i + 1 < len(input_list):
             next_token = input_list[i + 1]
             if next_token == user_token:
                 current_turn = "user"
                 turn_start_pos = i
-            elif next_token == model_token:
-                current_turn = "model"
+            elif next_token == assistant_token:
+                current_turn = "assistant"
                 turn_start_pos = i
         
         # ターン終了の検出
-        elif input_id == end_of_turn:
+        elif input_id == eot_id:
             current_turn = None
             turn_start_pos = None
         
@@ -267,14 +272,14 @@ def verify_label_masking(input_ids: "torch.Tensor", labels: "torch.Tensor",
                     'error': 'User turn should be masked'
                 })
         
-        elif current_turn == "model":
-            # modelターンでは、プロンプト部分（<start_of_turn>modelから最初の実質的な応答まで）は-100
+        elif current_turn == "assistant":
+            # assistantターンでは、プロンプト部分（<|start_header_id|>assistantから最初の実質的な応答まで）は-100
             # 実際の応答部分はinput_idと同じ値
             if turn_start_pos is not None:
-                # <start_of_turn>model の直後から予測開始位置を特定
-                model_start = turn_start_pos + 2  # <start_of_turn> + model
+                # <|start_header_id|>assistant<|end_header_id|> の直後から予測開始位置を特定
+                assistant_start = turn_start_pos + 3  # <|start_header_id|> + assistant + <|end_header_id|>
                 
-                if i < model_start:
+                if i < assistant_start:
                     # プロンプト部分は-100であるべき
                     if label != -100:
                         token_text = processor.tokenizer.decode([input_id])
@@ -285,7 +290,7 @@ def verify_label_masking(input_ids: "torch.Tensor", labels: "torch.Tensor",
                             'input_id': input_id,
                             'label': label,
                             'expected_label': -100,
-                            'error': 'Model prompt should be masked'
+                            'error': 'Assistant prompt should be masked'
                         })
                 else:
                     # 応答部分はinput_idと同じであるべき
@@ -298,7 +303,7 @@ def verify_label_masking(input_ids: "torch.Tensor", labels: "torch.Tensor",
                             'input_id': input_id,
                             'label': label,
                             'expected_label': input_id,
-                            'error': 'Model response should match input_id'
+                            'error': 'Assistant response should match input_id'
                         })
     
     is_correct = len(errors) == 0
@@ -325,8 +330,8 @@ def run_comprehensive_verification(samples_per_dataset: int = 25) -> Dict[str, A
     config = get_config()
     print(f"✅ 設定読み込み完了")
     print(f"  データセットベースディレクトリ: {config.DATASET_BASE_DIR}")
-    print(f"  モデル: {config.GEMMA_MODEL_ID}")
-    print(f"  バッチサイズ: {config.BATCH_SIZE_PER_GPU}")
+    print(f"  モデル: {config.MODEL_ID}")
+    print(f"  バッチサイズ: {config.BATCH_SIZE}")
     print(f"  各データセットサンプル数: {samples_per_dataset}")
     
     # セッション情報
@@ -337,9 +342,9 @@ def run_comprehensive_verification(samples_per_dataset: int = 25) -> Dict[str, A
     # Processor初期化
     print("📝 Tokenizer/Processorを初期化中...")
     processor = AutoProcessor.from_pretrained(
-        config.GEMMA_MODEL_ID,
+        config.MODEL_ID,
         trust_remote_code=True,
-        use_fast=False
+        use_fast=True
     )
     
     # 全データセット設定を取得
@@ -376,17 +381,17 @@ def run_comprehensive_verification(samples_per_dataset: int = 25) -> Dict[str, A
             print(f"📦 {dataset_name} データセットを準備中...")
             dataset = HybridDataset(
                 base_image_dir=config.DATASET_BASE_DIR,
-                gemma_processor=processor,
+                llama4_processor=processor,
                 samples_per_epoch=samples_per_dataset,
                 dataset=dataset_type,
                 sample_rate=[1],
                 **{dataset_config['config_attr'].lower(): sub_dataset}
             )
             
-            # DataLoader作成（config_linux.pyのバッチサイズを使用）
+            # DataLoader作成（config_llama4.pyのバッチサイズを使用）
             dataloader = DataLoader(
                 dataset,
-                batch_size=config.BATCH_SIZE_PER_GPU,
+                batch_size=config.BATCH_SIZE,
                 collate_fn=collate_fn,
                 shuffle=False
             )

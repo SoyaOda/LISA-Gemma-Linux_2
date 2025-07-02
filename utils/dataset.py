@@ -31,8 +31,8 @@ from .vqa_dataset import VQADataset
 def get_config():
     """実行時の設定ファイルを動的に取得"""
     try:
-        # 環境変数から設定ファイルを指定可能
-        config_path = os.environ.get('LISA_CONFIG_PATH', 'config_linux')
+        # 環境変数から設定ファイルを指定可能（Llama4プロジェクトではconfig_llama4がデフォルト）
+        config_path = os.environ.get('LISA_CONFIG_PATH', 'config_llama4')
         
         # 小規模テスト用設定を優先的に試行
         if os.path.exists('config_small_test.py'):
@@ -40,14 +40,21 @@ def get_config():
             print("設定: config_small_test.py を使用")
             return config
         
-        # 通常の設定ファイル
+        # Llama4プロジェクトの通常設定ファイル
+        if config_path == 'config_llama4' and os.path.exists('config_llama4.py'):
+            from config_llama4 import create_config
+            config = create_config("default")
+            print("設定: config_llama4.py を使用")
+            return config
+        
+        # 後方互換性のためのconfig_linux.py
         if config_path == 'config_linux' and os.path.exists('config_linux.py'):
             import config_linux as config
             print("設定: config_linux.py を使用")
             return config
         
         # カスタム設定ファイル
-        if config_path != 'config_linux':
+        if config_path not in ['config_llama4', 'config_linux']:
             import importlib
             config = importlib.import_module(config_path)
             print(f"設定: {config_path}.py を使用")
