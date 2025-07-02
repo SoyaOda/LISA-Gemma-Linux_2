@@ -382,7 +382,7 @@ def run_comprehensive_verification(samples_per_dataset: int = 25) -> Dict[str, A
             print(f"📦 {dataset_name} データセットを準備中...")
             dataset = HybridDataset(
                 base_image_dir=config.DATASET_BASE_DIR,
-                gemma_processor=processor,  # NOTE: utils/dataset.pyではgemma_processorパラメータ名だが、実際はLlama4 processorを渡す
+                llama_processor=processor,  # 正しいパラメータ名に修正
                 samples_per_epoch=samples_per_dataset,
                 dataset=dataset_type,
                 sample_rate=[1],

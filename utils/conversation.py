@@ -1,3 +1,4 @@
+# utils/conversation.py
 """
 Conversation prompt templates.
 """
@@ -5,7 +6,6 @@ Conversation prompt templates.
 import dataclasses
 from enum import Enum, auto
 from typing import Any, List
-
 
 class SeparatorStyle(Enum):
     """Different separator style."""
@@ -18,30 +18,20 @@ class SeparatorStyle(Enum):
     RWKV = auto()
     GEMMA3 = auto()
 
-
 @dataclasses.dataclass
 class Conversation:
     """A class that keeps all conversation history."""
 
-    # System prompts
     system: str
-    # Two roles
     roles: List[str]
-    # All messages
     messages: List[List[str]]
-    # Offset of few shot examples
     offset: int
-    # Separator
     sep_style: SeparatorStyle
     sep: str
     sep2: str = None
-    # Stop criteria (the default one is EOS token)
     stop_str: str = None
-    # Stops generation if meeting any token in this list
     stop_token_ids: List[int] = None
 
-    # Used for the state in the gradio servers.
-    # TODO(lmzheng): refactor this
     conv_id: Any = None
     skip_next: bool = False
     model_name: str = None
@@ -96,9 +86,7 @@ class Conversation:
             for i, (role, message) in enumerate(self.messages):
                 if message:
                     ret += (
-                        role
-                        + ": "
-                        + message.replace("\r\n", "\n").replace("\n\n", "\n")
+                        role + ": " + message.replace("\r\n", "\n").replace("\n\n", "\n")
                     )
                     ret += "\n\n"
                 else:
@@ -120,7 +108,7 @@ class Conversation:
 
     def to_gradio_chatbot(self):
         ret = []
-        for i, (role, msg) in enumerate(self.messages[self.offset :]):
+        for i, (role, msg) in enumerate(self.messages[self.offset:]):
             if i % 2 == 0:
                 ret.append([msg, None])
             else:
@@ -152,11 +140,10 @@ class Conversation:
             "model_name": self.model_name,
         }
 
-
 # A template with one conversation example
 conv_one_shot = Conversation(
     system="A chat between a curious human and an artificial intelligence assistant. "
-    "The assistant gives helpful, detailed, and polite answers to the human's questions.",
+           "The assistant gives helpful, detailed, and polite answers to the human's questions.",
     roles=("Human", "Assistant"),
     messages=(
         (
@@ -191,11 +178,10 @@ conv_one_shot = Conversation(
     stop_str="###",
 )
 
-
 # Vicuna v1.1 template
 conv_vicuna_v1_1 = Conversation(
     system="A chat between a curious user and an artificial intelligence assistant. "
-    "The assistant gives helpful, detailed, and polite answers to the user's questions.",
+           "The assistant gives helpful, detailed, and polite answers to the user's questions.",
     roles=("USER", "ASSISTANT"),
     messages=(),
     offset=0,
@@ -289,7 +275,20 @@ conv_gemma3 = Conversation(
     stop_str="<end_of_turn>",
 )
 
+# Llama-4 default template
+conv_llama4 = Conversation(
+    system="",
+    roles=("user", "assistant"),
+    messages=(),
+    offset=0,
+    sep_style=SeparatorStyle.ADD_COLON_TWO,
+    sep=" ",
+    sep2="</s>",
+    stop_str="</s>",
+)
+
 conv_templates = {
+    "llama4": conv_llama4,
     "baize": conv_baize,
     "conv_one_shot": conv_one_shot,
     "dolly": conv_dolly,
@@ -301,11 +300,13 @@ conv_templates = {
     "gemma3": conv_gemma3,
 }
 
-
 def get_default_conv_template(model_name):
     model_name = model_name.lower()
     if "gemma" in model_name or "gemma-3" in model_name:
         return conv_gemma3
+
+    elif "llama-4" in model_name or "llama4" in model_name or "scout" in model_name or "maverick" in model_name:
+        return conv_llama4
     elif "vicuna" in model_name or "output" in model_name:
         return conv_vicuna_v1_1
     elif "koala" in model_name:
@@ -322,7 +323,6 @@ def get_default_conv_template(model_name):
         return conv_rwkv
     return conv_one_shot
 
-
 if __name__ == "__main__":
     conv = conv_templates["vicuna_v1.1"].copy()
     conv.append_message(conv.roles[0], "Hello!")
@@ -332,4 +332,4 @@ if __name__ == "__main__":
     print(conv.get_prompt())
 
 # デフォルト会話テンプレート（LISA互換）
-default_conversation = conv_gemma3
+default_conversation = conv_llama4

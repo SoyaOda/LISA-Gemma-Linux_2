@@ -1,3 +1,4 @@
+# utils/utils.py
 from enum import Enum
 
 import numpy as np
@@ -9,8 +10,8 @@ from typing import Union, List
 from transformers import PreTrainedTokenizer
 
 IGNORE_INDEX = -100
-# ✅ Gemma-3は既に画像対応のため、特別な画像トークンインデックスは不要
-# 代わりにオリジナルLISA準拠の設計を使用
+# ✅ Llama-4-Scoutモデルも画像対応のため、特別な画像トークンは不要
+# オリジナルLISAの設計を踏襲します
 DEFAULT_IMAGE_TOKEN = "<image>"
 DEFAULT_IMAGE_PATCH_TOKEN = "<im_patch>"
 DEFAULT_IM_START_TOKEN = "<im_start>"
@@ -83,14 +84,13 @@ class AverageMeter(object):
                 + [
                     self.count,
                 ],
-                dtype=torch.float32,
+                dtype=torch.float32, 
                 device=device,
             )
         else:
             total = torch.tensor(
                 [self.sum, self.count], dtype=torch.float32, device=device
             )
-
         dist.all_reduce(total, dist.ReduceOp.SUM, async_op=False)
         if total.shape[0] > 2:
             self.sum, self.count = total[:-1].cpu().numpy(), total[-1].cpu().item()
@@ -114,12 +114,10 @@ class AverageMeter(object):
             fmtstr = "{name} {count:.3f}"
         else:
             raise ValueError("invalid summary type %r" % self.summary_type)
-
         return fmtstr.format(**self.__dict__)
 
 
 def intersectionAndUnionGPU(output, target, K, ignore_index=255):
-    # 'K' classes, output and target sizes are N or N * L or N * H * W, each value in range 0 to K - 1.
     assert output.dim() in [1, 2, 3]
     assert output.shape == target.shape
     output = output.view(-1)
@@ -171,23 +169,21 @@ def dict_to_cuda(input_dict):
 def tokenizer_image_token(
     text: str, 
     tokenizer: PreTrainedTokenizer, 
-    image_token_index: int = None,  # ✅ Gemma-3では不要だが互換性のため保持
+    image_token_index: int = None,  # ✅ Llama-4では不要だが互換性のため保持
     return_tensors: str = None
 ) -> Union[List[int], torch.Tensor]:
     """
-    ✅ Gemma-3対応の画像トークン処理関数（修正版）
-    
-    Gemma-3は既に画像対応のため、特別な画像トークン処理は不要。
-    しかし、互換性のためにオリジナルLISA準拠の簡単な処理を提供。
+    ✅ Llama-4対応の画像トークン処理関数
+
+    Llama-4-Scoutは画像を直接扱えるため、特別な画像トークン展開は不要。
+    互換性のため、オリジナルLISA準拠の処理を提供します。
     """
-    # ✅ Gemma-3では画像は内蔵SigLIPで処理されるため、
+    # ✅ Llama-4では画像は内蔵SigLIPで処理されるため、
     # 特別な画像トークン展開は不要。単純にテキストトークン化のみ。
-    
-    # 画像トークンを除去してテキストのみをトークン化
+
     text_without_image_tokens = text.replace(DEFAULT_IMAGE_TOKEN, "").strip()
     
     if not text_without_image_tokens:
-        # テキストが空の場合はデフォルトトークンを返す
         tokens = tokenizer.encode("", add_special_tokens=True)
     else:
         tokens = tokenizer.encode(text_without_image_tokens, add_special_tokens=True)
