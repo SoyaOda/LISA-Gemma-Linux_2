@@ -39,7 +39,7 @@ python lambda_quick_setup.py --ip YOUR_LAMBDA_IP
 - ✅ HuggingFace 認証設定
 - ✅ WandB 認証設定
 - ✅ プロジェクト環境設定
-- ✅ 開発用エイリアス自動生成
+- ✅ 環境変数設定
 
 ### 3. 認証設定（事前準備）
 
@@ -73,4 +73,32 @@ rsync -avz --progress --exclude='.git' --exclude='__pycache__' --exclude='*.pyc'
 ```bash
 # プロジェクト全体の高速同期（変更分のみ転送）
 rsync -avz --progress --delete --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='lambda_results' --exclude='verification_output' --exclude='vis_output' --exclude='.gitignore' -e "ssh -i ~/.ssh/lambda_cloud_key" ./ ubuntu@YOUR_IP:/lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux/
+```
+
+## 💡 実用的なコマンド例
+
+### 検証スクリプト実行例
+
+```bash
+# Llama4設定検証
+ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.95.127 "cd /lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux && source ../../venvs/lisa_gemma_venv/bin/activate && python verify_llama4_complete_config.py"
+
+# エンドツーエンドテスト
+ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.95.127 "cd /lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux && source ../../venvs/lisa_gemma_venv/bin/activate && python verify_llama4_end_to_end.py"
+
+# 単一バッチ学習テスト
+ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.95.127 "cd /lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux && source ../../venvs/lisa_gemma_venv/bin/activate && python overfit_llama4_single_batch.py"
+```
+
+### TMUX を使った長時間実行
+
+```bash
+# バックグラウンドで学習開始
+ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.95.127 "cd /lambda/nfs/lisa-gemma-project-fs/code/LISA-Gemma-Linux && source ../../venvs/lisa_gemma_venv/bin/activate && tmux new-session -d -s lisa_llama4_training 'python train_llama4.py'"
+
+# セッションにアタッチして進捗確認
+ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.95.127 -t "tmux attach -t lisa_llama4_training"
+
+# セッション確認
+ssh -i ~/.ssh/lambda_cloud_key ubuntu@150.136.95.127 "tmux list-sessions"
 ```

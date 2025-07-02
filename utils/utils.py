@@ -9,8 +9,7 @@ from typing import Union, List
 from transformers import PreTrainedTokenizer
 
 IGNORE_INDEX = -100
-# ✅ Gemma-3は既に画像対応のため、特別な画像トークンインデックスは不要
-# 代わりにオリジナルLISA準拠の設計を使用
+# ✅ Llama-4はNativeマルチモーダル対応、オリジナルLISA準拠の設計を使用
 DEFAULT_IMAGE_TOKEN = "<image>"
 DEFAULT_IMAGE_PATCH_TOKEN = "<im_patch>"
 DEFAULT_IM_START_TOKEN = "<im_start>"
@@ -171,16 +170,16 @@ def dict_to_cuda(input_dict):
 def tokenizer_image_token(
     text: str, 
     tokenizer: PreTrainedTokenizer, 
-    image_token_index: int = None,  # ✅ Gemma-3では不要だが互換性のため保持
+    image_token_index: int = None,  # ✅ Llama-4でも互換性のため保持
     return_tensors: str = None
 ) -> Union[List[int], torch.Tensor]:
     """
-    ✅ Gemma-3対応の画像トークン処理関数（修正版）
+    ✅ Llama-4対応の画像トークン処理関数
     
-    Gemma-3は既に画像対応のため、特別な画像トークン処理は不要。
-    しかし、互換性のためにオリジナルLISA準拠の簡単な処理を提供。
+    Llama-4はNativeマルチモーダル対応のため、特別な画像トークン処理は不要。
+    互換性のためにオリジナルLISA準拠の簡単な処理を提供。
     """
-    # ✅ Gemma-3では画像は内蔵SigLIPで処理されるため、
+    # ✅ Llama-4では画像は内蔵ビジョンエンコーダーで処理されるため、
     # 特別な画像トークン展開は不要。単純にテキストトークン化のみ。
     
     # 画像トークンを除去してテキストのみをトークン化

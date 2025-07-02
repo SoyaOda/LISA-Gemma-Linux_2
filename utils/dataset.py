@@ -1,6 +1,6 @@
 """
-LISA-Gemma3 デュアルストリーム・データパイプライン
-仕様書第3章に従った実装
+LISA-Llama4 デュアルストリーム・データパイプライン
+Llama4 Native Multimodal + SAM統合実装
 """
 
 import glob
@@ -60,7 +60,7 @@ def get_config():
     print("警告: 設定ファイルが見つかりません。デフォルト設定を使用します。")
     class DefaultConfig:
         MODEL_MAX_LENGTH = 2048
-        GEMMA_IMAGE_SIZE = 896
+        LLAMA4_IMAGE_SIZE = 1120  # Llama4の推奨画像サイズ
         SAM_IMAGE_SIZE = 1024
         SEG_TOKEN = "[SEG]"
         DATASET_BASE_DIR = "./dataset"
@@ -127,20 +127,20 @@ def preprocess_sam_image(image: Image.Image, target_size: Optional[int] = None) 
     
     return transform(padded_image)
 
-def preprocess_gemma_image(image: Image.Image, processor: AutoProcessor, target_size: Optional[int] = None) -> torch.Tensor:
+def preprocess_llama4_image(image: Image.Image, processor: AutoProcessor, target_size: Optional[int] = None) -> torch.Tensor:
     """
-    Gemma用画像前処理：896x896にリサイズ・正規化
+    Llama4用画像前処理：1120x1120にリサイズ・正規化
     """
     if target_size is None:
-        target_size = getattr(config, 'GEMMA_IMAGE_SIZE', 896)
+        target_size = getattr(config, 'LLAMA4_IMAGE_SIZE', 1120)
     
-    # AutoProcessorを使用してGemma用前処理
+    # AutoProcessorを使用してLlama4用前処理
     try:
         processed = processor(images=image, return_tensors="pt")
         image_tensor = processed['pixel_values'].squeeze(0)  # (1, C, H, W) -> (C, H, W)
         return image_tensor
     except Exception as e:
-        print(f"Gemma画像前処理エラー: {e}")
+        print(f"Llama4画像前処理エラー: {e}")
         # フォールバック: 手動前処理
         image_resized = image.resize((target_size, target_size), Image.LANCZOS)
         transform = transforms.Compose([
@@ -151,13 +151,13 @@ def preprocess_gemma_image(image: Image.Image, processor: AutoProcessor, target_
 
 
 
-def build_correct_labels_for_gemma3(input_ids: torch.Tensor, tokenizer) -> torch.Tensor:
+def build_correct_labels_for_llama4(input_ids: torch.Tensor, tokenizer) -> torch.Tensor:
     """
-    Gemma3チャットテンプレートに準拠した正確なラベルマスキング
+    Llama4チャットテンプレートに準拠した正確なラベルマスキング
     
     Args:
         input_ids: トークンID列 [seq_len]
-        tokenizer: Gemma3用トークナイザー
+        tokenizer: Llama4用トークナイザー
     
     Returns:
         正確にマスクされたラベル [seq_len]
@@ -165,73 +165,52 @@ def build_correct_labels_for_gemma3(input_ids: torch.Tensor, tokenizer) -> torch
     labels = input_ids.clone()
     input_ids_list = input_ids.tolist()
     
-    # 特殊トークンIDを取得
-    user_turn_start = None
-    model_turn_start = None
-    turn_end = None
+    # Llama4の特殊トークンIDを取得
+    bos_token_id = getattr(tokenizer, 'bos_token_id', None)
+    eos_token_id = getattr(tokenizer, 'eos_token_id', None)
     
-    # トークナイザーから特殊トークンIDを取得
-    for token_str, token_id in tokenizer.get_vocab().items():
-        if token_str == "<start_of_turn>":
-            user_turn_start = model_turn_start = token_id
-        elif token_str == "<end_of_turn>":
-            turn_end = token_id
+    # [INST] と [/INST] トークンのIDを取得
+    inst_start_id = None
+    inst_end_id = None
     
-    # フォールバック: ハードコーディングされた値
-    if user_turn_start is None:
-        user_turn_start = model_turn_start = getattr(tokenizer, 'convert_tokens_to_ids', lambda x: None)("<start_of_turn>")
-    if turn_end is None:
-        turn_end = getattr(tokenizer, 'convert_tokens_to_ids', lambda x: None)("<end_of_turn>")
-    
-    # user/modelトークンのID
-    user_token_id = getattr(tokenizer, 'convert_tokens_to_ids', lambda x: None)("user")
-    model_token_id = getattr(tokenizer, 'convert_tokens_to_ids', lambda x: None)("model")
+    try:
+        inst_start_id = tokenizer.convert_tokens_to_ids("[INST]")
+        inst_end_id = tokenizer.convert_tokens_to_ids("[/INST]")
+    except:
+        # フォールバック: 部分文字列で検索
+        for token_str, token_id in tokenizer.get_vocab().items():
+            if "INST" in token_str and token_str.startswith("["):
+                inst_start_id = token_id
+            elif "INST" in token_str and token_str.endswith("]"):
+                inst_end_id = token_id
     
     # シーケンス全体を-100で初期化（デフォルトでマスク）
     labels.fill_(-100)
     
     i = 0
     while i < len(input_ids_list):
-        # <start_of_turn>を探す
-        if input_ids_list[i] == user_turn_start:  # <start_of_turn>
-            if i + 1 < len(input_ids_list):
-                next_token = input_ids_list[i + 1]
-                
-                if next_token == model_token_id:
-                    # modelターンの場合: <start_of_turn>model から <end_of_turn> まで
-                    # modelトークンの直後から予測開始
-                    start_pred = i + 2  # <start_of_turn>model の次から
-                    
-                    # 対応する<end_of_turn>を探す
-                    j = start_pred
-                    while j < len(input_ids_list) and input_ids_list[j] != turn_end:
-                        j += 1
-                    
-                    # modelの応答部分を予測対象に
-                    if j < len(input_ids_list):  
-                        # <end_of_turn>が見つかった場合: start_pred から end_of_turn の直前まで
-                        labels[start_pred:j] = input_ids[start_pred:j]
-                        i = j + 1  # <end_of_turn>の次へ
-                    else:
-                        # <end_of_turn>が見つからない場合（最後のmodelターン）: シーケンス末尾まで
-                        # PADトークンは除外
-                        end_pos = len(input_ids_list)
-                        while end_pos > start_pred and input_ids_list[end_pos - 1] == 0:  # PADトークン除外
-                            end_pos -= 1
-                        if end_pos > start_pred:
-                            labels[start_pred:end_pos] = input_ids[start_pred:end_pos]
-                        i = len(input_ids_list)  # ループ終了
-                elif next_token == user_token_id:
-                    # userターンの場合: 完全にマスク（何もしない、既に-100）
-                    # 対応する<end_of_turn>を探して飛ばす
-                    j = i + 2  # <start_of_turn>user の次から
-                    while j < len(input_ids_list) and input_ids_list[j] != turn_end:
-                        j += 1
-                    i = j + 1  # <end_of_turn>の次へ
-                else:
-                    i += 1
-            else:
-                i += 1
+        # [/INST]の後の応答部分のみラベルとして使用
+        if input_ids_list[i] == inst_end_id:  # [/INST]
+            # [/INST]の次のトークンから応答開始
+            response_start = i + 1
+            # </s>または次の<s>[INST]まで、または末尾まで
+            response_end = len(input_ids_list)
+            
+            for j in range(response_start, len(input_ids_list)):
+                if input_ids_list[j] == eos_token_id:  # </s>
+                    response_end = j + 1  # </s>も含める
+                    break
+                elif input_ids_list[j] == bos_token_id:  # 次の<s>
+                    response_end = j
+                    break
+            
+            # 応答部分をラベルとして使用
+            for j in range(response_start, response_end):
+                if j < len(input_ids_list):
+                    labels[j] = input_ids_list[j]
+            
+            # 次の[INST]を探すためにi を進める
+            i = response_end
         else:
             i += 1
     
@@ -303,17 +282,17 @@ def preprocess_mask(mask: np.ndarray, target_size: Optional[int] = None) -> torc
 
 class HybridDataset(torch.utils.data.Dataset):
     """
-    仕様書第3章.2 HybridDatasetの実装
-    デュアルストリーム処理：Gemma用とSAM用の2系統前処理を同時実行
+    LISA-Llama4 HybridDatasetの実装
+    デュアルストリーム処理：Llama4用とSAM用の2系統前処理を同時実行
     """
 
     def __init__(
         self,
         base_image_dir: Optional[str] = None,
-        gemma_processor: Optional[AutoProcessor] = None,
+        llama4_processor: Optional[AutoProcessor] = None,
         samples_per_epoch: int = 500 * 8 * 2 * 10,
         precision: str = "bf16",
-        gemma_image_size: Optional[int] = None,
+        llama4_image_size: Optional[int] = None,
         sam_image_size: Optional[int] = None,
         num_classes_per_sample: int = 3,
         exclude_val: bool = False,
@@ -327,10 +306,10 @@ class HybridDataset(torch.utils.data.Dataset):
     ):
         # 設定ファイルからパラメータを取得（引数で指定されていない場合）
         self.base_image_dir = base_image_dir or getattr(config, 'DATASET_BASE_DIR', './dataset')
-        self.gemma_processor = gemma_processor
+        self.llama4_processor = llama4_processor
         self.samples_per_epoch = samples_per_epoch
         self.precision = precision
-        self.gemma_image_size = gemma_image_size or getattr(config, 'GEMMA_IMAGE_SIZE', 896)
+        self.llama4_image_size = llama4_image_size or getattr(config, 'LLAMA4_IMAGE_SIZE', 1120)
         self.sam_image_size = sam_image_size or getattr(config, 'SAM_IMAGE_SIZE', 1024)
         self.num_classes_per_sample = num_classes_per_sample
         self.exclude_val = exclude_val
@@ -347,12 +326,12 @@ class HybridDataset(torch.utils.data.Dataset):
         self.sample_rate = sample_rate / sample_rate.sum()
 
         # [SEG]トークンの一元セットアップ（オリジナルLISA準拠）
-        if self.gemma_processor and self.gemma_processor.tokenizer:
+        if self.llama4_processor and self.llama4_processor.tokenizer:
             self.seg_token = getattr(config, 'SEG_TOKEN', '[SEG]')
-            self.seg_token_idx = setup_seg_token(self.gemma_processor.tokenizer, self.seg_token)
+            self.seg_token_idx = setup_seg_token(self.llama4_processor.tokenizer, self.seg_token)
             self.max_length = getattr(config, 'MODEL_MAX_LENGTH', 2048)
         else:
-            raise ValueError("gemma_processor は必須です")
+            raise ValueError("llama4_processor は必須です")
 
         # データセットの初期化
         self.datasets = dataset.split("||")
@@ -360,7 +339,7 @@ class HybridDataset(torch.utils.data.Dataset):
         
         print(f"HybridDataset初期化:")
         print(f"  - ベースディレクトリ: {self.base_image_dir}")
-        print(f"  - Gemma画像サイズ: {self.gemma_image_size}")
+        print(f"  - Llama4画像サイズ: {self.llama4_image_size}")
         print(f"  - SAM画像サイズ: {self.sam_image_size}")
         print(f"  - 対象データセット: {self.datasets}")
         
@@ -371,11 +350,11 @@ class HybridDataset(torch.utils.data.Dataset):
                 self.all_datasets.append(
                     SemSegDataset(
                         self.base_image_dir,
-                        self.gemma_processor.tokenizer,
+                        self.llama4_processor.tokenizer,
                         None,  # vision_tower は使用しない
                         samples_per_epoch,
                         precision,
-                        self.gemma_image_size,
+                        self.llama4_image_size,
                         num_classes_per_sample,
                         exclude_val,
                         self.sem_seg_data,
@@ -391,11 +370,11 @@ class HybridDataset(torch.utils.data.Dataset):
                 self.all_datasets.append(
                     ReferSegDataset(
                         self.base_image_dir,
-                        self.gemma_processor.tokenizer,
+                        self.llama4_processor.tokenizer,
                         None,  # vision_tower は使用しない
                         samples_per_epoch,
                         precision,
-                        self.gemma_image_size,
+                        self.llama4_image_size,
                         num_classes_per_sample,
                         exclude_val,
                         self.refer_seg_data,
@@ -411,11 +390,11 @@ class HybridDataset(torch.utils.data.Dataset):
                 self.all_datasets.append(
                     VQADataset(
                         self.base_image_dir,
-                        self.gemma_processor.tokenizer,
+                        self.llama4_processor.tokenizer,
                         None,  # vision_tower は使用しない
                         samples_per_epoch,
                         precision,
-                        self.gemma_image_size,
+                        self.llama4_image_size,
                         exclude_val,
                         self.vqa_data,
                     )
@@ -430,11 +409,11 @@ class HybridDataset(torch.utils.data.Dataset):
                 self.all_datasets.append(
                     ReasonSegDataset(
                         base_image_dir=self.base_image_dir,
-                        tokenizer=self.gemma_processor.tokenizer,
+                        tokenizer=self.llama4_processor.tokenizer,
                         vision_tower=None,  # vision_tower は使用しない
                         samples_per_epoch=samples_per_epoch,
                         precision=precision,
-                        image_size=self.gemma_image_size,
+                        image_size=self.llama4_image_size,
                         num_classes_per_sample=num_classes_per_sample,
                         exclude_val=exclude_val,
                         reason_seg_data=self.reason_seg_data,
@@ -484,7 +463,7 @@ class HybridDataset(torch.utils.data.Dataset):
         # サンプルの形式を確認
         if len(sample) == 9:
             # 新しい9要素形式（SemSegDataset, ReferSegDataset）
-            image_path, image_sam, image_gemma, conversations, masks, label, resize, questions, sampled_classes = sample
+            image_path, image_sam, image_llama4, conversations, masks, label, resize, questions, sampled_classes = sample
             
             # conversationsからテキストプロンプトを抽出
             if isinstance(conversations, list) and len(conversations) > 0:
@@ -550,7 +529,7 @@ class HybridDataset(torch.utils.data.Dataset):
                     raise ValueError(f"サポートされていない画像形式: {type(image_data)}")
             
             # デュアル前処理
-            image_gemma = preprocess_gemma_image(image_pil, self.gemma_processor, self.gemma_image_size)
+            image_llama4 = preprocess_llama4_image(image_pil, self.llama4_processor, self.llama4_image_size)
             image_sam = preprocess_sam_image(image_pil, self.sam_image_size)
             
             # オリジナルLISAとの互換性のために初期化
@@ -567,7 +546,7 @@ class HybridDataset(torch.utils.data.Dataset):
         if self.seg_token not in text_prompt:
             text_prompt += f" {self.seg_token}"
 
-        # Gemma-3の正しいマルチモーダル処理
+        # Llama-4の正しいマルチモーダル処理
         # PIL画像を準備
         if len(sample) == 9:
             # 新しい9要素形式の場合、既にPIL画像がある
@@ -603,7 +582,7 @@ class HybridDataset(torch.utils.data.Dataset):
             # 5要素形式の場合、既にimage_pilが準備されている
             pass
         
-        # Gemma-3の公式apply_chat_templateを使用
+        # Llama-4の公式apply_chat_templateを使用
         messages = [
             {
                 "role": "user",
@@ -615,8 +594,8 @@ class HybridDataset(torch.utils.data.Dataset):
         ]
         
         try:
-            # Gemma-3プロセッサーでマルチモーダル処理
-            gemma_processed = self.gemma_processor.apply_chat_template(
+            # Llama-4プロセッサーでマルチモーダル処理
+            llama4_processed = self.llama4_processor.apply_chat_template(
                 messages,
                 add_generation_prompt=True,
                 tokenize=True,
@@ -625,24 +604,24 @@ class HybridDataset(torch.utils.data.Dataset):
             )
             
             # 処理結果から必要な要素を抽出
-            input_ids = gemma_processed['input_ids'].squeeze(0)
-            attention_mask = gemma_processed['attention_mask'].squeeze(0)
-            pixel_values = gemma_processed['pixel_values'].squeeze(0)
+            input_ids = llama4_processed['input_ids'].squeeze(0)
+            attention_mask = llama4_processed['attention_mask'].squeeze(0)
+            pixel_values = llama4_processed['pixel_values'].squeeze(0)
             
-            # pixel_valuesをimage_gemmaとして使用
-            image_gemma = pixel_values
+            # pixel_valuesをimage_llama4として使用
+            image_llama4 = pixel_values
             
             # SAM用画像を別途処理
             image_sam = preprocess_sam_image(image_pil, self.sam_image_size)
             
         except Exception as e:
-            print(f"❌ Gemma-3マルチモーダル処理エラー: {e}")
+            print(f"❌ Llama-4マルチモーダル処理エラー: {e}")
             print(f"   テキスト: {text_prompt[:100]}...")
-            raise RuntimeError(f"Gemma-3マルチモーダル処理に失敗: {e}")
+            raise RuntimeError(f"Llama-4マルチモーダル処理に失敗: {e}")
 
         # 画像の形状を確認（apply_chat_templateで処理済みなので基本的に正しい形状）
-        if image_gemma.dim() == 4:  # (1, C, H, W) → (C, H, W)
-            image_gemma = image_gemma.squeeze(0)
+        if image_llama4.dim() == 4:  # (1, C, H, W) → (C, H, W)
+            image_llama4 = image_llama4.squeeze(0)
         
         if image_sam.dim() == 4:  # (1, C, H, W) → (C, H, W)
             image_sam = image_sam.squeeze(0)
@@ -651,8 +630,8 @@ class HybridDataset(torch.utils.data.Dataset):
         seg_token_mask = (input_ids == self.seg_token_idx)
 
         # ラベルの処理（言語生成用）
-        # Gemma3チャットテンプレートに準拠した正確なラベルマスキング
-        labels = build_correct_labels_for_gemma3(input_ids, self.gemma_processor.tokenizer)
+        # Llama4チャットテンプレートに準拠した正確なラベルマスキング
+        labels = build_correct_labels_for_llama4(input_ids, self.llama4_processor.tokenizer)
 
         # マスクの処理
         has_mask = masks is not None
@@ -690,8 +669,8 @@ class HybridDataset(torch.utils.data.Dataset):
             'input_ids': input_ids,
             'labels': labels,
             'attention_mask': attention_mask,
-            'images_for_sam': image_sam,      # SAM用画像 (C, 1024, 1024)
-            'images_for_gemma': image_gemma,  # Gemma用画像 (C, 896, 896)
+            'images_for_sam': image_sam,        # SAM用画像 (C, 1024, 1024)
+            'images_for_llama4': image_llama4,  # Llama4用画像 (C, 1120, 1120)
             'ground_truth_mask': ground_truth_mask if has_mask else None,
             'has_mask': has_mask,
             'seg_token_mask': seg_token_mask,
@@ -717,7 +696,7 @@ def collate_fn(batch: List[Dict]) -> Dict[str, Any]:
     config = get_config()
     sam_image_size = getattr(config, 'SAM_IMAGE_SIZE', 1024)
     # 各キーごとにデータを収集
-    images_for_gemma = []
+    images_for_llama4 = []
     images_for_sam = []
     input_ids = []
     attention_masks = []
@@ -732,7 +711,7 @@ def collate_fn(batch: List[Dict]) -> Dict[str, Any]:
     sampled_classes_list = []  # オリジナルLISA互換
     
     for item in batch:
-        images_for_gemma.append(item["images_for_gemma"])
+        images_for_llama4.append(item["images_for_llama4"])
         images_for_sam.append(item["images_for_sam"])
         input_ids.append(item["input_ids"])
         attention_masks.append(item["attention_mask"])
@@ -742,7 +721,7 @@ def collate_fn(batch: List[Dict]) -> Dict[str, Any]:
         if isinstance(label, torch.Tensor):
             # トークンレベルのラベル（言語生成）の場合
             if label.dim() == 1 and len(label) == item["input_ids"].size(0):
-                labels.append(label)  # build_correct_labels_for_gemma3で処理済み
+                labels.append(label)  # build_correct_labels_for_llama4で処理済み
             elif label.dim() == 0:  # スカラーテンソル
                 # スカラーラベルの場合は全シーケンスに同じラベルを適用（通常はしない）
                 labels.append(torch.full_like(item["input_ids"], label.item()))
@@ -766,8 +745,8 @@ def collate_fn(batch: List[Dict]) -> Dict[str, Any]:
         sampled_classes_list.append(item.get("sampled_classes"))
     
     # テンソルのスタック
-    images_for_gemma = torch.stack(images_for_gemma)  # (B, 3, 896, 896)
-    images_for_sam = torch.stack(images_for_sam)      # (B, 3, 1024, 1024)
+    images_for_llama4 = torch.stack(images_for_llama4)  # (B, 3, 1120, 1120)
+    images_for_sam = torch.stack(images_for_sam)        # (B, 3, 1024, 1024)
     
     # テキストシーケンスの長さ統一（パディング）
     max_length = max(ids.size(0) for ids in input_ids)
@@ -806,8 +785,8 @@ def collate_fn(batch: List[Dict]) -> Dict[str, Any]:
             label_list.append(None)
 
     return {
-        # Gemma-3デュアルストリーム用
-        "images_for_gemma": images_for_gemma,           # (B, 3, 896, 896)
+        # Llama-4デュアルストリーム用
+        "images_for_llama4": images_for_llama4,         # (B, 3, 1120, 1120)
         "images_for_sam": images_for_sam,               # (B, 3, 1024, 1024)
         "input_ids": input_ids_padded,                  # (B, unified_max_length)
         "attention_masks": attention_masks_padded,      # (B, unified_max_length) - オリジナルLISA準拠の命名
@@ -825,7 +804,7 @@ def collate_fn(batch: List[Dict]) -> Dict[str, Any]:
         "sampled_classes_list": sampled_classes_list,   # List[Optional[Any]]
         # 追加の互換性フィールド
         "images": images_for_sam,                       # エイリアス: オリジナルLISAでの名前
-        "images_clip": images_for_gemma,                # エイリアス: オリジナルLISAでCLIP画像として使用
+        "images_clip": images_for_llama4,               # エイリアス: オリジナルLISAでCLIP画像として使用
     }
 
 # エイリアスは削除 - 明確な命名を使用
@@ -833,34 +812,34 @@ def collate_fn(batch: List[Dict]) -> Dict[str, Any]:
 # - HybridDataset (統合データセット)
 # - collate_fn (バッチ結合関数)
 
-class LisaGemma3ValDataset(torch.utils.data.Dataset):
+class LisaLlama4ValDataset(torch.utils.data.Dataset):
     """
-    LISA-Gemma3用の評価データセット
+    LISA-Llama4用の評価データセット
     デュアルストリーム対応
     """
 
     def __init__(
         self,
         base_image_dir: str,
-        gemma_processor: AutoProcessor,
+        llama4_processor: AutoProcessor,
         val_dataset: str,
-        gemma_image_size: int = 896,
+        llama4_image_size: int = 1120,
         sam_image_size: int = 1024,
     ):
         self.base_image_dir = base_image_dir
-        self.gemma_processor = gemma_processor
-        self.gemma_image_size = gemma_image_size
+        self.llama4_processor = llama4_processor
+        self.llama4_image_size = llama4_image_size
         self.sam_image_size = sam_image_size
         
         # 評価用データセットの初期化
         if "refer_seg" in val_dataset.lower():
             self.dataset = ReferSegDataset(
                 base_image_dir,
-                gemma_processor,
+                llama4_processor,
                 None,
                 1000,  # サンプル数
                 "bf16",
-                gemma_image_size,
+                llama4_image_size,
                 3,
                 False,
                 val_dataset,
@@ -868,11 +847,11 @@ class LisaGemma3ValDataset(torch.utils.data.Dataset):
         elif "sem_seg" in val_dataset.lower():
             self.dataset = SemSegDataset(
                 base_image_dir,
-                gemma_processor,
+                llama4_processor,
                 None,
                 1000,  # サンプル数
                 "bf16",
-                gemma_image_size,
+                llama4_image_size,
                 3,
                 False,
                 val_dataset,
@@ -881,11 +860,11 @@ class LisaGemma3ValDataset(torch.utils.data.Dataset):
             # ReasonSegをデフォルトとする
             self.dataset = ReasonSegDataset(
                         base_image_dir,
-                gemma_processor,
+                llama4_processor,
                 None,
                 1000,
                 "bf16",
-                gemma_image_size,
+                llama4_image_size,
                 3,
                 False,
                 "ReasonSeg|val",

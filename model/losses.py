@@ -1,5 +1,6 @@
 """
-LISA-Gemma3 モデルの損失関数モジュール
+LISA-Llama4 モデルの損失関数モジュール
+Llama-4-Scout-17B-16E-Instruct + SAM integration用の損失関数
 """
 
 import torch

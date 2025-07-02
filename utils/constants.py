@@ -1,5 +1,6 @@
 """
-LISA-Gemma3プロジェクト用の共通定数定義
+LISA-Llama4プロジェクト用の共通定数定義
+Llama-4-Scout-17B-16E-Instruct + SAM統合モデル用
 """
 
 # デフォルトトークン
@@ -8,34 +9,29 @@ DEFAULT_IM_START_TOKEN = "<im_start>"
 DEFAULT_IM_END_TOKEN = "<im_end>"
 DEFAULT_SEG_TOKEN = "[SEG]"
 
-# Gemma-3のチャットテンプレート用トークン
-GEMMA_START_OF_TURN = "<start_of_turn>"
-GEMMA_END_OF_TURN = "<end_of_turn>"
-GEMMA_BOS_TOKEN = "<bos>"
-GEMMA_EOS_TOKEN = "<eos>"
+# Llama-4のチャットテンプレート用トークン (transformers標準)
+LLAMA4_START_OF_TURN = "<|start_header_id|>"
+LLAMA4_END_OF_TURN = "<|end_header_id|>"
+LLAMA4_BOS_TOKEN = "<|begin_of_text|>"
+LLAMA4_EOS_TOKEN = "<|end_of_text|>"
 
 # 無視すべきインデックス
 IGNORE_INDEX = -100
 
-# ✅ 仕様書準拠の正しい設計：
-# Gemma-3-4b-itは既に画像対応（SigLIP内蔵）のため、
-# 独自の画像トークン256個の予約は不要。
+# ✅ Llama-4-Scout-17B-16E-Instruct仕様準拠設計：
+# Llama-4はネイティブマルチモーダル（Early Fusion）のため、
 # SEGトークン1個のみを追加し、語彙サイズは最小限に抑える。
 SEG_TOKEN = "[SEG]"  # オリジナルLISAと同じ形式
-
-# ❌ 削除された不要な設定：
-# GEMMA_IMAGE_TOKEN_NUM = 256  # 不要な画像トークン予約（削除）
-# IMAGE_TOKEN_INDEX = 262146   # 不要な画像インデックス（削除）
 
 # システムプロンプト
 SYSTEM_PROMPT = """You are a helpful assistant that can analyze images and understand visual content. You can describe what you see in images and answer questions about them."""
 
-GEMMA_SYSTEM_PROMPT = """You are a helpful assistant that can analyze images and perform segmentation tasks. When asked to segment objects, you should respond with the [SEG] token."""
+LLAMA4_SYSTEM_PROMPT = """You are a helpful assistant that can analyze images and perform segmentation tasks. When asked to segment objects, you should respond with the [SEG] token."""
 
-# Gemma-3専用システムプロンプト
-GEMMA3_SEGMENTATION_PROMPT = """You are LISA (Large-language Instructed Segmentation Assistant), a multimodal AI assistant that can understand images and perform precise object segmentation. When asked to segment objects or regions in images, respond with the [SEG] token to indicate the segmentation mask."""
+# Llama-4専用システムプロンプト
+LLAMA4_SEGMENTATION_PROMPT = """You are LISA (Large-language Instructed Segmentation Assistant), a multimodal AI assistant powered by Llama-4-Scout-17B-16E-Instruct that can understand images and perform precise object segmentation. When asked to segment objects or regions in images, respond with the [SEG] token to indicate the segmentation mask."""
 
-GEMMA3_VQA_PROMPT = """You are a helpful multimodal AI assistant that can analyze images and answer questions about visual content. Provide accurate, detailed responses based on what you observe in the images."""
+LLAMA4_VQA_PROMPT = """You are a helpful multimodal AI assistant powered by Llama-4-Scout-17B-16E-Instruct that can analyze images and answer questions about visual content. Provide accurate, detailed responses based on what you observe in the images."""
 
 # 質問テンプレート
 SHORT_QUESTION_LIST = [
@@ -71,10 +67,13 @@ ANSWER_LIST = [
 ]
 
 # 画像前処理の定数
+# SAM用設定（変更なし）
 SAM_PIXEL_MEAN = [123.675, 116.28, 103.53]
 SAM_PIXEL_STD = [58.395, 57.12, 57.375]
 SAM_IMAGE_SIZE = 1024
-GEMMA_IMAGE_SIZE = 896
+
+# Llama-4-Scout-17B-16E-Instruct用設定（公式仕様準拠）
+LLAMA4_IMAGE_SIZE = 1120  # 公式最大解像度 1120x1120
 
 # デフォルト設定
 DEFAULT_IGNORE_LABEL = 255

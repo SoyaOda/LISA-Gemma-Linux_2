@@ -391,10 +391,10 @@ class SemSegDataset(torch.utils.data.Dataset):
         image = cv2.imread(image_path)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-        # デュアルエンコーダ対応: Gemma用とSAM用の画像前処理
-        # Gemma用画像前処理（896x896）
-        image_for_gemma = cv2.resize(image, (896, 896))
-        image_for_gemma = torch.from_numpy(image_for_gemma).permute(2, 0, 1).float() / 255.0
+        # デュアルエンコーダ対応: Llama4用とSAM用の画像前処理
+        # Llama4用画像前処理（1120x1120）
+        image_for_llama4 = cv2.resize(image, (1120, 1120))
+        image_for_llama4 = torch.from_numpy(image_for_llama4).permute(2, 0, 1).float() / 255.0
         
         # SAM用画像前処理（1024x1024）
         image_for_sam = self.transform.apply_image(image)
@@ -471,7 +471,7 @@ class SemSegDataset(torch.utils.data.Dataset):
         return (
             image_path,        # 0: 画像パス
             image_for_sam,     # 1: SAM用前処理済み画像 (torch.Tensor)
-            image_for_gemma,   # 2: Gemma用前処理済み画像 (torch.Tensor)
+            image_for_llama4,  # 2: Llama4用前処理済み画像 (torch.Tensor)
             conversations,     # 3: 会話形式のテキスト (List[str])
             masks,             # 4: マスク (torch.Tensor)
             label,             # 5: ラベル (torch.Tensor)
@@ -496,10 +496,10 @@ class SemSegDataset(torch.utils.data.Dataset):
         image = cv2.imread(image_path)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-        # デュアルエンコーダ対応: Gemma用とSAM用の画像前処理
-        # Gemma用画像前処理（896x896）
-        image_for_gemma = cv2.resize(image, (896, 896))
-        image_for_gemma = torch.from_numpy(image_for_gemma).permute(2, 0, 1).float() / 255.0
+        # デュアルエンコーダ対応: Llama4用とSAM用の画像前処理
+        # Llama4用画像前処理（1120x1120）
+        image_for_llama4 = cv2.resize(image, (1120, 1120))
+        image_for_llama4 = torch.from_numpy(image_for_llama4).permute(2, 0, 1).float() / 255.0
         
         # SAM用画像前処理（1024x1024）
         image_for_sam = self.transform.apply_image(image)
@@ -586,7 +586,7 @@ class SemSegDataset(torch.utils.data.Dataset):
         return (
             image_path,        # 0: 画像パス
             image_for_sam,     # 1: SAM用前処理済み画像 (torch.Tensor)
-            image_for_gemma,   # 2: Gemma用前処理済み画像 (torch.Tensor)
+            image_for_llama4,  # 2: Llama4用前処理済み画像 (torch.Tensor)
             conversations,     # 3: 会話形式のテキスト (List[str])
             masks,             # 4: マスク (torch.Tensor)
             label_tensor,      # 5: ラベル (torch.Tensor)

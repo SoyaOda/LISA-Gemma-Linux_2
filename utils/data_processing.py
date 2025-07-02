@@ -10,7 +10,7 @@ from typing import Dict, List, Any
 
 class DataCollatorForSupervisedDataset:
     """
-    Gemma-3対応のデータコレーター
+    Llama-4対応のデータコレーター
     バッチ処理とパディングを担当
     """
     def __init__(self, tokenizer, pad_to_multiple_of=None):
@@ -26,7 +26,7 @@ class DataCollatorForSupervisedDataset:
         attention_mask_list = []
         labels_list = []
         images_sam_list = []
-        images_gemma_list = []
+        images_llama4_list = []
         masks_list = []
         
         for item in batch:
@@ -38,8 +38,8 @@ class DataCollatorForSupervisedDataset:
                 labels_list.append(item['labels'])
             if 'image_sam' in item:
                 images_sam_list.append(item['image_sam'])
-            if 'image_gemma' in item:
-                images_gemma_list.append(item['image_gemma'])
+            if 'image_llama4' in item:
+                images_llama4_list.append(item['image_llama4'])
             if 'ground_truth_mask' in item:
                 masks_list.append(item['ground_truth_mask'])
         
@@ -79,8 +79,8 @@ class DataCollatorForSupervisedDataset:
         # 画像のスタック
         if images_sam_list:
             batch_output['images_sam'] = torch.stack(images_sam_list)
-        if images_gemma_list:
-            batch_output['images_gemma'] = torch.stack(images_gemma_list)
+        if images_llama4_list:
+            batch_output['images_llama4'] = torch.stack(images_llama4_list)
         if masks_list:
             batch_output['masks'] = torch.stack(masks_list)
         
