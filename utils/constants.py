@@ -10,7 +10,7 @@ DEFAULT_SEG_TOKEN = "[SEG]"
 
 # Gemma-3のチャットテンプレート用トークン
 GEMMA_START_OF_TURN = "<start_of_turn>"
-GEMMA_END_OF_TURN = "<end_of_turn>" 
+GEMMA_END_OF_TURN = "<end_of_turn>"
 GEMMA_BOS_TOKEN = "<bos>"
 GEMMA_EOS_TOKEN = "<eos>"
 

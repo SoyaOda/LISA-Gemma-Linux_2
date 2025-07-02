@@ -19,8 +19,24 @@ HF_CACHE_DIR = os.environ.get('HF_HOME', None)
 # ==============================================================================
 # 2. モデル識別子とファイル設定
 # ==============================================================================
-# Hugging Faceモデル識別子
+# Hugging Faceモデル識別子（デフォルト：4B）
 GEMMA_MODEL_ID = "google/gemma-3-4b-it"
+
+# モデル設定マップ（4B/27B対応）
+GEMMA_MODEL_CONFIGS = {
+    "4b": {
+        "model_id": "google/gemma-3-4b-it",
+        "hidden_size": 2560,
+        "recommended_batch_size": 2,
+        "memory_gb_estimate": 46.4  # BF16での推定メモリ使用量
+    },
+    "27b": {
+        "model_id": "google/gemma-3-27b-it",
+        "hidden_size": 4608,
+        "recommended_batch_size": 1,
+        "memory_gb_estimate": 46.4  # BF16での推定メモリ使用量（27Bでも適切な設定で46.4GB）
+    }
+}
 
 # ログと出力の保存先
 LOG_BASE_DIR = str(PROJECT_ROOT / "runs")
@@ -42,8 +58,14 @@ MODEL_MAX_LENGTH = 2048
 SEG_PROJECTION_DIM = 256
 # セグメンテーション用の特別なトークン（オリジナルLISAに準拠）
 SEG_TOKEN = "[SEG]"
-# Gemma-3-4bの隠れ層サイズ
+# Gemma-3-4bの隠れ層サイズ（デフォルト）
 GEMMA_HIDDEN_SIZE = 2560
+
+def get_model_config(model_size: str = "4b"):
+    """モデルサイズに応じた設定を取得"""
+    if model_size not in GEMMA_MODEL_CONFIGS:
+        raise ValueError(f"サポートされていないモデルサイズ: {model_size}. 対応サイズ: {list(GEMMA_MODEL_CONFIGS.keys())}")
+    return GEMMA_MODEL_CONFIGS[model_size]
 
 # ==============================================================================
 # 4. 訓練ハイパーパラメータ

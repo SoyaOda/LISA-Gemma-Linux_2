@@ -72,8 +72,6 @@ config = get_config()
 
 # デフォルト設定
 DEFAULT_IMAGE_TOKEN = "<image>"
-# utils/constants.pyから統一されたIMAGE_TOKEN_INDEXを使用
-from .constants import IMAGE_TOKEN_INDEX
 DEFAULT_SEG_TOKEN = getattr(config, 'SEG_TOKEN', "[SEG]")
 IGNORE_INDEX = -100
 

@@ -9,8 +9,8 @@ from typing import Union, List
 from transformers import PreTrainedTokenizer
 
 IGNORE_INDEX = -100
-# utils/constants.pyから統一されたIMAGE_TOKEN_INDEXを使用
-from .constants import IMAGE_TOKEN_INDEX
+# ✅ Gemma-3は既に画像対応のため、特別な画像トークンインデックスは不要
+# 代わりにオリジナルLISA準拠の設計を使用
 DEFAULT_IMAGE_TOKEN = "<image>"
 DEFAULT_IMAGE_PATCH_TOKEN = "<im_patch>"
 DEFAULT_IM_START_TOKEN = "<im_start>"
@@ -171,32 +171,26 @@ def dict_to_cuda(input_dict):
 def tokenizer_image_token(
     text: str, 
     tokenizer: PreTrainedTokenizer, 
-    image_token_index: int = IMAGE_TOKEN_INDEX,
+    image_token_index: int = None,  # ✅ Gemma-3では不要だが互換性のため保持
     return_tensors: str = None
 ) -> Union[List[int], torch.Tensor]:
     """
-    Gemma-3対応の画像トークン処理関数
-    画像トークンを含むテキストをトークン化し、画像トークンの位置に特別なインデックスを挿入
-    """
-    # 画像トークンで分割
-    text_chunks = text.split(DEFAULT_IMAGE_TOKEN)
+    ✅ Gemma-3対応の画像トークン処理関数（修正版）
     
-    if len(text_chunks) == 1:
-        # 画像トークンがない場合
-        tokens = tokenizer.encode(text, add_special_tokens=True)
+    Gemma-3は既に画像対応のため、特別な画像トークン処理は不要。
+    しかし、互換性のためにオリジナルLISA準拠の簡単な処理を提供。
+    """
+    # ✅ Gemma-3では画像は内蔵SigLIPで処理されるため、
+    # 特別な画像トークン展開は不要。単純にテキストトークン化のみ。
+    
+    # 画像トークンを除去してテキストのみをトークン化
+    text_without_image_tokens = text.replace(DEFAULT_IMAGE_TOKEN, "").strip()
+    
+    if not text_without_image_tokens:
+        # テキストが空の場合はデフォルトトークンを返す
+        tokens = tokenizer.encode("", add_special_tokens=True)
     else:
-        # 画像トークンがある場合
-        tokens = []
-        for i, chunk in enumerate(text_chunks):
-            if i > 0:
-                # 画像トークンの位置に特別なインデックスを挿入
-                # Gemma-3では画像は256トークンにエンコードされる
-                tokens.extend([image_token_index] * 256)
-            
-            if chunk:
-                # チャンクが空でない場合のみトークン化
-                chunk_tokens = tokenizer.encode(chunk, add_special_tokens=(i == 0))
-                tokens.extend(chunk_tokens)
+        tokens = tokenizer.encode(text_without_image_tokens, add_special_tokens=True)
     
     if return_tensors == "pt":
         return torch.tensor(tokens, dtype=torch.long)

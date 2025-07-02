@@ -10,10 +10,10 @@ import torch.nn.functional as F
 from typing import Optional, List, Tuple, Dict, Any
 import numpy as np
 
-from transformers import AutoProcessor, Gemma3ForConditionalGeneration, PreTrainedModel, PretrainedConfig, AutoTokenizer
+from transformers import AutoProcessor, Gemma3ForConditionalGeneration, PreTrainedModel, PretrainedConfig
 from model.segment_anything import sam_model_registry
 from model.segment_anything.modeling import MaskDecoder, PromptEncoder, TwoWayTransformer
-from utils.constants import SEG_TOKEN
+from utils.constants import DEFAULT_SEG_TOKEN
 
 # LISA-Gemmaモデルのカスタム設定クラス
 class LisaGemmaConfig(PretrainedConfig):
@@ -29,11 +29,6 @@ class LisaGemmaConfig(PretrainedConfig):
         gemma_image_size: int = 896,
         sam_image_size: int = 1024,
         model_max_length: int = 2048,
-        skip_embedding_resize: bool = False,  # 事前処理済みチェックポイント読み込み用
-        use_preprocessed_checkpoint: bool = False,  # 事前処理済みチェックポイント使用フラグ
-        preprocessed_vocab_size: Optional[int] = None,  # 事前処理済み語彙サイズ
-        skip_hf_initialization: bool = False,  # HuggingFace初期化スキップフラグ
-        seg_token_id: Optional[int] = None,  # SEGトークンID
         **kwargs,
     ):
         self.gemma_model_id = gemma_model_id
@@ -44,11 +39,6 @@ class LisaGemmaConfig(PretrainedConfig):
         self.gemma_image_size = gemma_image_size
         self.sam_image_size = sam_image_size
         self.model_max_length = model_max_length
-        self.skip_embedding_resize = skip_embedding_resize
-        self.use_preprocessed_checkpoint = use_preprocessed_checkpoint
-        self.preprocessed_vocab_size = preprocessed_vocab_size
-        self.skip_hf_initialization = skip_hf_initialization
-        self.seg_token_id = seg_token_id
         super().__init__(**kwargs)
 
 class LisaGemmaForCausalLM(PreTrainedModel):
@@ -59,81 +49,11 @@ class LisaGemmaForCausalLM(PreTrainedModel):
 
         # 1. Gemma-3 multimodal model の初期化
         print(f"Gemma-3マルチモーダルモデルをロード中... ({config.gemma_model_id})")
-        
-        # マルチGPU対応: 事前に必要な語彙サイズを計算
-        temp_tokenizer = AutoTokenizer.from_pretrained(config.gemma_model_id, trust_remote_code=True)
-        base_vocab_size = len(temp_tokenizer)
-        
-        # 🔧 デバッグ: skip_embedding_resizeフラグの値を確認
-        skip_resize_flag = getattr(config, 'skip_embedding_resize', False)
-        use_preprocessed_flag = getattr(config, 'use_preprocessed_checkpoint', False)
-        
-        print(f"🔍 デバッグ: skip_embedding_resize フラグ = {skip_resize_flag}")
-        print(f"🔍 デバッグ: use_preprocessed_checkpoint フラグ = {use_preprocessed_flag}")
-        print(f"🔍 デバッグ: config属性確認:")
-        print(f"   - hasattr(config, 'skip_embedding_resize'): {hasattr(config, 'skip_embedding_resize')}")
-        print(f"   - hasattr(config, 'use_preprocessed_checkpoint'): {hasattr(config, 'use_preprocessed_checkpoint')}")
-        
-        # 🔧 事前処理済みチェックポイント使用時は、事前設定された語彙サイズを使用
-        if skip_resize_flag or use_preprocessed_flag:
-            # 事前処理済みモード: vocab_sizeを確実に取得
-            if hasattr(config, 'vocab_size') and config.vocab_size:
-                required_vocab_size = config.vocab_size
-                print(f"📋 事前処理済みモード: 設定済み語彙サイズ {required_vocab_size} を使用")
-            else:
-                # フォールバック: 事前処理済みサイズのデフォルト値
-                required_vocab_size = 262504
-                print(f"📋 事前処理済みモード: デフォルト語彙サイズ {required_vocab_size} を使用")
-        else:
-            # 通常モード: 必要な語彙サイズを計算（仕様書準拠）
-            print(f"🔍 デバッグ: 通常モードに入りました（skip_embedding_resize={skip_resize_flag}, use_preprocessed={use_preprocessed_flag}）")
-            # ✅ 仕様書準拠: SEGトークン1個のみ追加（最小限の語彙拡張）
-            required_vocab_size = base_vocab_size + 1  # SEGトークンのみ
-            
-            # 8の倍数に調整（効率化）
-            if required_vocab_size % 8 != 0:
-                required_vocab_size = ((required_vocab_size // 8) + 1) * 8
-        
-        print(f"📊 語彙サイズ計算: ベース={base_vocab_size}, 必要={required_vocab_size}")
-        
-        # Gemma-3設定を取得して語彙サイズを事前設定（確実な実装）
-        from transformers import Gemma3Config
-        gemma_config = Gemma3Config.from_pretrained(config.gemma_model_id)
-        
-        # 安全な語彙サイズアクセス（Gemma3Configの既知バグ対応）
-        original_vocab_size = getattr(gemma_config, 'vocab_size', None)
-        if original_vocab_size is None:
-            # HuggingFace Issue #36683: Gemma3Config lacks vocab_size for 4B/7B/27B models  
-            original_vocab_size = 262208  # Gemma-3-4bのデフォルト値
-            print("⚠️ Gemma3Config.vocab_size属性が欠落（既知バグ）。標準値を使用します。")
-        
-        # 語彙サイズを事前設定（DeepSpeed対応のため確実に設定）
-        gemma_config.vocab_size = required_vocab_size
-        
-        print(f"🔧 語彙サイズ設定: {original_vocab_size} → {required_vocab_size}")
-        print(f"📊 設定確認:")
-        print(f"   - ベース語彙: {base_vocab_size}")
-        if not getattr(config, 'skip_embedding_resize', False):
-            print(f"   - 追加トークン: SEGトークン1個のみ（仕様書準拠）")
-            print(f"   - 必要最小サイズ: {base_vocab_size + 1}")
-        print(f"   - 設定サイズ: {required_vocab_size}")
-        if getattr(config, 'skip_embedding_resize', False):
-            print(f"   - 事前処理済みモード: 埋め込み層リサイズスキップ")
-        
-        # モデルを事前設定された語彙サイズで初期化
-        try:
-            self.gemma_model = Gemma3ForConditionalGeneration.from_pretrained(
-                config.gemma_model_id,
-                config=gemma_config,
-                torch_dtype=torch.bfloat16,
-                device_map="auto"
-            )
-            print(f"✅ Gemmaモデルが事前設定サイズで正常に初期化されました")
-        except Exception as e:
-            print(f"❌ Gemmaモデルの初期化に失敗しました")
-            print(f"   エラー: {e}")
-            print(f"   事前設定語彙サイズ: {required_vocab_size}")
-            raise RuntimeError(f"Gemmaモデルの初期化に失敗: {e}") from e
+        self.gemma_model = Gemma3ForConditionalGeneration.from_pretrained(
+            config.gemma_model_id,
+            torch_dtype=torch.bfloat16,
+            device_map="auto"
+        )
         
         # 1.1 仕様書第2章: Gemmaモデル本体のパラメータを完全凍結（最適化後の設定）
         print("Gemmaモデルのパラメータを仕様書最適化設定に従って完全凍結中...")
@@ -201,7 +121,7 @@ class LisaGemmaForCausalLM(PreTrainedModel):
 
         # 5. 特別なセグメンテーショントークンを語彙に追加
         print("セグメンテーショントークンを追加中...")
-        self.seg_token = config.seg_token
+        self.seg_token = DEFAULT_SEG_TOKEN  # オリジナルLISAと同じ形式
         
         # トークナイザーにSEGトークンを追加
         if self.seg_token not in self.gemma_processor.tokenizer.get_vocab():
@@ -215,69 +135,40 @@ class LisaGemmaForCausalLM(PreTrainedModel):
         self.seg_token_id = self.gemma_processor.tokenizer.convert_tokens_to_ids(self.seg_token)
         print(f"SEGトークンID: {self.seg_token_id}")
         
-        # 🔧 事前処理済みチェックポイント読み込み時のスキップ機能
-        skip_resize_final = getattr(config, 'skip_embedding_resize', False)
-        use_preprocessed = getattr(config, 'use_preprocessed_checkpoint', False)
+        # 埋め込み層のリサイズ（SEGトークンのみ追加）
+        # オリジナルLISAと同様、SEGトークン1個のみ追加
+        current_vocab_size = len(self.gemma_processor.tokenizer)
+        required_vocab_size = current_vocab_size  # SEGトークンは既に追加済み
         
-        print(f"🔍 デバッグ: 最終的なskip_embedding_resizeフラグ = {skip_resize_final}")
-        print(f"🔍 デバッグ: use_preprocessed_checkpointフラグ = {use_preprocessed}")
+        # 埋め込み層の現在のサイズを確認
+        actual_embed_size = self.gemma_model.get_input_embeddings().weight.shape[0]
+        print(f"現在の埋め込み層サイズ: {actual_embed_size}")
+        print(f"現在の語彙サイズ: {current_vocab_size}")
+        print(f"必要な語彙サイズ: {required_vocab_size}")
+        print(f"SEGトークンのみ追加（オリジナルLISA方式）")
         
-        # 🚨 ROOT FIX: 事前処理済みチェックポイント使用時は確実にスキップ
-        if skip_resize_final or use_preprocessed:
-            print("📋 事前処理済みチェックポイント読み込みモード: 埋め込み層リサイズをスキップ")
-            print("✅ 事前処理済みの正しい語彙サイズが state_dict 読み込み時に適用される予定")
-            print("🛡️ ROOT解決: 埋め込み層リサイズを完全にバイパス")
-        else:
-            # 埋め込み層サイズの検証と強制リサイズ（仕様書準拠）
-            current_vocab_size = len(self.gemma_processor.tokenizer)
-            required_vocab_size = current_vocab_size  # SEGトークンは既に追加済み
+        # 埋め込み層のリサイズが必要かチェック
+        if actual_embed_size < required_vocab_size:
+            print(f"埋め込み層をリサイズ中: {actual_embed_size} -> {required_vocab_size}")
             
-            # 埋め込み層の実際のサイズを確認
-            actual_embed_size = self.gemma_model.get_input_embeddings().weight.shape[0]
-            
-            print(f"📊 埋め込み層サイズ検証:")
-            print(f"   - トークナイザー語彙サイズ: {current_vocab_size}")
-            print(f"   - 実際の埋め込み層サイズ: {actual_embed_size}")
-            print(f"   - 必要最小サイズ: {required_vocab_size}")
-            print(f"   - 追加トークン: SEGトークン1個のみ（仕様書準拠）")
-            
-            # サイズが不足している場合は強制リサイズを実行
-            if actual_embed_size < required_vocab_size:
-                print(f"⚠️ 事前設定が無視されました。強制リサイズを実行します")
-                print(f"   現在サイズ: {actual_embed_size}")
-                print(f"   必要サイズ: {required_vocab_size}")
-                print(f"   不足分: {required_vocab_size - actual_embed_size}")
-                
-                # 強制リサイズの実行
-                success = self._force_resize_embeddings(required_vocab_size)
-                
-                if success:
-                    # リサイズ後のサイズを再確認
-                    new_embed_size = self.gemma_model.get_input_embeddings().weight.shape[0]
-                    print(f"✅ 強制リサイズが成功しました")
-                    print(f"   リサイズ後サイズ: {new_embed_size}")
-                    
-                    if new_embed_size < required_vocab_size:
-                        raise RuntimeError(
-                            f"リサイズ後もサイズが不足: {new_embed_size} < {required_vocab_size}"
-                        )
+            try:
+                self.gemma_model.resize_token_embeddings(required_vocab_size)
+                print(f"✅ 埋め込み層が正常にリサイズされました（新サイズ: {required_vocab_size}）")
+            except RuntimeError as e:
+                if "DTensor" in str(e):
+                    print(f"⚠️ DeepSpeed環境での実行を検出。埋め込み層のリサイズを延期します")
                 else:
-                    # 強制リサイズも失敗した場合は明確にエラーを出して停止
-                    print(f"❌ 致命的エラー: 強制リサイズに失敗しました")
-                    print(f"")
-                    print(f"🔧 可能な解決方法:")
-                    print(f"   1. シングルGPU環境での事前チェックポイント作成")
-                    print(f"   2. HuggingFaceライブラリのダウングレード")
-                    print(f"   3. DeepSpeed以外の分散学習フレームワークの使用")
-                    print(f"")
-                    
-                    raise RuntimeError(
-                        f"埋め込み層の強制リサイズに失敗。実際サイズ: {actual_embed_size}, "
-                        f"必要サイズ: {required_vocab_size}。SEGトークンにアクセスできません。"
-                    )
-            else:
-                print(f"✅ 埋め込み層サイズが適切です: {actual_embed_size} >= {required_vocab_size}")
-                print(f"✅ 事前設定による語彙サイズ調整が成功しました")
+                    print(f"❌ 埋め込み層のリサイズに失敗: {e}")
+                    raise e
+            
+            # リサイズ後のサイズを確認
+            new_embed_size = self.gemma_model.get_input_embeddings().weight.shape[0]
+            print(f"リサイズ後の埋め込み層サイズ: {new_embed_size}")
+            
+            if new_embed_size < required_vocab_size:
+                raise RuntimeError(f"埋め込み層のリサイズに失敗: {new_embed_size} < {required_vocab_size}")
+        else:
+            print(f"✅ 埋め込み層サイズは十分です: {actual_embed_size} >= {required_vocab_size}")
         
         # 設定情報を保存
         self.gemma_image_size = config.gemma_image_size
@@ -285,168 +176,6 @@ class LisaGemmaForCausalLM(PreTrainedModel):
         self.model_max_length = config.model_max_length
         
         print("✅ LISA-Gemmaモデルの初期化が完了しました")
-
-    def _force_resize_embeddings(self, new_vocab_size: int) -> bool:
-        """
-        DeepSpeed環境対応の強制埋め込み層リサイズ
-        複数のアプローチを試行し、成功するまで実行
-        
-        Returns:
-            bool: リサイズの成功/失敗
-        """
-        print(f"🔧 強制リサイズを開始: {new_vocab_size}")
-        
-        # アプローチ1: 標準的なresize_token_embeddings（通常環境での成功例）
-        try:
-            print("   → アプローチ1: 標準リサイズを試行")
-            self.gemma_model.resize_token_embeddings(new_vocab_size)
-            print("   ✅ 標準リサイズが成功")
-            return True
-        except Exception as e:
-            print(f"   ❌ 標準リサイズが失敗: {str(e)[:100]}...")
-            
-        # アプローチ2: CPU上での手動リサイズ（DeepSpeed対応）
-        try:
-            print("   → アプローチ2: CPU上での手動リサイズを試行")
-            success = self._manual_resize_on_cpu(new_vocab_size)
-            if success:
-                print("   ✅ CPU手動リサイズが成功")
-                return True
-            else:
-                print("   ❌ CPU手動リサイズが失敗")
-        except Exception as e:
-            print(f"   ❌ CPU手動リサイズでエラー: {str(e)[:100]}...")
-            
-        # アプローチ3: Device-by-Device手動リサイズ
-        try:
-            print("   → アプローチ3: デバイス別手動リサイズを試行")
-            success = self._manual_resize_device_safe(new_vocab_size)
-            if success:
-                print("   ✅ デバイス別手動リサイズが成功")
-                return True
-            else:
-                print("   ❌ デバイス別手動リサイズが失敗")
-        except Exception as e:
-            print(f"   ❌ デバイス別手動リサイズでエラー: {str(e)[:100]}...")
-        
-        print("   ❌ 全てのリサイズアプローチが失敗")
-        return False
-    
-    def _manual_resize_on_cpu(self, new_vocab_size: int) -> bool:
-        """CPU上での手動リサイズ（DeepSpeed環境で最も成功率が高い）"""
-        try:
-            import torch
-            import torch.nn as nn
-            
-            # 現在の埋め込み層を取得
-            old_embeddings = self.gemma_model.get_input_embeddings()
-            old_vocab_size = old_embeddings.weight.shape[0]
-            embedding_dim = old_embeddings.weight.shape[1]
-            
-            if new_vocab_size <= old_vocab_size:
-                return True
-                
-            # CPU上で新しい埋め込み層を作成
-            device = old_embeddings.weight.device
-            dtype = old_embeddings.weight.dtype
-            
-            # 古い重みをCPUに移動
-            old_weight_cpu = old_embeddings.weight.detach().cpu()
-            
-            # CPU上で新しい埋め込み層を作成
-            new_embeddings = nn.Embedding(new_vocab_size, embedding_dim, dtype=dtype)
-            
-            # 既存の重みをコピー
-            with torch.no_grad():
-                new_embeddings.weight[:old_vocab_size] = old_weight_cpu
-                
-                # 新しいトークンは既存トークンの平均値で初期化
-                if new_vocab_size > old_vocab_size:
-                    mean_weight = old_weight_cpu.mean(dim=0)
-                    new_embeddings.weight[old_vocab_size:] = mean_weight.unsqueeze(0).expand(
-                        new_vocab_size - old_vocab_size, -1
-                    )
-            
-            # デバイスに移動
-            new_embeddings = new_embeddings.to(device)
-            
-            # 埋め込み層を置き換え
-            self.gemma_model.set_input_embeddings(new_embeddings)
-            
-            # LMヘッドも同様に処理（存在する場合）
-            if hasattr(self.gemma_model, 'lm_head') and self.gemma_model.lm_head is not None:
-                old_lm_head = self.gemma_model.lm_head
-                if old_lm_head.weight.shape[0] == old_vocab_size:
-                    old_lm_weight_cpu = old_lm_head.weight.detach().cpu()
-                    
-                    new_lm_head = nn.Linear(embedding_dim, new_vocab_size, 
-                                          bias=old_lm_head.bias is not None, dtype=dtype)
-                    
-                    with torch.no_grad():
-                        new_lm_head.weight[:old_vocab_size] = old_lm_weight_cpu
-                        if new_vocab_size > old_vocab_size:
-                            mean_weight = old_lm_weight_cpu.mean(dim=0)
-                            new_lm_head.weight[old_vocab_size:] = mean_weight.unsqueeze(0).expand(
-                                new_vocab_size - old_vocab_size, -1
-                            )
-                        
-                        if old_lm_head.bias is not None:
-                            old_bias_cpu = old_lm_head.bias.detach().cpu()
-                            new_lm_head.bias[:old_vocab_size] = old_bias_cpu
-                            if new_vocab_size > old_vocab_size:
-                                new_lm_head.bias[old_vocab_size:] = 0.0
-                    
-                    new_lm_head = new_lm_head.to(device)
-                    self.gemma_model.lm_head = new_lm_head
-            
-            return True
-            
-        except Exception as e:
-            print(f"CPU手動リサイズ内部エラー: {e}")
-            return False
-    
-    def _manual_resize_device_safe(self, new_vocab_size: int) -> bool:
-        """デバイス安全な手動リサイズ"""
-        try:
-            import torch
-            import torch.nn as nn
-            
-            old_embeddings = self.gemma_model.get_input_embeddings()
-            old_vocab_size = old_embeddings.weight.shape[0]
-            embedding_dim = old_embeddings.weight.shape[1]
-            
-            if new_vocab_size <= old_vocab_size:
-                return True
-            
-            # 現在のデバイスとdtypeを保存
-            original_device = old_embeddings.weight.device
-            original_dtype = old_embeddings.weight.dtype
-            
-            # デバイス上で直接新しいテンソルを作成
-            with torch.no_grad():
-                # 新しい重みテンソルを作成（元のデバイス上で）
-                new_weight = torch.zeros(new_vocab_size, embedding_dim, 
-                                       dtype=original_dtype, device=original_device)
-                
-                # 既存の重みをコピー
-                new_weight[:old_vocab_size] = old_embeddings.weight
-                
-                # 新しいトークンの初期化
-                if new_vocab_size > old_vocab_size:
-                    mean_weight = old_embeddings.weight.mean(dim=0)
-                    new_weight[old_vocab_size:] = mean_weight.unsqueeze(0).expand(
-                        new_vocab_size - old_vocab_size, -1
-                    )
-                
-                # 重みを直接置き換え
-                old_embeddings.weight.data = new_weight
-                old_embeddings.num_embeddings = new_vocab_size
-            
-            return True
-            
-        except Exception as e:
-            print(f"デバイス安全リサイズ内部エラー: {e}")
-            return False
 
     @classmethod
     def from_config_file(cls, config_path: str, **kwargs):
@@ -470,11 +199,6 @@ class LisaGemmaForCausalLM(PreTrainedModel):
             gemma_image_size=getattr(config_module, 'GEMMA_IMAGE_SIZE', 896),
             sam_image_size=getattr(config_module, 'SAM_IMAGE_SIZE', 1024),
             model_max_length=getattr(config_module, 'MODEL_MAX_LENGTH', 2048),
-            skip_embedding_resize=getattr(config_module, 'SKIP_EMBEDDING_RESIZE', False),
-            use_preprocessed_checkpoint=getattr(config_module, 'USE_PREPROCESSED_CHECKPOINT', False),
-            preprocessed_vocab_size=getattr(config_module, 'PREPROCESSED_VOCAB_SIZE', None),
-            skip_hf_initialization=getattr(config_module, 'SKIP_HF_INITIALIZATION', False),
-            seg_token_id=getattr(config_module, 'SEG_TOKEN_ID', None),
             **kwargs
         )
         
