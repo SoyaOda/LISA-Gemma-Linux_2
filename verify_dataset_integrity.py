@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-LISA-Gemma Dataset Integrity Verification
+LISA-Llama4 Dataset Integrity Verification
 Lambda Cloud最適化版 - 軽量化とライブラリ遅延読み込み
 
 HybridDatasetが各サブデータセットを正しく処理し、意図した通りの学習サンプルを生成しているかを
@@ -28,7 +28,7 @@ import json
 # from PIL import Image  # 遅延読み込み
 # from torchvision.transforms import ToPILImage  # 遅延読み込み
 
-print("🚀 LISA-Gemma Dataset Integrity Verification (Lambda Cloud Optimized)")
+print("🚀 LISA-Llama4 Dataset Integrity Verification (Lambda Cloud Optimized)")
 print("📦 基本ライブラリ読み込み完了")
 
 # プロジェクトのルートディレクトリをsys.pathに追加
@@ -214,7 +214,7 @@ def main():
     # セッションタイムスタンプの生成
     session_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     
-    print("\n🔍 LISA-Gemma Dataset Integrity Verification")
+    print("\n🔍 LISA-Llama4 Dataset Integrity Verification")
     print("=" * 60)
     print(f"🚀 検証セッション開始: {session_timestamp}")
     print(f"📁 出力ディレクトリ: verification_output/session_{session_timestamp}/")
@@ -240,6 +240,7 @@ def main():
         print(f"   SAMチェックポイント: {config.SAM_CHECKPOINT_PATH}")
         print(f"   バッチサイズ: {config.BATCH_SIZE_PER_GPU}")
         print(f"   勾配蓄積ステップ: {config.GRADIENT_ACCUMULATION_STEPS}")
+        print(f"   Llama4モデル: {config.LLAMA_MODEL_ID}")
         
         dataset_configs = []
         if "sem_seg" in args.datasets:
