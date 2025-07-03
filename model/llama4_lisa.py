@@ -29,6 +29,10 @@ class LisaLlama4Config(PretrainedConfig):
         llama_image_size: int = 448,      # Llama4 Visionモデルの基本タイル画像サイズ
         sam_image_size: int = 1024,       # SAMエンコーダ入力サイズ
         model_max_length: int = 131072,   # Llama4の最大シーケンス長（128K）
+        # Llama-4-Scout-17B-16E-Instruct特有の設定
+        attn_implementation: str = "flex_attention",  # MoE対応の最適化アテンション
+        device_map: str = "auto",                     # meta tensor対策
+        torch_dtype: str = "bfloat16",               # 推奨精度
         **kwargs,
     ):
         self.llama_model_id = llama_model_id
@@ -39,6 +43,9 @@ class LisaLlama4Config(PretrainedConfig):
         self.llama_image_size = llama_image_size
         self.sam_image_size = sam_image_size
         self.model_max_length = model_max_length
+        self.attn_implementation = attn_implementation
+        self.device_map = device_map
+        self.torch_dtype = torch_dtype
         super().__init__(**kwargs)
 
 class LisaLlama4ForCausalLM(PreTrainedModel):
@@ -47,14 +54,38 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
     def __init__(self, config: LisaLlama4Config):
         super().__init__(config)
 
-        # 1. Llama-4マルチモーダルモデルの初期化
+        # 1. Llama-4マルチモーダルモデルの初期化（Webリサーチ準拠設定）
         print(f"Llama-4モデルをロード中... ({config.llama_model_id})")
-        self.llama_model = Llama4ForConditionalGeneration.from_pretrained(
-            config.llama_model_id,
-            attn_implementation="flex_attention",
-            torch_dtype=torch.bfloat16,
-            device_map="auto"
-        )
+        print(f"  - アテンション実装: {config.attn_implementation}")
+        print(f"  - デバイスマップ: {config.device_map}")
+        print(f"  - Torch精度: {config.torch_dtype}")
+        
+        # flex_attention vs eagerアテンションの説明
+        if config.attn_implementation == "eager":
+            print("  ⚠️  注意: flex_attentionにバグがあるため、eagerアテンションを使用")
+            print("     パフォーマンスは劣りますが、安定性が向上します")
+        
+        # torch_dtypeの変換
+        if config.torch_dtype == "bfloat16":
+            torch_dtype = torch.bfloat16
+        elif config.torch_dtype == "float16":
+            torch_dtype = torch.float16
+        else:
+            torch_dtype = torch.bfloat16  # デフォルト
+        
+        try:
+            self.llama_model = Llama4ForConditionalGeneration.from_pretrained(
+                config.llama_model_id,
+                attn_implementation=config.attn_implementation,
+                device_map=config.device_map,
+                torch_dtype=torch_dtype,
+            )
+            print("✅ Llama-4モデルの初期化完了")
+        except Exception as e:
+            print(f"❌ モデルロードエラー: {e}")
+            if "flex_attention" in str(e):
+                print("💡 提案: config_linux.pyのATTN_IMPLEMENTATIONを'eager'に変更してください")
+            raise e
         
         # 1.1 モデル本体のパラメータを完全凍結（LoRA微調整の下準備）
         print("Llama4モデルのパラメータを全て凍結中...")
@@ -177,6 +208,10 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
             llama_image_size=getattr(config_module, 'LLAMA_IMAGE_SIZE', 448),
             sam_image_size=getattr(config_module, 'SAM_IMAGE_SIZE', 1024),
             model_max_length=getattr(config_module, 'MODEL_MAX_LENGTH', 131072),
+            # Llama-4-Scout特有の設定
+            attn_implementation=getattr(config_module, 'ATTN_IMPLEMENTATION', "flex_attention"),
+            device_map=getattr(config_module, 'DEVICE_MAP', "auto"),
+            torch_dtype=getattr(config_module, 'TORCH_DTYPE', "bfloat16"),
             **kwargs
         )
         return cls(lisa_config)

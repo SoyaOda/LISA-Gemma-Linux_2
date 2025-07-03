@@ -21,6 +21,12 @@ HF_CACHE_DIR = os.environ.get('HF_HOME', None)
 # 使用するLlama4モデル
 LLAMA_MODEL_ID = "meta-llama/Llama-4-Scout-17B-16E-Instruct"
 
+# Llama-4-Scout-17B-16E-Instruct特有の設定（Webリサーチ準拠）
+# 注意: flex_attentionにバグがあるため、現在はeagerが推奨（2025年実装状況）
+ATTN_IMPLEMENTATION = "eager"           # flex_attentionバグ回避のため
+DEVICE_MAP = "auto"                     # meta tensor対策  
+TORCH_DTYPE = "bfloat16"               # 推奨精度
+
 # モデルサイズ/バリエーションに応じた設定
 LLAMA_MODEL_CONFIGS = {
     "scout": {

@@ -2,7 +2,7 @@
 """
 第3節：視覚-言語アライメントのためのアーキテクチャ監査 (Lambda Cloud最適化)
 
-完全なLISA-Gemmaモデルをインスタンス化し、その構成要素（Vision Tower, Projector, LLM, Seg Decoder）を検査し、
+完全なLISA-Llama4モデルをインスタンス化し、その構成要素（Vision Tower, Projector, LLM, Seg Decoder）を検査し、
 次元の互換性を検証し、各モジュールの学習可能パラメータの状態を報告する。
 
 論理的根拠:
@@ -18,7 +18,7 @@ import sys
 import traceback
 from datetime import datetime
 
-print("🚀 LISA-Gemma Model Architecture Verification (Lambda Cloud Optimized)")
+print("🚀 LISA-Llama4 Model Architecture Verification (Lambda Cloud Optimized)")
 
 # 重いライブラリは遅延読み込み
 # import torch  # 遅延読み込み
@@ -46,14 +46,14 @@ def get_config():
 def load_heavy_libraries():
     """重いライブラリを必要時に読み込む"""
     print("📦 重いライブラリを読み込み中...")
-    global torch, nn, LisaGemmaForCausalLM, LisaGemmaConfig, LoraConfig, get_peft_model
+    global torch, nn, LisaLlama4ForCausalLM, LisaLlama4Config, LoraConfig, get_peft_model
     
     import torch
     import torch.nn as nn
-    from model.gemma_lisa import LisaGemmaForCausalLM, LisaGemmaConfig
+    from model.llama4_lisa import LisaLlama4ForCausalLM, LisaLlama4Config
     from peft import LoraConfig, get_peft_model
     
-    print("✅ PyTorch, LISA-Gemma, PEFT読み込み完了")
+    print("✅ PyTorch, LISA-Llama4, PEFT読み込み完了")
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Verify model architecture and parameters")
@@ -84,9 +84,9 @@ def main():
     # 設定読み込み
     config = get_config()
     print(f"✅ 設定読み込み完了")
-    print(f"  Gemmaモデル: {config.GEMMA_MODEL_ID}")
+    print(f"  Llama4モデル: {config.LLAMA_MODEL_ID}")
     print(f"  SAMチェックポイント: {config.SAM_CHECKPOINT_PATH}")
-    print(f"  Gemma画像サイズ: {config.GEMMA_IMAGE_SIZE}")
+    print(f"  Llama4画像サイズ: {config.LLAMA_IMAGE_SIZE}")
     print(f"  SAM画像サイズ: {config.SAM_IMAGE_SIZE}")
     print(f"  LoRA設定: r={config.LORA_R}, alpha={config.LORA_ALPHA}")
     
@@ -96,23 +96,40 @@ def main():
         print(f"使用デバイス: {device}")
         
         # 1. モデルの初期化
-        print("\n📝 LISA-Gemmaモデルを初期化中...")
+        print("\n📝 LISA-Llama4モデルを初期化中...")
         
-        # LisaGemmaConfigの作成
-        lisa_config = LisaGemmaConfig(
-            gemma_model_id=config.GEMMA_MODEL_ID,
+        # LisaLlama4Configの作成（Llama-4-Scout仕様準拠）
+        lisa_config = LisaLlama4Config(
+            llama_model_id=config.LLAMA_MODEL_ID,
             sam_checkpoint_path=config.SAM_CHECKPOINT_PATH,
             seg_token=config.SEG_TOKEN,
-            gemma_hidden_size=config.GEMMA_HIDDEN_SIZE,
+            llama_hidden_size=config.LLAMA_HIDDEN_SIZE,
             sam_prompt_embed_dim=config.SEG_PROJECTION_DIM,
-            gemma_image_size=config.GEMMA_IMAGE_SIZE,
+            llama_image_size=config.LLAMA_IMAGE_SIZE,
             sam_image_size=config.SAM_IMAGE_SIZE,
             model_max_length=config.MODEL_MAX_LENGTH,
+            # Llama-4-Scout-17B-16E-Instruct特有の設定（config_linux.pyから取得）
+            attn_implementation=config.ATTN_IMPLEMENTATION,
+            device_map=config.DEVICE_MAP,
+            torch_dtype=config.TORCH_DTYPE,
         )
         
-        # モデルの初期化
-        model = LisaGemmaForCausalLM(lisa_config)
-        model = model.to(device)
+        # モデルの初期化（metaテンソー対応）
+        model = LisaLlama4ForCausalLM(lisa_config)
+        
+        # metaテンソー問題の対処
+        try:
+            model = model.to(device)
+            print("✅ 通常のモデル移動が完了しました")
+        except NotImplementedError as e:
+            if "meta tensor" in str(e):
+                print("⚠️  metaテンソーが検出されました。device_map='auto'を使用します")
+                # metaテンソー対応の再初期化
+                lisa_config.device_map = "auto"
+                model = LisaLlama4ForCausalLM(lisa_config)
+                print("✅ device_map='auto'でモデル移動が完了しました")
+            else:
+                raise e
         
         # LoRA設定を適用（最適化後の設定で検証するため）
         print("\n🔧 LoRA設定を適用中...")
@@ -126,8 +143,8 @@ def main():
                 task_type="CAUSAL_LM"
             )
             
-            # LoRAをGemmaモデルに適用
-            model.gemma_model = get_peft_model(model.gemma_model, lora_config)
+            # LoRAをLlama4モデルに適用
+            model.llama_model = get_peft_model(model.llama_model, lora_config)
             print("✅ LoRA設定が正常に適用されました")
             
         except Exception as e:
@@ -142,14 +159,14 @@ def main():
         print(f"モデルタイプ: {model.__class__.__name__}")
         
         # 主要コンポーネントの存在確認
-        has_gemma = hasattr(model, 'gemma_model') and model.gemma_model is not None
+        has_llama = hasattr(model, 'llama_model') and model.llama_model is not None
         has_sam_encoder = hasattr(model, 'sam_image_encoder') and model.sam_image_encoder is not None
         has_sam_prompt = hasattr(model, 'sam_prompt_encoder') and model.sam_prompt_encoder is not None
         has_sam_decoder = hasattr(model, 'sam_mask_decoder') and model.sam_mask_decoder is not None
         has_projector = hasattr(model, 'mlp_projector') and model.mlp_projector is not None
         
         print("\n主要コンポーネント:")
-        print(f"  ✓ Gemma-3 Model: {'存在' if has_gemma else '欠如'}")
+        print(f"  ✓ Llama4モデル: {'存在' if has_llama else '欠如'}")
         print(f"  ✓ SAM Image Encoder: {'存在' if has_sam_encoder else '欠如'}")
         print(f"  ✓ SAM Prompt Encoder: {'存在' if has_sam_prompt else '欠如'}")
         print(f"  ✓ SAM Mask Decoder: {'存在' if has_sam_decoder else '欠如'}")
@@ -168,8 +185,8 @@ def main():
                     print(f"    - 入力次元: {layer.in_features}")
                     print(f"    - 出力次元: {layer.out_features}")
             
-            # ダミー入力でテスト
-            dummy_hidden_state = torch.randn(1, config.GEMMA_HIDDEN_SIZE, device=device, dtype=torch.bfloat16)
+            # ダミー入力でテスト (Llama4隠れ次元 -> プロンプト埋め込み次元)
+            dummy_hidden_state = torch.randn(1, config.LLAMA_HIDDEN_SIZE, device=device, dtype=torch.bfloat16)
             print(f"\nダミー入力形状: {dummy_hidden_state.shape}")
             
             with torch.no_grad():
@@ -205,7 +222,7 @@ def main():
             print(f"SAM画像特徴量形状: {sam_features.shape}")
             
             # プロンプトエンコーダのテスト
-            if has_projector and projector_output_dim == expected_dim:
+            if has_projector and 'projected_output' in locals() and projector_output_dim == expected_dim:
                 with torch.no_grad():
                     sparse_embeddings, dense_embeddings = model.sam_prompt_encoder(
                         points=None,
@@ -227,8 +244,8 @@ def main():
         trainable_params = 0
         
         trainable_modules = {
-            'gemma_embeddings': [],
-            'gemma_lm_head': [],
+            'llama_embeddings': [],
+            'llama_lm_head': [],
             'lora_adapters': [],
             'sam_image_encoder': [],
             'sam_prompt_encoder': [],
@@ -244,10 +261,10 @@ def main():
                 trainable_params += param.numel()
                 
                 # モジュールごとに分類
-                if 'gemma_model' in name and ('embed_tokens' in name or 'input_embeddings' in name):
-                    trainable_modules['gemma_embeddings'].append(name)
-                elif 'gemma_model' in name and ('lm_head' in name or 'output_embeddings' in name):
-                    trainable_modules['gemma_lm_head'].append(name)
+                if 'llama_model' in name and ('embed_tokens' in name or 'input_embeddings' in name):
+                    trainable_modules['llama_embeddings'].append(name)
+                elif 'llama_model' in name and ('lm_head' in name or 'output_embeddings' in name):
+                    trainable_modules['llama_lm_head'].append(name)
                 elif any(lora_key in name for lora_key in ['lora_A', 'lora_B', 'lora_embedding_A', 'lora_embedding_B']):
                     trainable_modules['lora_adapters'].append(name)
                 elif 'sam_image_encoder' in name:
@@ -267,7 +284,7 @@ def main():
         print(f"学習可能率: {100 * trainable_params / total_params:.2f}%")
         
         # 仕様書準拠性チェック
-        trainable_ratio = 100 * trainable_params / total_params
+        trainable_ratio = 100 * trainable_params / total_params if total_params > 0 else 0.0
         spec_compliant = trainable_ratio < 1.0
         print(f"\n📋 仕様書準拠性: {'✅ 準拠' if spec_compliant else '❌ 違反'} (要求: <1%, 現在: {trainable_ratio:.2f}%)")
         
@@ -316,32 +333,32 @@ def main():
                     projector_trainable = True
                     break
         
-        # Gemmaモデルの状態確認
-        gemma_main_frozen = True
-        gemma_embeddings_frozen = True
-        gemma_lm_head_frozen = True
+        # Llamaモデルの状態確認
+        llama_main_frozen = True
+        llama_embeddings_frozen = True
+        llama_lm_head_frozen = True
         lora_adapters_trainable = False
         
-        if has_gemma:
-            for name, param in model.gemma_model.named_parameters():
+        if has_llama:
+            for name, param in model.llama_model.named_parameters():
                 if param.requires_grad:
                     if 'embed_tokens' in name:
-                        gemma_embeddings_frozen = False
+                        llama_embeddings_frozen = False
                     elif 'lm_head' in name:
-                        gemma_lm_head_frozen = False
+                        llama_lm_head_frozen = False
                     elif any(lora_key in name for lora_key in ['lora_A', 'lora_B']):
                         lora_adapters_trainable = True
                     else:
-                        gemma_main_frozen = False
+                        llama_main_frozen = False
         
         print("\n最適化後の期待設定との比較:")
         print(f"  SAM Image Encoder: {'✅ 凍結' if sam_encoder_frozen else '❌ 学習可能（期待: 凍結）'}")
         print(f"  SAM Prompt Encoder: {'✅ 凍結' if sam_prompt_frozen else '❌ 学習可能（期待: 凍結）'}")
         print(f"  SAM Mask Decoder: {'✅ 学習可能' if sam_decoder_trainable else '❌ 凍結（期待: 学習可能）'}")
         print(f"  MLP Projector: {'✅ 学習可能' if projector_trainable else '❌ 凍結（期待: 学習可能）'}")
-        print(f"  Gemma本体: {'✅ 凍結' if gemma_main_frozen else '❌ 学習可能（期待: 凍結）'}")
-        print(f"  Gemma埋め込み層: {'✅ 凍結' if gemma_embeddings_frozen else '❌ 学習可能（期待: 凍結）'}")
-        print(f"  Gemma LMヘッド: {'✅ 凍結' if gemma_lm_head_frozen else '❌ 学習可能（期待: 凍結）'}")
+        print(f"  Llama4本体: {'✅ 凍結' if llama_main_frozen else '❌ 学習可能（期待: 凍結）'}")
+        print(f"  Llama4埋め込み層: {'✅ 凍結' if llama_embeddings_frozen else '❌ 学習可能（期待: 凍結）'}")
+        print(f"  Llama4 LMヘッド: {'✅ 凍結' if llama_lm_head_frozen else '❌ 学習可能（期待: 凍結）'}")
         print(f"  LoRAアダプタ: {'✅ 学習可能' if lora_adapters_trainable else '❌ 凍結（期待: 学習可能）'}")
         
         # 5. 追加の診断情報
@@ -349,9 +366,9 @@ def main():
         
         # デバイスとデータ型の確認
         print("\nモジュールのデバイスとデータ型:")
-        if has_gemma:
-            gemma_param = next(model.gemma_model.parameters())
-            print(f"  Gemma Model: device={gemma_param.device}, dtype={gemma_param.dtype}")
+        if has_llama:
+            llama_param = next(model.llama_model.parameters())
+            print(f"  Llama4 Model: device={llama_param.device}, dtype={llama_param.dtype}")
         if has_sam_encoder:
             sam_param = next(model.sam_image_encoder.parameters())
             print(f"  SAM Encoder: device={sam_param.device}, dtype={sam_param.dtype}")
@@ -369,8 +386,8 @@ def main():
             print(f"⚠️  学習可能パラメータ率が仕様書要求を超過: {trainable_ratio:.2f}% > 1%")
             print("   → 埋め込み層とLMヘッドの凍結を検討してください")
         
-        if not gemma_embeddings_frozen:
-            print("⚠️  Gemma埋め込み層が学習可能になっています")
+        if not llama_embeddings_frozen:
+            print("⚠️  Llama4埋め込み層が学習可能になっています")
             print("   → パラメータ効率のため凍結を推奨")
         
         if not lora_adapters_trainable:
