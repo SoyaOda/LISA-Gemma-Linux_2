@@ -14,6 +14,8 @@ from transformers import AutoProcessor, Llama4ForConditionalGeneration, PreTrain
 from model.segment_anything import sam_model_registry
 from model.segment_anything.modeling import MaskDecoder, PromptEncoder, TwoWayTransformer
 from utils.constants import DEFAULT_SEG_TOKEN
+from torchvision import transforms
+from PIL import Image
 
 # LISA-Llama4モデルのカスタム設定クラス
 class LisaLlama4Config(PretrainedConfig):
@@ -107,42 +109,30 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
                 sam = sam_model_registry["vit_h"](checkpoint=config.sam_checkpoint_path)
                 
                 # SAMの各コンポーネントを取り出し
-                self.sam_image_encoder = sam.image_encoder
-                self.sam_prompt_encoder = sam.prompt_encoder
-                self.sam_mask_decoder = sam.mask_decoder
-
-                # SAMの画像エンコーダとプロンプトエンコーダは凍結
-                for param in self.sam_image_encoder.parameters():
-                    param.requires_grad = False
-                for param in self.sam_prompt_encoder.parameters():
-                    param.requires_grad = False
-                # SAMのマスクデコーダは学習可能にする
-                for param in self.sam_mask_decoder.parameters():
-                    param.requires_grad = True
+                self.sam_model = sam
+                self.sam_model.image_encoder.requires_grad = False
+                self.sam_model.prompt_encoder.requires_grad = False
+                self.sam_model.mask_decoder.requires_grad = True
                 
                 # デバイスをLlamaモデルと合わせる
                 device = next(self.llama_model.parameters()).device
-                self.sam_image_encoder = self.sam_image_encoder.to(device)
-                self.sam_prompt_encoder = self.sam_prompt_encoder.to(device)
-                self.sam_mask_decoder = self.sam_mask_decoder.to(device)
+                self.sam_model.image_encoder = self.sam_model.image_encoder.to(device)
+                self.sam_model.prompt_encoder = self.sam_model.prompt_encoder.to(device)
+                self.sam_model.mask_decoder = self.sam_model.mask_decoder.to(device)
                 
                 print("✅ SAMコンポーネントの初期化と凍結が完了しました")
             except Exception as e:
                 print(f"❌ SAMのロードに失敗: {e}")
                 print("SAMなしで続行します（セグメンテーション機能は無効）")
-                self.sam_image_encoder = None
-                self.sam_prompt_encoder = None
-                self.sam_mask_decoder = None
+                self.sam_model = None
         else:
             print("⚠️ SAMチェックポイントが指定されていません。SAM機能はオフになります。")
-            self.sam_image_encoder = None
-            self.sam_prompt_encoder = None
-            self.sam_mask_decoder = None
+            self.sam_model = None
 
         # 4. MLPプロジェクタの定義 (Llama4 hidden -> SAM埋め込みへの橋渡し)
         print("MLPプロジェクタを構築中...")
         device = next(self.llama_model.parameters()).device
-        self.mlp_projector = nn.Sequential(
+        self.multi_modal_projector = nn.Sequential(
             nn.Linear(config.llama_hidden_size, config.llama_hidden_size),
             nn.GELU(),
             nn.Linear(config.llama_hidden_size, config.sam_prompt_embed_dim),
@@ -218,34 +208,72 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
 
     def has_sam_capability(self) -> bool:
         """SAMによるマスク生成機能が利用可能か確認"""
-        return all([
-            self.sam_image_encoder is not None,
-            self.sam_prompt_encoder is not None,
-            self.sam_mask_decoder is not None
-        ])
+        return self.sam_model is not None
 
-    def prepare_multimodal_input(self, image, text_prompt):
+    def prepare_multimodal_input(self, image, text_prompt, for_training=False):
         """
-        Llama4公式のチャットテンプレートに従って入力データを準備
+        Llama4のマルチモーダル入力を正しく準備
+        
+        Args:
+            image: PIL Image or torch.Tensor
+            text_prompt: str
+            for_training: bool - Training時とInference時で処理を分ける
         """
-        messages = [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "image", "image": image},
-                    {"type": "text", "text": text_prompt}
-                ]
-            }
-        ]
-        # 公式Processorのチャットテンプレートを適用して入力取得
-        inputs = self.llama_processor.apply_chat_template(
-            messages,
-            add_generation_prompt=True,
-            tokenize=True,
-            return_dict=True,
-            return_tensors="pt"
-        )
-        return inputs
+        if for_training:
+            # Training時: 生のtensorを使用（apply_chat_templateは使わない）
+            # これは_forward_dual_stream_batchで既に正しく実装済み
+            raise ValueError("Training時はこのメソッドを使わず、直接tensorを渡してください")
+        
+        else:
+            # Inference時: apply_chat_templateを使用
+            messages = [
+                {
+                    "role": "user", 
+                    "content": [
+                        {"type": "image", "image": image},
+                        {"type": "text", "text": text_prompt}
+                    ]
+                }
+            ]
+            
+            try:
+                # Llama4の公式Processorでチャットテンプレート適用
+                inputs = self.llama_processor.apply_chat_template(
+                    messages,
+                    add_generation_prompt=True,
+                    tokenize=True,
+                    return_dict=True,
+                    return_tensors="pt"
+                )
+                return inputs
+            except Exception as e:
+                print(f"⚠️ apply_chat_template エラー: {e}")
+                print("🔄 フォールバック: 基本的なtokenization")
+                
+                # フォールバック: 基本的なtokenization
+                if isinstance(image, torch.Tensor):
+                    pixel_values = image.unsqueeze(0) if image.dim() == 3 else image
+                else:
+                    # PIL to tensor conversion
+                    import torchvision.transforms as transforms
+                    transform = transforms.Compose([
+                        transforms.Resize((448, 448)),
+                        transforms.ToTensor(),
+                        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+                    ])
+                    pixel_values = transform(image).unsqueeze(0)
+                
+                input_ids = self.llama_processor.tokenizer.encode(
+                    text_prompt, 
+                    return_tensors="pt",
+                    add_special_tokens=True
+                )
+                
+                return {
+                    "input_ids": input_ids,
+                    "pixel_values": pixel_values,
+                    "attention_mask": torch.ones_like(input_ids)
+                }
 
     def get_trainable_parameters_info(self):
         """学習可能なパラメータ数等の情報を取得"""
@@ -336,7 +364,7 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
             "hidden_states": outputs.hidden_states
         }
         # 3. SEGトークンが出現したらマスク生成
-        if generate_mask and self.sam_image_encoder is not None:
+        if generate_mask and self.sam_model is not None:
             input_ids = llama_inputs.get("input_ids")
             seg_positions = (input_ids == self.seg_token_id).nonzero(as_tuple=True)
             if len(seg_positions[0]) > 0:
@@ -346,7 +374,7 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
                 sam_image_tensor = torch.tensor(np.array(sam_image)).permute(2, 0, 1).float().unsqueeze(0).to(device)
                 # SAM画像エンコーダから特徴抽出
                 with torch.no_grad():
-                    sam_features = self.sam_image_encoder(sam_image_tensor)
+                    sam_features = self.sam_model.image_encoder(sam_image_tensor)
                 # SEGトークン隠れ状態からマスク生成
                 masks = self._generate_masks_from_seg_tokens_single(outputs.hidden_states[-1], seg_positions, sam_features, device)
                 results["predicted_masks"] = masks
@@ -381,7 +409,7 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
             "hidden_states": outputs.hidden_states
         }
         # セグメンテーションマスク生成処理
-        if generate_mask and self.sam_image_encoder is not None:
+        if generate_mask and self.sam_model is not None:
             seg_positions = (input_ids == self.seg_token_id).nonzero(as_tuple=True)
             if len(seg_positions[0]) > 0:
                 print(f"バッチ内SEGトークン数: {len(seg_positions[0])}")
@@ -394,7 +422,7 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
                     sam_img = F.interpolate(img, size=(self.sam_image_size, self.sam_image_size), mode='bilinear', align_corners=False)
                     sam_img = sam_img * 255.0  # 正規化: 0-1 -> 0-255
                     with torch.no_grad():
-                        sam_feat = self.sam_image_encoder(sam_img)
+                        sam_feat = self.sam_model.image_encoder(sam_img)
                     sam_features_list.append(sam_feat)
                 masks = self._generate_masks_from_seg_tokens_batch(outputs.hidden_states[-1], seg_positions, sam_features_list, device)
                 results["predicted_masks"] = masks if masks is not None else None
@@ -408,92 +436,145 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
                 mlp_loss = torch.tensor(0.0, device=device, requires_grad=True)
                 for batch_idx, token_idx in zip(seg_positions[0], seg_positions[1]):
                     seg_hidden = outputs.hidden_states[-1][batch_idx, token_idx]
-                    seg_embed = self.mlp_projector(seg_hidden)
+                    seg_embed = self.multi_modal_projector(seg_hidden)
                     mlp_loss = mlp_loss + seg_embed.sum() * 1e-6
                 results["text_loss"] = outputs.loss + mlp_loss if outputs.loss is not None else mlp_loss
             results["predicted_masks"] = None
         return results
 
-    def _forward_dual_stream_batch(self, input_ids, attention_mask, images_for_llama, images_for_sam, labels, generate_mask, device):
+    def _forward_dual_stream_batch(
+        self,
+        input_ids,
+        attention_mask,
+        images_for_llama,
+        images_for_sam,
+        labels=None,
+        generate_mask=True,
+        seg_token_idx=None,
+        **kwargs
+    ):
         """
-        新方式: デュアルストリーム画像入力のフォワード処理（Llama用画像とSAM用画像を別々に供給）
+        デュアルストリーム処理：LlamaとSAM両方の処理を実行
+        
+        Args:
+            input_ids: テキストトークンID [batch, seq_len]
+            attention_mask: アテンションマスク [batch, seq_len] 
+            images_for_llama: Llama用画像 (任意の形状)
+            images_for_sam: SAM用画像 [batch, 3, 1024, 1024]
+            labels: 学習用ラベル [batch, seq_len]
+            generate_mask: セグメンテーションマスク生成フラグ
+            seg_token_idx: SEGトークン位置情報
         """
-        # Path 1: SAM画像エンコーディング
-        sam_features_list = []
-        if generate_mask and self.sam_image_encoder is not None and images_for_sam is not None:
-            if not hasattr(self, '_sam_counter'):
-                self._sam_counter = 1
-            else:
-                self._sam_counter += 1
-            if self._sam_counter <= 2:
-                print(f"SAMエンコード (batch #{self._sam_counter}): images_for_sam{images_for_sam.shape}")
-            elif self._sam_counter == 3:
-                print("🔇 SAMエンコードのログを以降省略")
-            with torch.no_grad():
-                batch = images_for_sam.shape[0]
-                for i in range(batch):
-                    sam_img = images_for_sam[i:i+1]  # (1,3,1024,1024)
-                    sam_feat = self.sam_image_encoder(sam_img)
-                    sam_features_list.append(sam_feat)
-        # Path 2: Llamaモデルでの言語推論
-        if not hasattr(self, '_llama_counter'):
-            self._llama_counter = 1
+        batch_size = input_ids.shape[0]
+        device = input_ids.device
+        
+        # SAMによる画像エンコード
+        if generate_mask:
+            image_features_sam = []
+            for i in range(batch_size):
+                print(f"SAMエンコード (batch #{i+1}): images_for_sam{images_for_sam[i:i+1].shape}")
+                features = self.sam_model.image_encoder(images_for_sam[i:i+1])
+                image_features_sam.append(features)
+            image_features_sam = torch.cat(image_features_sam, dim=0)
         else:
-            self._llama_counter += 1
-        if self._llama_counter <= 3:
-            print(f"🔍 Llama入力 (dual stream #{self._llama_counter}): input_ids{input_ids.shape}, images_for_llama{images_for_llama.shape}, labels{labels.shape if labels is not None else None}")
-        elif self._llama_counter == 4:
-            print("🔇 デュアルストリームのデバッグ出力を省略します")
-        outputs = self.llama_model(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-            pixel_values=images_for_llama,
-            labels=labels,
-            output_hidden_states=True,
-            return_dict=True
-        )
-        text_loss = outputs.loss
-        results = {
-            "text_loss": text_loss,
-            "logits": outputs.logits,
-            "hidden_states": outputs.hidden_states
+            image_features_sam = None
+        
+        # Llama4 Training API使用
+        print(f"🔍 Llama4 Training API (dual stream #{batch_size}): input_ids{input_ids.shape}")
+        print(f"  images_for_llama: {images_for_llama.shape}")
+        
+        # 🔥 FIXED: 5Dテンソル制限を削除
+        # Llama4は多タイル画像をネイティブに処理するため制限しない
+        if images_for_llama.dim() == 5:
+            print(f"  5Dテンソル検出: {images_for_llama.shape}")
+            print(f"  全タイルをLlama4に渡します（制限なし）")
+            # 5D -> 4D変換: (batch, num_tiles, channels, height, width) -> (batch * num_tiles, channels, height, width)
+            batch_size_orig, num_tiles, channels, height, width = images_for_llama.shape
+            pixel_values = images_for_llama.view(-1, channels, height, width)
+            print(f"  変換後pixel_values: {pixel_values.shape}")
+        else:
+            pixel_values = images_for_llama
+            print(f"  pixel_values: {pixel_values.shape}")
+        
+        # Llama4 forward pass
+        try:
+            outputs = self.llama_model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                pixel_values=pixel_values,
+                labels=labels,
+                return_dict=True
+            )
+        except Exception as e:
+            print(f"❌ Llama4フォワードエラー: {e}")
+            raise e
+        
+        # Hidden statesを取得
+        hidden_states = outputs.hidden_states[-1] if hasattr(outputs, 'hidden_states') else outputs.last_hidden_state
+        
+        # SEGトークン検出とマスク生成
+        if generate_mask and self.seg_token_id is not None:
+            seg_mask = (input_ids == self.seg_token_id)
+            
+            if seg_mask.any():
+                # SEGトークンの隠れ状態を抽出
+                seg_indices = seg_mask.nonzero(as_tuple=False)
+                seg_embeddings = []
+                
+                for batch_idx, seq_idx in seg_indices:
+                    seg_embedding = hidden_states[batch_idx, seq_idx]
+                    seg_embeddings.append(seg_embedding)
+                
+                if seg_embeddings:
+                    seg_embeddings = torch.stack(seg_embeddings)
+                    
+                    # MLPプロジェクタでSAM埋め込み次元にマッピング
+                    sam_embeddings = self.multi_modal_projector(seg_embeddings)
+                    
+                    # SAMでマスク生成
+                    if image_features_sam is not None:
+                        masks = []
+                        for i, embedding in enumerate(sam_embeddings):
+                            sparse_embeddings = embedding.unsqueeze(0).unsqueeze(0)
+                            dense_embeddings = self.sam_model.prompt_encoder.no_mask_embed.weight.reshape(1, -1, 1, 1)
+                            
+                            # SAMマスクデコーダ
+                            low_res_masks, iou_predictions = self.sam_model.mask_decoder(
+                                image_embeddings=image_features_sam[min(i, image_features_sam.shape[0]-1):min(i, image_features_sam.shape[0]-1)+1],
+                                image_pe=self.sam_model.prompt_encoder.get_dense_pe(),
+                                sparse_prompt_embeddings=sparse_embeddings,
+                                dense_prompt_embeddings=dense_embeddings,
+                                multimask_output=False
+                            )
+                            masks.append(low_res_masks)
+                        
+                        pred_masks = torch.cat(masks, dim=0)
+                    else:
+                        pred_masks = None
+                else:
+                    pred_masks = None
+                    sam_embeddings = None
+            else:
+                pred_masks = None
+                sam_embeddings = None
+                
+            # プロジェクタの勾配維持
+            if hasattr(self, 'multi_modal_projector'):
+                dummy_loss = (self.multi_modal_projector.weight.sum() + 
+                             self.multi_modal_projector.bias.sum()) * 1e-6
+                if hasattr(outputs, 'loss') and outputs.loss is not None:
+                    outputs.loss = outputs.loss + dummy_loss
+        else:
+            pred_masks = None
+            sam_embeddings = None
+        
+        return {
+            "text_loss": outputs.loss if hasattr(outputs, 'loss') else None,
+            "logits": outputs.logits if hasattr(outputs, 'logits') else None,
+            "hidden_states": hidden_states,
+            "pred_masks": pred_masks,
+            "sam_embeddings": sam_embeddings
         }
-        # 橋渡し: SEGトークン -> SAMマスク生成
-        if generate_mask and sam_features_list:
-            seg_positions = (input_ids == self.seg_token_id).nonzero(as_tuple=True)
-            if len(seg_positions[0]) > 0:
-                if not hasattr(self, '_seg_counter'):
-                    self._seg_counter = 1
-                else:
-                    self._seg_counter += 1
-                if self._seg_counter <= 2:
-                    print(f"SEGトークン検出: {len(seg_positions[0])}個 (batch)")
-                elif self._seg_counter == 3:
-                    print("🔇 SEGトークン検出ログを省略します")
-                masks = self._generate_masks_from_seg_tokens_dual(outputs.hidden_states[-1], seg_positions, sam_features_list, device)
-                results["predicted_masks"] = masks
-            else:
-                results["predicted_masks"] = None
-        else:
-            # マスク非生成でもMLPプロジェクタに微小な勾配を流す
-            seg_positions = (input_ids == self.seg_token_id).nonzero(as_tuple=True)
-            if len(seg_positions[0]) > 0:
-                if not hasattr(self, '_mlp_grad_counter'):
-                    self._mlp_grad_counter = 1
-                else:
-                    self._mlp_grad_counter += 1
-                if self._mlp_grad_counter <= 2:
-                    print(f"MLPプロジェクタ用ダミー損失を追加 (SEGトークン数: {len(seg_positions[0])})")
-                elif self._mlp_grad_counter == 3:
-                    print("🔇 MLPプロジェクタ勾配ログを省略します")
-                mlp_loss = torch.tensor(0.0, device=device, requires_grad=True)
-                for batch_idx, token_idx in zip(seg_positions[0], seg_positions[1]):
-                    seg_hidden = outputs.hidden_states[-1][batch_idx, token_idx]
-                    seg_embed = self.mlp_projector(seg_hidden)
-                    mlp_loss = mlp_loss + seg_embed.sum() * 1e-6
-                results["text_loss"] = (results["text_loss"] + mlp_loss) if results["text_loss"] is not None else mlp_loss
-            results["predicted_masks"] = None
-        return results
 
     def _generate_masks_from_seg_tokens_single(self, hidden_states, seg_positions, sam_features, device):
         """
@@ -504,15 +585,15 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
         for batch_idx, token_idx in zip(seg_positions[0], seg_positions[1]):
             # SEGトークン隠れベクトル抽出
             seg_hidden = hidden_states[batch_idx, token_idx]  # (hidden_size,)
-            seg_emb = self.mlp_projector(seg_hidden.unsqueeze(0))  # (1,256)
+            seg_emb = self.multi_modal_projector(seg_hidden.unsqueeze(0))  # (1,256)
             sparse_embeddings = seg_emb.unsqueeze(1)  # (1,1,256)
             dense_embeddings = torch.zeros(
                 (sam_features.shape[0], sam_features.shape[2], sam_features.shape[3]),
                 device=device, dtype=sam_features.dtype
             )
-            dense_pe = self.sam_prompt_encoder.get_dense_pe()
+            dense_pe = self.sam_model.prompt_encoder.get_dense_pe()
             try:
-                mask, iou_pred = self.sam_mask_decoder(
+                mask, iou_pred = self.sam_model.mask_decoder(
                     image_embeddings=sam_features,
                     image_pe=dense_pe,
                     sparse_prompt_embeddings=sparse_embeddings,
@@ -545,15 +626,15 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
                     # i番目の画像にSEGトークンがある場合
                     token_idx = seg_positions[1][j]
                     seg_hidden = hidden_states[i, token_idx]
-                    seg_emb = self.mlp_projector(seg_hidden.unsqueeze(0))  # (1,256)
+                    seg_emb = self.multi_modal_projector(seg_hidden.unsqueeze(0))  # (1,256)
                     sparse_embeddings = seg_emb.unsqueeze(1)  # (1,1,256)
                     dense_embeddings = torch.zeros(
                         (sam_features_list[i].shape[0], sam_features_list[i].shape[2], sam_features_list[i].shape[3]),
                         device=device, dtype=sam_features_list[i].dtype
                     )
-                    dense_pe = self.sam_prompt_encoder.get_dense_pe()
+                    dense_pe = self.sam_model.prompt_encoder.get_dense_pe()
                     try:
-                        mask, _ = self.sam_mask_decoder(
+                        mask, _ = self.sam_model.mask_decoder(
                             image_embeddings=sam_features_list[i],
                             image_pe=dense_pe,
                             sparse_prompt_embeddings=sparse_embeddings,
@@ -571,69 +652,75 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
             masks.append(mask_for_image)
         return torch.cat(masks, dim=0) if masks else None
 
-    def _generate_masks_from_seg_tokens_dual(self, hidden_states, seg_positions, sam_features_list, device):
-        """
-        デュアルストリーム用: SEGトークン隠れ状態からマスク生成
-        """
-        if not seg_positions[0].numel():
-            return None
-        masks = []
-        for batch_idx, token_idx in zip(seg_positions[0], seg_positions[1]):
-            seg_hidden = hidden_states[batch_idx, token_idx]
-            seg_emb = self.mlp_projector(seg_hidden.unsqueeze(0))  # (1,256)
-            sparse_embeddings = seg_emb.unsqueeze(1)  # (1,1,256)
-            dense_embeddings = torch.zeros(
-                (sam_features_list[batch_idx].shape[0], sam_features_list[batch_idx].shape[2], sam_features_list[batch_idx].shape[3]),
-                device=device, dtype=sam_features_list[batch_idx].dtype
-            )
-            dense_pe = self.sam_prompt_encoder.get_dense_pe()
-            try:
-                mask, _ = self.sam_mask_decoder(
-                    image_embeddings=sam_features_list[batch_idx],
-                    image_pe=dense_pe,
-                    sparse_prompt_embeddings=sparse_embeddings,
-                    dense_prompt_embeddings=dense_embeddings,
-                    multimask_output=False
-                )
-                masks.append(mask)
-            except Exception as e:
-                print(f"SAMデコーダエラー(dual): {e}")
-                dummy_mask = torch.zeros((1, 1, 256, 256), device=device, dtype=sam_features_list[batch_idx].dtype)
-                masks.append(dummy_mask)
-        if len(masks) == 0:
-            return None
-        return masks[0] if len(masks) == 1 else torch.cat(masks, dim=0)
-
     def generate_with_segmentation(self, image, text_prompt, max_new_tokens=100):
         """
-        画像を含むプロンプトに対するテキスト生成と必要ならセグメンテーションを実行
+        Llama4の正しいInference API使用
+        1. apply_chat_templateでInference用入力を準備
+        2. model.generate()でテキスト生成
+        3. SEGトークン検出時はforward()でマスク生成
         """
-        # まずテキスト生成のみ実行
-        inputs = self.prepare_multimodal_input(image, text_prompt)
-        device = next(self.llama_model.parameters()).device
-        inputs = {k: (v.to(device) if isinstance(v, torch.Tensor) else v) for k,v in inputs.items()}
-        with torch.inference_mode():
-            generated_ids = self.llama_model.generate(
-                **inputs,
-                max_new_tokens=max_new_tokens,
-                do_sample=False,
-                pad_token_id=self.llama_processor.tokenizer.eos_token_id
-            )
-        # 生成テキストをデコード
-        input_len = inputs["input_ids"].shape[-1]
-        new_tokens = generated_ids[0][input_len:]
-        generated_text = self.llama_processor.tokenizer.decode(new_tokens, skip_special_tokens=True)
-        # SEGトークンを検知してマスク生成
-        results = {}
-        if self.seg_token in generated_text:
-            print(f"生成テキスト中に{self.seg_token}を検出。マスク生成を実行します。")
-            infer_results = self.forward(image=image, text_prompt=text_prompt, generate_mask=True)
-            results["generated_text"] = generated_text
-            results["predicted_masks"] = infer_results.get("predicted_masks")
-        else:
-            results["generated_text"] = generated_text
-            results["predicted_masks"] = None
-        return results
+        print("\n🎯 Inference開始: generate_with_segmentation")
+        
+        try:
+            # Step 1: Inference用入力準備（apply_chat_templateを使用）
+            print("📝 Step 1: Inference用入力準備")
+            inputs = self.prepare_multimodal_input(image, text_prompt, for_training=False)
+            device = next(self.llama_model.parameters()).device
+            inputs = {k: (v.to(device) if isinstance(v, torch.Tensor) else v) for k,v in inputs.items()}
+            
+            print(f"🔍 入力確認: input_ids {inputs['input_ids'].shape}")
+            if 'pixel_values' in inputs:
+                print(f"🔍 入力確認: pixel_values {inputs['pixel_values'].shape}")
+            
+            # Step 2: テキスト生成（Inference API）
+            print("📝 Step 2: テキスト生成実行")
+            with torch.inference_mode():
+                generated_ids = self.llama_model.generate(
+                    **inputs,
+                    max_new_tokens=max_new_tokens,
+                    do_sample=False,  # 決定的生成
+                    pad_token_id=self.llama_processor.tokenizer.pad_token_id or self.llama_processor.tokenizer.eos_token_id,
+                    eos_token_id=self.llama_processor.tokenizer.eos_token_id
+                )
+            
+            # Step 3: 生成されたテキストをデコード
+            print("📝 Step 3: 生成テキストデコード")
+            input_len = inputs["input_ids"].shape[-1]
+            new_tokens = generated_ids[0][input_len:]
+            generated_text = self.llama_processor.tokenizer.decode(new_tokens, skip_special_tokens=True)
+            
+            print(f"✅ 生成テキスト: {generated_text[:100]}...")
+            
+            # Step 4: SEGトークンチェックとマスク生成
+            print("📝 Step 4: SEGトークンチェック")
+            results = {"generated_text": generated_text}
+            
+            if self.seg_token in generated_text:
+                print(f"🎯 {self.seg_token}トークン検出！マスク生成実行")
+                # Training APIを使用してマスク生成
+                mask_results = self.forward(
+                    image=image, 
+                    text_prompt=text_prompt, 
+                    generate_mask=True
+                )
+                results["predicted_masks"] = mask_results.get("pred_masks")
+                print(f"✅ マスク生成完了: {type(results['predicted_masks'])}")
+            else:
+                print("ℹ️ SEGトークンなし - マスクなし")
+                results["predicted_masks"] = None
+                
+            return results
+            
+        except Exception as e:
+            print(f"❌ generate_with_segmentation エラー: {e}")
+            import traceback
+            traceback.print_exc()
+            return {
+                "status": "error",
+                "error": str(e),
+                "generated_text": "",
+                "predicted_masks": None
+            }
 
     def apply_lora_configuration(self, lora_config):
         """
@@ -680,7 +767,7 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
                 lname = name.lower()
                 if 'lora' in lname:
                     categories['LoRA'] += count
-                elif 'mlp_projector' in name or 'mlp_projector' in lname:
+                elif 'multi_modal_projector' in name or 'multi_modal_projector' in lname:
                     categories['MLP Projector'] += count
                 elif 'sam_mask_decoder' in name:
                     categories['SAM Mask Decoder'] += count
