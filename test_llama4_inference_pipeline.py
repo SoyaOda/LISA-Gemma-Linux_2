@@ -130,14 +130,14 @@ def test_llama4_inference():
                 elif has_seg and not mask_generated:
                     print(f"   ⚠️  部分成功: SEGトークン検出、マスク生成失敗")
                     status = "partial"
-                else:
+        else:
                     print(f"   ❌ 期待外: SEGトークン未検出")
                     status = "unexpected"
             else:
                 if not has_seg:
                     print(f"   🎉 期待通り: SEGトークンなし")
                     status = "success"
-                else:
+        else:
                     print(f"   ⚠️  期待外: SEGトークン検出")
                     status = "unexpected"
             
@@ -149,10 +149,10 @@ def test_llama4_inference():
                 "mask_generated": mask_generated
             })
             
-        except Exception as e:
+    except Exception as e:
             print(f"   ❌ テスト実行エラー: {e}")
-            import traceback
-            traceback.print_exc()
+        import traceback
+        traceback.print_exc()
             results.append({"test": test_case['name'], "status": "error", "error": str(e)})
     
     # 結果サマリー

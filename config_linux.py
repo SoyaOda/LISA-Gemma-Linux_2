@@ -24,7 +24,7 @@ LLAMA_MODEL_ID = "meta-llama/Llama-4-Scout-17B-16E-Instruct"
 # Llama-4-Scout-17B-16E-Instruct特有の設定（Webリサーチ準拠）
 # 注意: flex_attentionにバグがあるため、現在はeagerが推奨（2025年実装状況）
 ATTN_IMPLEMENTATION = "eager"           # flex_attentionバグ回避のため
-DEVICE_MAP = "auto"                     # meta tensor対策  
+DEVICE_MAP = "balanced"                   # balanced（GPUバランス重視）に変更
 TORCH_DTYPE = "bfloat16"               # 推奨精度
 
 # モデルサイズ/バリエーションに応じた設定

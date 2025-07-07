@@ -214,13 +214,13 @@ class CompositeLoss(nn.Module):
         if device is None:
             device = torch.device("cpu")
         
-        total_loss = torch.tensor(0.0, device=device)
-        
         # 1. テキスト生成損失
+        ce_loss = None
         text_loss = model_outputs.get("text_loss")
         if text_loss is not None:
             losses["text_loss"] = text_loss
-            total_loss += self.ce_loss_weight * text_loss
+            ce_loss = self.ce_loss_weight * text_loss
+            print(f"  🔍 直接取得したtext_loss: {text_loss.item():.6f}")
         else:
             # text_lossが直接渡されていない場合、logitsとlabelsから計算
             logits = model_outputs.get("logits")
@@ -239,17 +239,27 @@ class CompositeLoss(nn.Module):
                 if valid_labels > 0:
                     text_loss = ce_loss_fn(logits_flat, labels_flat)
                     losses["text_loss"] = text_loss
-                    total_loss += self.ce_loss_weight * text_loss
+                    ce_loss = self.ce_loss_weight * text_loss
+                    print(f"  🔍 計算されたtext_loss: {text_loss.item():.6f}")
                 else:
-                    losses["text_loss"] = torch.tensor(0.0, device=device)
+                    losses["text_loss"] = torch.zeros(1, device=device, requires_grad=True).squeeze()
+                    ce_loss = torch.zeros(1, device=device, requires_grad=True).squeeze()
+                    print(f"  ⚠️ 有効なラベルなし")
             else:
-                losses["text_loss"] = torch.tensor(0.0, device=device)
+                losses["text_loss"] = torch.zeros(1, device=device, requires_grad=True).squeeze()
+                ce_loss = torch.zeros(1, device=device, requires_grad=True).squeeze()
+                print(f"  ⚠️ logitsまたはlabelsなし")
         
         # 2. セグメンテーション損失
+        mask_loss = None
         predicted_masks = model_outputs.get("predicted_masks")
         ground_truth_mask = batch.get("ground_truth_mask")
         
         if predicted_masks is not None and ground_truth_mask is not None:
+            # デバイス一致の確保：ground_truth_maskをpredicted_masksと同じデバイスに移動
+            target_device = predicted_masks.device
+            ground_truth_mask = ground_truth_mask.to(target_device)
+            
             # デバッグ: テンソルサイズを出力（最初の3回のみ）
             if hasattr(self, '_mask_debug_counter'):
                 self._mask_debug_counter += 1
@@ -257,26 +267,45 @@ class CompositeLoss(nn.Module):
                 self._mask_debug_counter = 1
                 
             if self._mask_debug_counter <= 3:
-                print(f"  predicted_masks shape: {predicted_masks.shape}")
-                print(f"  ground_truth_mask shape: {ground_truth_mask.shape}")
+                print(f"  predicted_masks shape: {predicted_masks.shape}, device: {predicted_masks.device}")
+                print(f"  ground_truth_mask shape: {ground_truth_mask.shape}, device: {ground_truth_mask.device}")
             elif self._mask_debug_counter == 4:
                 print(f"🔇 マスク形状 ログ表示を抑制（以降は省略）")
             
             # DICE損失
             dice_loss = self.dice_loss(predicted_masks, ground_truth_mask)
             losses["dice_loss"] = dice_loss
-            total_loss += self.dice_loss_weight * dice_loss
             
             # BCE損失
             bce_loss = self.bce_loss(predicted_masks, ground_truth_mask)
             losses["bce_loss"] = bce_loss
-            total_loss += self.bce_loss_weight * bce_loss
+            
+            # Original-LISA方式：BCE + DICE損失を組み合わせ
+            mask_loss = self.dice_loss_weight * dice_loss + self.bce_loss_weight * bce_loss
+            print(f"  🔍 mask_loss: {mask_loss.item():.6f} (DICE: {dice_loss.item():.6f}, BCE: {bce_loss.item():.6f})")
         else:
             # マスクデータが存在しない場合（VQAデータなど）
-            losses["dice_loss"] = torch.tensor(0.0, device=total_loss.device)
-            losses["bce_loss"] = torch.tensor(0.0, device=total_loss.device)
+            losses["dice_loss"] = torch.zeros(1, device=device, requires_grad=True).squeeze()
+            losses["bce_loss"] = torch.zeros(1, device=device, requires_grad=True).squeeze()
+            mask_loss = torch.zeros(1, device=device, requires_grad=True).squeeze()
+            print(f"  ⚠️ マスクデータなし - マスク損失は0に設定")
+        
+        # 3. Original-LISA方式の総損失計算: ce_loss + mask_loss
+        if ce_loss is not None and mask_loss is not None:
+            total_loss = ce_loss + mask_loss
+            print(f"  🔍 total_loss = ce_loss + mask_loss: {total_loss.item():.6f}")
+        elif ce_loss is not None:
+            total_loss = ce_loss
+            print(f"  🔍 total_loss = ce_loss only: {total_loss.item():.6f}")
+        elif mask_loss is not None:
+            total_loss = mask_loss
+            print(f"  🔍 total_loss = mask_loss only: {total_loss.item():.6f}")
+        else:
+            total_loss = torch.zeros(1, device=device, requires_grad=True).squeeze()
+            print(f"  ⚠️ どの損失も計算されませんでした")
         
         losses["total_loss"] = total_loss
+        print(f"  📊 final total_loss: {total_loss.item():.6f}, requires_grad: {total_loss.requires_grad}")
         
         return losses
 

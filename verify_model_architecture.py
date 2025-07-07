@@ -119,7 +119,7 @@ def main():
         
         # metaテンソー問題の対処
         try:
-            model = model.to(device)
+        model = model.to(device)
             print("✅ 通常のモデル移動が完了しました")
         except NotImplementedError as e:
             if "meta tensor" in str(e):
