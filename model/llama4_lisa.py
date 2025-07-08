@@ -46,8 +46,8 @@ class LisaLlama4Config(PretrainedConfig):
         sam_image_size: int = 1024,       # SAMエンコーダ入力サイズ
         model_max_length: int = 131072,   # Llama4の最大シーケンス長（128K）
         # Llama-4-Scout-17B-16E-Instruct特有の設定
-        attn_implementation: str = "flex_attention",  # MoE対応の最適化アテンション
-        device_map: str = "auto",                     # meta tensor対策
+        attn_implementation: str = "eager",          # 安定したアテンション実装（flex_attentionはバグあり）
+        device_map: str = "auto",                     # GPU自動分散
         torch_dtype: str = "bfloat16",               # 推奨精度
         **kwargs,
     ):
@@ -70,16 +70,15 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
     def __init__(self, config: LisaLlama4Config):
         super().__init__(config)
 
-        # 1. Llama-4マルチモーダルモデルの初期化（Webリサーチ準拠設定）
+        # 動的コンパイルを無効化してGPU分散エラーを回避（成功した単独モデルと同じ設定）
+        torch.compiler.disable()
+        print("動的コンパイル無効化: GPU分散エラー回避のため")
+
+        # 1. Llama-4マルチモーダルモデルの初期化（成功した単独モデル準拠設定）
         print(f"Llama-4モデルをロード中... ({config.llama_model_id})")
         print(f"  - アテンション実装: {config.attn_implementation}")
         print(f"  - デバイスマップ: {config.device_map}")
         print(f"  - Torch精度: {config.torch_dtype}")
-        
-        # flex_attention vs eagerアテンションの説明
-        if config.attn_implementation == "eager":
-            print("  ⚠️  注意: flex_attentionにバグがあるため、eagerアテンションを使用")
-            print("     パフォーマンスは劣りますが、安定性が向上します")
         
         # torch_dtypeの変換
         if config.torch_dtype == "bfloat16":
@@ -89,63 +88,38 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
         else:
             torch_dtype = torch.bfloat16  # デフォルト
         
-        try:
-            # 🎯 メモリ効率化: 4bit量子化設定（QLoRA手法）
+        # 2. 量子化設定（成功した単独モデルと同じ設定）
+        quantization_config = None
+        use_4bit = True  # 4bit量子化を使用（成功した設定）
+        if use_4bit:
             from transformers import BitsAndBytesConfig
-            
-            # 4bit量子化設定（QLoRA: Webリサーチで最も推奨）
             quantization_config = BitsAndBytesConfig(
-                load_in_4bit=True,                      # 🔧 4bit量子化（8bit→4bit）
-                bnb_4bit_use_double_quant=True,         # 🔧 Double Quantization
-                bnb_4bit_quant_type="nf4",              # 🔧 NormalFloat4（推奨）
-                bnb_4bit_compute_dtype=torch.bfloat16,  # 🔧 計算精度
-                llm_int8_enable_fp32_cpu_offload=True   # 🔧 CPU Offloading
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=torch_dtype,
+                bnb_4bit_use_double_quant=True,
+                bnb_4bit_quant_type="nf4"
             )
-            
-            print("  🎯 4bit量子化設定を適用中（QLoRA手法）...")
-            
+            print("4bit量子化設定を適用")
+        
+        # 3. Llama4モデル初期化（成功した単独モデルと同じ設定）
+        print("Llama4モデル初期化開始...")
+        try:
             self.llama_model = Llama4ForConditionalGeneration.from_pretrained(
                 config.llama_model_id,
-                attn_implementation=config.attn_implementation,
-                device_map="auto",                        # 🔧 autoで自動分散（推奨）
+                quantization_config=quantization_config,
                 torch_dtype=torch_dtype,
-                quantization_config=quantization_config,  # 🔧 4bit量子化追加
-                low_cpu_mem_usage=True,                   # 🔧 CPUメモリ効率化
-                trust_remote_code=True,                   # 🔧 Llama4対応
-                max_memory={i: f"{70}GB" for i in range(8)}, # 🔧 各GPU70GB制限（分散強制）
-                offload_folder="./offload_cache",          # 🔧 CPUオフロード強化
-                offload_state_dict=True                   # 🔧 状態辞書もオフロード
+                attn_implementation=config.attn_implementation,  # eager設定を使用
+                device_map="auto",
+                trust_remote_code=True,
+                low_cpu_mem_usage=True
             )
-            print("✅ Llama-4モデルの初期化完了（4bit量子化）")
+            print("✅ Llama-4モデルの初期化完了")
+            print(f"  - パラメータ数: {sum(p.numel() for p in self.llama_model.parameters()):,}")
+            print(f"  - デバイス分散: {self.llama_model.hf_device_map}")
             
-            # 🎯 Gradient Checkpointing有効化（メモリ効率化）
-            if hasattr(self.llama_model, 'gradient_checkpointing_enable'):
-                self.llama_model.gradient_checkpointing_enable()
-                print("✅ Gradient Checkpointing有効化完了")
-            else:
-                print("⚠️ このモデルはGradient Checkpointingをサポートしていません")
-                
         except Exception as e:
-            print(f"❌ モデルロードエラー: {e}")
-            if "flex_attention" in str(e):
-                print("💡 提案: config_linux.pyのATTN_IMPLEMENTATIONを'eager'に変更してください")
-            elif "quantization" in str(e).lower() or "4bit" in str(e).lower():
-                print("💡 提案: 4bit量子化の代わりに標準精度を試行中...")
-                # フォールバック: 量子化なし
-                self.llama_model = Llama4ForConditionalGeneration.from_pretrained(
-                    config.llama_model_id,
-                    attn_implementation=config.attn_implementation,
-                    device_map=config.device_map,
-                    torch_dtype=torch_dtype,
-                    low_cpu_mem_usage=True,
-                    max_memory={i: "30GB" for i in range(8)},  # 🔧 さらに保守的制限
-                    offload_folder="./offload_cache",
-                    offload_state_dict=True,                    # 🔧 状態辞書もオフロード
-                    trust_remote_code=True
-                )
-                print("✅ Llama-4モデルの初期化完了（標準精度）")
-            else:
-                raise e
+            print(f"❌ Llama4モデル初期化エラー: {e}")
+            raise
         
         # 1.1 モデル本体のパラメータを完全凍結（LoRA微調整の下準備）
         print("Llama4モデルのパラメータを全て凍結中...")
@@ -160,19 +134,27 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
         print(f"Llama4 Processorをロード中... ({config.llama_model_id})")
         self.llama_processor = AutoProcessor.from_pretrained(config.llama_model_id)
         
-        # 3. SAMコンポーネントのロードと凍結（指定がある場合）
+        # 4. SAMコンポーネントのロードと凍結（指定がある場合）
         if config.sam_checkpoint_path:
             print(f"SAMモデルをロード中... ({config.sam_checkpoint_path})")
             try:
                 self.sam_model = sam_model_registry["vit_h"](checkpoint=config.sam_checkpoint_path)
-                # 🔧 SAMをCPUに配置してGPUメモリ節約
-                self.sam_model = self.sam_model.to("cpu")
                 self.sam_model.eval()
+                
+                # SAMモデルをGPUに移動（PyTorch公式推奨方法）
+                if torch.cuda.is_available():
+                    # シンプルで確実な方法: cuda()を使用してモデル全体を一度に移動
+                    self.sam_model = self.sam_model.cuda()
+                    print(f"✅ SAMモデルをGPUに移動しました（標準方法）")
+                    
+                    # 同期してデバイス移動完了を確実にする
+                    torch.cuda.synchronize()
+                    print(f"✅ CUDA同期完了 - SAMモデル準備完了")
                 
                 # SAMパラメータを凍結
                 for param in self.sam_model.parameters():
                     param.requires_grad = False
-                print("✅ SAMコンポーネントの初期化と凍結が完了しました（CPU配置）")
+                print("✅ SAMコンポーネントの初期化と凍結が完了しました")
             except Exception as e:
                 print(f"❌ SAMのロードに失敗: {e}")
                 print("SAMなしで続行します（セグメンテーション機能は無効）")
@@ -181,17 +163,15 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
             print("⚠️ SAMチェックポイントが指定されていません。SAM機能はオフになります。")
             self.sam_model = None
 
-        # MLPプロジェクタの初期化（メモリ効率化: CPUに配置）
+        # 5. MLPプロジェクタの初期化
         print("MLPプロジェクタを構築中...")
         self.multi_modal_projector = MultiModalProjector(
             llama_hidden_size=config.llama_hidden_size,
             sam_prompt_embed_dim=config.sam_prompt_embed_dim
         )
-        # 🔧 MLPプロジェクタをCPUに配置してGPUメモリ節約
-        self.multi_modal_projector = self.multi_modal_projector.to("cpu")
-        print("✅ MLPプロジェクタ初期化完了（CPU配置）")
+        print("✅ MLPプロジェクタ初期化完了")
 
-        # 5. セグメンテーショントークンの語彙追加
+        # 6. セグメンテーショントークンの語彙追加
         print("セグメンテーショントークンを追加中...")
         self.seg_token = DEFAULT_SEG_TOKEN  # 既定の[SEG]トークン文字列
         tokenizer = self.llama_processor.tokenizer
@@ -204,7 +184,7 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
         self.seg_token_id = tokenizer.convert_tokens_to_ids(self.seg_token)
         print(f"SEGトークンID: {self.seg_token_id}")
         
-        # 5.1 埋め込み層のリサイズ（追加トークンに対応）
+        # 6.1 埋め込み層のリサイズ（追加トークンに対応）
         current_vocab_size = len(tokenizer)
         embed_size = self.llama_model.get_input_embeddings().weight.shape[0]
         print(f"現在の埋め込みボキャブラリサイズ: {embed_size}, トークナイザー語彙数: {current_vocab_size}")
@@ -226,7 +206,7 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
         else:
             print("✅ 埋め込み層サイズは既に十分対応しています")
 
-        # 6. 統一された損失関数の初期化
+        # 7. 統一された損失関数の初期化
         print("CompositeLoss損失関数を初期化中...")
         self.loss_fn = CompositeLoss(
             ce_loss_weight=1.0,    # テキスト生成損失の重み
@@ -235,12 +215,12 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
         )
         print("✅ CompositeLoss損失関数の初期化が完了しました")
 
-        # 7. 便利のため設定値を保存
+        # 8. 便利のため設定値を保存
         self.llama_image_size = config.llama_image_size
         self.sam_image_size = config.sam_image_size
         self.model_max_length = config.model_max_length
 
-        print("✅ LISA-Llama4モデルの初期化が完了しました")
+        print("✅ LISA-Llama4モデルの初期化が完了しました（成功した単独モデル準拠設定）")
 
     @classmethod
     def from_config_file(cls, config_path: str, **kwargs):
@@ -261,7 +241,7 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
             sam_image_size=getattr(config_module, 'SAM_IMAGE_SIZE', 1024),
             model_max_length=getattr(config_module, 'MODEL_MAX_LENGTH', 131072),
             # Llama-4-Scout特有の設定
-            attn_implementation=getattr(config_module, 'ATTN_IMPLEMENTATION', "flex_attention"),
+            attn_implementation=getattr(config_module, 'ATTN_IMPLEMENTATION', "eager"),
             device_map=getattr(config_module, 'DEVICE_MAP', "auto"),
             torch_dtype=getattr(config_module, 'TORCH_DTYPE', "bfloat16"),
             **kwargs
@@ -306,7 +286,18 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
                     return_dict=True,
                     return_tensors="pt"
                 )
-                return inputs
+                print(f"🔍 apply_chat_template結果: type={type(inputs)}, keys={list(inputs.keys())}")
+                
+                # BatchFeatureまたは辞書を辞書として扱う（両方ともdict-likeインターフェース）
+                if hasattr(inputs, 'keys') and hasattr(inputs, '__getitem__'):
+                    # 辞書形式のデータに変換（必要に応じて）
+                    result_dict = {}
+                    for key in inputs.keys():
+                        result_dict[key] = inputs[key]
+                    print(f"✅ BatchFeature/dict変換成功: keys={list(result_dict.keys())}")
+                    return result_dict
+                else:
+                    raise ValueError(f"apply_chat_templateが期待通りのdict-likeオブジェクトを返しませんでした: {type(inputs)}")
             except Exception as e:
                 print(f"⚠️ apply_chat_template エラー: {e}")
                 print("🔄 フォールバック: 基本的なtokenization")
@@ -432,7 +423,9 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
                 print(f"入力中にSEGトークンを{len(seg_positions[0])}個検出")
                 # 画像をSAM用に整形 (1024x1024)
                 sam_image = image.resize((self.sam_image_size, self.sam_image_size))
-                sam_image_tensor = torch.tensor(np.array(sam_image)).permute(2, 0, 1).float().unsqueeze(0).to(device)
+                sam_image_tensor = torch.tensor(np.array(sam_image)).permute(2, 0, 1).float().unsqueeze(0).cuda()
+                print(f"🔄 SAM入力をGPUに移動: {sam_image_tensor.shape}")
+                
                 # SAM画像エンコーダから特徴抽出
                 with torch.no_grad():
                     sam_features = self.sam_model.image_encoder(sam_image_tensor)
@@ -482,6 +475,8 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
                     # Llamaの画像入力がタイル処理済みの場合でも、簡易的に全体をresize (注意:情報損失の可能性)
                     sam_img = F.interpolate(img, size=(self.sam_image_size, self.sam_image_size), mode='bilinear', align_corners=False)
                     sam_img = sam_img * 255.0  # 正規化: 0-1 -> 0-255
+                    sam_img = sam_img.cuda()  # シンプルなGPU移動
+                    
                     with torch.no_grad():
                         sam_feat = self.sam_model.image_encoder(sam_img)
                     sam_features_list.append(sam_feat)
@@ -741,9 +736,19 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
         hidden_states: (1, seq_len, hidden_size)
         """
         masks = []
+        
+        # multi_modal_projectorのデバイスを取得
+        projector_device = next(self.multi_modal_projector.parameters()).device
+        
         for batch_idx, token_idx in zip(seg_positions[0], seg_positions[1]):
-            # SEGトークン隠れベクトル抽出
+            # SEGトークン隠れベクトル抽出とデバイス統一
             seg_hidden = hidden_states[batch_idx, token_idx]  # (hidden_size,)
+            seg_hidden = seg_hidden.to(projector_device)  # projectorと同じデバイスに移動
+            
+            # PyTorch公式推奨：データ型も統一（BFloat16 -> Float32）
+            projector_dtype = next(self.multi_modal_projector.parameters()).dtype
+            seg_hidden = seg_hidden.to(projector_dtype)
+            
             seg_emb = self.multi_modal_projector(seg_hidden.unsqueeze(0))  # (1,256)
             sparse_embeddings = seg_emb.unsqueeze(1)  # (1,1,256)
             dense_embeddings = torch.zeros(
@@ -752,6 +757,12 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
             )
             dense_pe = self.sam_model.prompt_encoder.get_dense_pe()
             try:
+                # PyTorch公式推奨: SAMデコーダー入力を全て確実にGPUに統一
+                sam_features = sam_features.cuda()
+                dense_pe = dense_pe.cuda()
+                sparse_embeddings = sparse_embeddings.cuda()
+                dense_embeddings = dense_embeddings.cuda()
+                
                 mask, iou_pred = self.sam_model.mask_decoder(
                     image_embeddings=sam_features,
                     image_pe=dense_pe,
@@ -777,6 +788,10 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
         masks = []
         seg_count = 0
         batch_size = hidden_states.shape[0]
+        
+        # multi_modal_projectorのデバイスを取得
+        projector_device = next(self.multi_modal_projector.parameters()).device
+        
         for i in range(batch_size):
             # 画像iに対応するSEGトークンを探索
             mask_for_image = None
@@ -785,6 +800,12 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
                     # i番目の画像にSEGトークンがある場合
                     token_idx = seg_positions[1][j]
                     seg_hidden = hidden_states[i, token_idx]
+                    seg_hidden = seg_hidden.to(projector_device)  # projectorと同じデバイスに移動
+                    
+                    # PyTorch公式推奨：データ型も統一（バッチ版）
+                    projector_dtype = next(self.multi_modal_projector.parameters()).dtype
+                    seg_hidden = seg_hidden.to(projector_dtype)
+                    
                     seg_emb = self.multi_modal_projector(seg_hidden.unsqueeze(0))  # (1,256)
                     sparse_embeddings = seg_emb.unsqueeze(1)  # (1,1,256)
                     dense_embeddings = torch.zeros(
@@ -793,8 +814,14 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
                     )
                     dense_pe = self.sam_model.prompt_encoder.get_dense_pe()
                     try:
+                        # PyTorch公式推奨: SAMデコーダー入力を全て確実にGPUに統一（バッチ版）
+                        sam_features_gpu = sam_features_list[i].cuda()
+                        dense_pe = dense_pe.cuda()
+                        sparse_embeddings = sparse_embeddings.cuda()
+                        dense_embeddings = dense_embeddings.cuda()
+                        
                         mask, _ = self.sam_model.mask_decoder(
-                            image_embeddings=sam_features_list[i],
+                            image_embeddings=sam_features_gpu,
                             image_pe=dense_pe,
                             sparse_prompt_embeddings=sparse_embeddings,
                             dense_prompt_embeddings=dense_embeddings,
