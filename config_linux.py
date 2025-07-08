@@ -1,109 +1,110 @@
 # config_linux.py
+"""
+LISA-Llama4統合モデル統一設定ファイル
+
+このファイルは以下の設定を一元管理します：
+- LISA-Llama4統合モデルの基本設定
+- LoRA（Parameter Efficient Fine-tuning）設定  
+- 分散学習・最適化設定
+- パス・ディレクトリ設定
+
+使用方法:
+    import config_linux as config
+    model_config = config.get_lisa_model_config()
+    lora_config = config.get_lora_config()
+"""
 import os
 from pathlib import Path
+from typing import Dict, Any
 
 # ==============================================================================
-# 1. パスおよびモデル識別子設定 (Lambda Cloud環境)
+# 1. 基本パス設定 (Lambda Cloud環境)
 # ==============================================================================
 PROJECT_ROOT = Path(__file__).parent
 
-# データセットベースディレクトリ (Lambda Cloud の NFSパスなど)
+# データセットベースディレクトリ
 DATASET_BASE_DIR = os.environ.get("LISA_DATASET_BASE_DIR", "/lambda/nfs/lisa-gemma-project-fs/data/dataset")
-# SAMチェックポイントのパス
+
+# SAMチェックポイントパス（ViT-H）
 SAM_CHECKPOINT_PATH = os.environ.get("LISA_SAM_CHECKPOINT_PATH", "/lambda/nfs/lisa-gemma-project-fs/data/weights/sam_vit_h_4b8939.pth")
 
-# Hugging Faceキャッシュディレクトリ（オプション環境変数）
+# Hugging Faceキャッシュディレクトリ
 HF_CACHE_DIR = os.environ.get('HF_HOME', None)
-
-# ==============================================================================
-# 2. モデル識別子およびモデル設定
-# ==============================================================================
-# 使用するLlama4モデル
-LLAMA_MODEL_ID = "meta-llama/Llama-4-Scout-17B-16E-Instruct"
-
-# Llama-4-Scout-17B-16E-Instruct特有の設定（Webリサーチ準拠）
-# 注意: flex_attentionにバグがあるため、現在はeagerが推奨（2025年実装状況）
-ATTN_IMPLEMENTATION = "eager"           # flex_attentionバグ回避のため
-DEVICE_MAP = "balanced"                   # balanced（GPUバランス重視）に変更
-TORCH_DTYPE = "bfloat16"               # 推奨精度
-
-# モデルサイズ/バリエーションに応じた設定
-LLAMA_MODEL_CONFIGS = {
-    "scout": {
-        "model_id": "meta-llama/Llama-4-Scout-17B-16E-Instruct",
-        "hidden_size": 5120,
-        "recommended_batch_size": 1,  # Scoutは17B (MoE全体109B) -> 高メモリ消費
-        "memory_gb_estimate": 80.0   # BF16での推定（単GPUに載せるには4bit量子化推奨）
-    },
-    "maverick": {
-        "model_id": "meta-llama/Llama-4-Maverick-17B-128E-Instruct",
-        "hidden_size": 5120,
-        "recommended_batch_size": 1,
-        "memory_gb_estimate": 160.0  # Maverick (402B total)はFP8で複数GPU前提
-    }
-}
 
 # ログ・出力ディレクトリ
 LOG_BASE_DIR = str(PROJECT_ROOT / "runs")
 WEIGHTS_DIR = str(PROJECT_ROOT / "weights")
 
 # ==============================================================================
-# 3. モデルハイパーパラメータ
+# 2. LISA-Llama4統合モデル設定（実際使用値に統一）
 # ==============================================================================
-# 画像サイズ設定
-LLAMA_IMAGE_SIZE = 448   # Llama4 Visionが扱うタイルサイズ (px)
-SAM_IMAGE_SIZE = 1024    # SAMエンコーダー入力サイズ (px)
-# モデルの最大トークン長 (Llama4は128kまで可能)
-MODEL_MAX_LENGTH = 131072
-# MLPプロジェクタ出力次元 (SAM prompt embedと一致)
-SEG_PROJECTION_DIM = 256
+# 使用モデル
+LLAMA_MODEL_ID = "meta-llama/Llama-4-Scout-17B-16E-Instruct"
+
+# Llama-4-Scout-17B-16E-Instruct設定（テストスクリプト実使用値）
+ATTN_IMPLEMENTATION = "eager"           # flex_attentionバグ回避（実証済み）
+DEVICE_MAP = "auto"                     # GPU自動分散（実使用値）
+TORCH_DTYPE = "bfloat16"               # 推奨精度（実使用値）
+
+# モデル構造パラメータ
+LLAMA_HIDDEN_SIZE = 5120               # Llama4-Scout隠れ層サイズ
+SAM_PROMPT_EMBED_DIM = 256             # SAM-ViT-H埋め込み次元
+LLAMA_IMAGE_SIZE = 448                 # Llama4画像タイルサイズ
+SAM_IMAGE_SIZE = 1024                  # SAMエンコーダ入力サイズ
+MODEL_MAX_LENGTH = 131072              # Llama4最大コンテキスト長（128K）
+
 # セグメンテーション特別トークン
 SEG_TOKEN = "[SEG]"
-# Llama4 Scoutのテキスト隠れ層サイズ
-LLAMA_HIDDEN_SIZE = 5120
 
 # ==============================================================================
-# 4. トレーニング設定
+# 3. LoRA（PEFT）設定（テストスクリプト実使用値）
 # ==============================================================================
-LEARNING_RATE = 1e-4
-EPOCHS = 10
-STEPS_PER_EPOCH = 500
-WEIGHT_DECAY = 1e-2
-BETA1 = 0.9
-BETA2 = 0.95
+LORA_R = 8                             # LoRAランク（実使用値）
+LORA_ALPHA = 16                        # LoRAアルファ（実使用値）
+LORA_DROPOUT = 0.05                    # LoRAドロップアウト（実使用値）
 
-# バッチサイズと勾配蓄積
-BATCH_SIZE_PER_GPU = 1  # Scoutモデルは大きいため、GPUあたり1に設定
-GRADIENT_ACCUMULATION_STEPS = 8  # 実質バッチサイズ = BATCH_SIZE_PER_GPU * accumulation * GPU数
-
-# システム・最適化設定
-MIXED_PRECISION = True    # bf16混合精度
-GRADIENT_CHECKPOINTING = True  # メモリ節約のための勾配チェックポイント
-DATALOADER_NUM_WORKERS = 4
-
-# ==============================================================================
-# 5. LoRAファインチューニング設定
-# ==============================================================================
-LORA_R = 8
-LORA_ALPHA = 16
-LORA_DROPOUT = 0.05
-# ターゲットモジュール: Llama4のAttentionとFFNプロジェクション層
+# ターゲットモジュール（Llama4-Scout全Attention+FFN）
 LORA_TARGET_MODULES = [
+    # Attention プロジェクション層
     "q_proj", "k_proj", "v_proj", "o_proj",
+    # FFN プロジェクション層  
     "gate_proj", "up_proj", "down_proj"
 ]
 
 # ==============================================================================
-# 6. データセット設定
+# 4. 学習・最適化設定（分散学習対応）
 # ==============================================================================
-# データセット混合比率 (例: sem_seg:refer_seg:vqa:reason_seg = 9:3:3:1)
-DATASET_SAMPLE_RATES = "9,3,3,1"
-# 1エポックあたり各データセットから使用するサンプル数 (デバッグ用に小さめ設定)
-SAMPLES_PER_EPOCH = 500
-# 推論（generate）時の最大新出トークン数
-MAX_NEW_TOKENS = 100
+# 基本学習設定
+LEARNING_RATE = 1e-4                   # AdamW学習率
+WEIGHT_DECAY = 1e-2                    # 重み減衰
+BETA1 = 0.9                            # Adam beta1
+BETA2 = 0.95                           # Adam beta2
 
-# データセット種別ごとの利用データ
+# エポック・ステップ設定
+EPOCHS = 10                            # デフォルトエポック数
+STEPS_PER_EPOCH = 500                  # ステップ/エポック
+
+# バッチサイズ・勾配設定（分散学習対応）
+BATCH_SIZE_PER_GPU = 1                 # GPU単位バッチサイズ（Scout大容量対応）
+GRADIENT_ACCUMULATION_STEPS = 8        # 勾配蓄積ステップ数
+# 実効バッチサイズ = BATCH_SIZE_PER_GPU × GRADIENT_ACCUMULATION_STEPS × GPU数
+
+# システム最適化設定
+MIXED_PRECISION = True                 # BF16混合精度学習
+GRADIENT_CHECKPOINTING = True          # メモリ効率化勾配チェックポイント
+DATALOADER_NUM_WORKERS = 4             # データローダワーカー数
+
+# 推論設定
+MAX_NEW_TOKENS = 100                   # 生成時最大新規トークン数
+
+# ==============================================================================
+# 5. データセット設定（最小限）
+# ==============================================================================
+# データセット種別（使用される場合の基本設定）
+DATASET_SAMPLE_RATES = "9,3,3,1"       # sem_seg:refer_seg:vqa:reason_seg
+SAMPLES_PER_EPOCH = 500                # デバッグ用サンプル数
+
+# データセット名（将来の完全学習用）
 SEM_SEG_DATA = "ade20k||cocostuff||mapillary||pascal_part||paco_lvis"
 REFER_SEG_DATA = "refclef||refcoco||refcoco+||refcocog"
 VQA_DATA = "llava_instruct_150k"
@@ -111,162 +112,132 @@ REASON_SEG_DATA = "ReasonSeg|train"
 VAL_DATASET = "ReasonSeg|val"
 
 # ==============================================================================
-# 7. データセットディレクトリ構造 (データ存在チェック用)
+# 6. 統一設定取得関数
 # ==============================================================================
-DATASET_STRUCTURE = {
-    "sem_seg": {
-        "ade20k": {
-            "path": "ade20k", "images": "images", "annotations": "annotations",
-            "required_files": ["images", "annotations"]
-        },
-        "cocostuff": {
-            "path": "cocostuff", "images": "train2017", "annotations": "train2017",
-            "required_files": ["train2017"]
-        },
-        "mapillary": {
-            "path": "mapillary", "images": "training/images", "annotations": "training/labels",
-            "config": "config_v2.0.json", "required_files": ["training", "config_v2.0.json"]
-        },
-        "pascal_part": {
-            "path": "vlpart/pascal_part", "json_file": "train.json",
-            "images": "VOCdevkit/VOC2010/JPEGImages", "required_files": ["train.json", "VOCdevkit"]
-        },
-        "paco_lvis": {
-            "path": "vlpart/paco", "annotations": "annotations",
-            "required_files": ["annotations"]
-        }
-    },
-    "refer_seg": {
-        "base_path": "refer_seg",
-        "datasets": {
-            "refcoco": {"annotations": "refcoco", "images": "images/mscoco/images/train2014"},
-            "refcoco+": {"annotations": "refcoco+", "images": "images/mscoco/images/train2014"},
-            "refcocog": {"annotations": "refcocog", "images": "images/mscoco/images/train2014"},
-            "refclef": {"annotations": "refclef", "images": "images/saiapr_tc-12"}
-        },
-        "required_files": ["refcoco", "refcoco+", "refcocog", "refclef", "images"]
-    },
-    "vqa": {
-        "llava_instruct_150k": {
-            "path": "llava_dataset", "json_file": "llava_instruct_150k.json",
-            "required_files": ["llava_instruct_150k.json"]
-        }
-    },
-    "reason_seg": {
-        "ReasonSeg": {
-            "path": "reason_seg/ReasonSeg", "train": "train", "val": "val", "explanatory": "explanatory",
-            "required_files": ["train", "val", "explanatory"]
-        }
-    },
-    "vlpart": {
-        "paco": {"path": "vlpart/paco", "annotations": "annotations", "required_files": ["annotations"]},
-        "pascal_part": {"path": "vlpart/pascal_part", "annotations": "train.json", "images": "VOCdevkit",
-                        "required_files": ["train.json", "VOCdevkit"]}
-    }
-}
-
-# ==============================================================================
-# 8. ユーティリティ関数
-# ==============================================================================
-def get_model_config(key: str = "scout"):
-    """モデルバリエーションに応じた設定取得"""
-    if key not in LLAMA_MODEL_CONFIGS:
-        raise ValueError(f"未サポートのモデル種別: {key}. 選択可能: {list(LLAMA_MODEL_CONFIGS.keys())}")
-    return LLAMA_MODEL_CONFIGS[key]
-
-def get_dataset_paths() -> dict:
-    """データセットパスのディクショナリ作成"""
-    base = Path(DATASET_BASE_DIR)
-    paths = {"sem_seg": {}, "refer_seg": {}, "vqa": {}, "reason_seg": {}}
-    # Semantic Segmentation
-    for name, cfg in DATASET_STRUCTURE["sem_seg"].items():
-        paths["sem_seg"][name] = str(base / cfg["path"])
-    # Referring Segmentation
-    refer_base = base / DATASET_STRUCTURE["refer_seg"]["base_path"]
-    for name, cfg in DATASET_STRUCTURE["refer_seg"]["datasets"].items():
-        paths["refer_seg"][name] = str(refer_base)
-    # VQA
-    for name, cfg in DATASET_STRUCTURE["vqa"].items():
-        paths["vqa"][name] = str(base / cfg["path"] / cfg["json_file"])
-    # Reasoning Segmentation
-    for name, cfg in DATASET_STRUCTURE["reason_seg"].items():
-        paths["reason_seg"][name] = str(base / cfg["path"])
-    return paths
-
-def get_required_weights() -> dict:
-    """必要な重みファイル情報"""
+def get_lisa_model_config() -> Dict[str, Any]:
+    """
+    LISA-Llama4統合モデル設定取得
+    
+    Returns:
+        Dict: LisaLlama4Config用設定辞書
+    """
     return {
-        "sam_vit_h": {
-            "path": SAM_CHECKPOINT_PATH,
-            "url": "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth",
-            "size_gb": 2.39,
-            "description": "SAM (ViT-H) モデルチェックポイント"
-        }
+        "llama_model_id": LLAMA_MODEL_ID,
+        "sam_checkpoint_path": SAM_CHECKPOINT_PATH,
+        "seg_token": SEG_TOKEN,
+        "llama_hidden_size": LLAMA_HIDDEN_SIZE,
+        "sam_prompt_embed_dim": SAM_PROMPT_EMBED_DIM,
+        "llama_image_size": LLAMA_IMAGE_SIZE,
+        "sam_image_size": SAM_IMAGE_SIZE,
+        "model_max_length": MODEL_MAX_LENGTH,
+        "attn_implementation": ATTN_IMPLEMENTATION,
+        "device_map": DEVICE_MAP,
+        "torch_dtype": TORCH_DTYPE,
     }
 
-def check_dataset_structure(dataset_name: str, dataset_type: str) -> tuple[bool, list]:
-    """指定データセットの構造チェック"""
-    base = Path(DATASET_BASE_DIR)
-    missing = []
-    if dataset_type not in DATASET_STRUCTURE or dataset_name not in DATASET_STRUCTURE[dataset_type]:
-        return False, [f"不明なデータセット: {dataset_type}/{dataset_name}"]
-    cfg = DATASET_STRUCTURE[dataset_type][dataset_name]
-    dataset_path = base / cfg.get("path", "")
-    if not dataset_path.exists():
-        missing.append(f"データセットディレクトリ未発見: {dataset_path}")
-        return False, missing
-    for req in cfg.get("required_files", []):
-        item_path = dataset_path / req
-        if not item_path.exists():
-            missing.append(f"必要ファイル/フォルダ未発見: {item_path}")
-    return (len(missing) == 0), missing
+def get_lora_config() -> Dict[str, Any]:
+    """
+    LoRA設定取得
+    
+    Returns:
+        Dict: LoraConfig用設定辞書
+    """
+    return {
+        "r": LORA_R,
+        "lora_alpha": LORA_ALPHA,
+        "lora_dropout": LORA_DROPOUT,
+        "target_modules": LORA_TARGET_MODULES,
+        "bias": "none",
+        "use_rslora": False
+    }
 
-def check_all_paths() -> bool:
-    """重要パスとファイルの存在チェック"""
-    errors = []
-    base = Path(DATASET_BASE_DIR)
-    if not base.exists():
-        errors.append(f"データセットベースディレクトリが存在しません: {base}")
-    sam_path = Path(SAM_CHECKPOINT_PATH)
-    if not sam_path.exists():
-        errors.append(f"SAMチェックポイントが存在しません: {sam_path}")
-        info = get_required_weights()["sam_vit_h"]
-        errors.append(f"ダウンロードコマンド例: wget {info['url']} -O {sam_path}")
-    critical = [("ReasonSeg", "reason_seg"), ("ade20k", "sem_seg"), ("llava_instruct_150k", "vqa")]
-    for name, dtype in critical:
-        ok, missing = check_dataset_structure(name, dtype)
-        if not ok:
-            for m in missing:
-                errors.append(f"{name}: {m}")
-    if errors:
-        print("❌ 設定エラー:")
-        for err in errors:
-            print(f"  - {err}")
-        print("\n対応策:")
-        print("1. 必要に応じ環境変数 LISA_DATASET_BASE_DIR, LISA_SAM_CHECKPOINT_PATH を設定してパスを修正")
-        print("2. あるいは、本ファイル内のパスを直接編集")
-        print("3. データセットおよびSAM重みファイルをダウンロード・配置してください")
-        raise FileNotFoundError("必須リソースが不足しています。上記対応策を実施してください。")
-    return True
+def get_training_config() -> Dict[str, Any]:
+    """
+    学習設定取得（分散学習対応）
+    
+    Returns:
+        Dict: 学習設定辞書
+    """
+    return {
+        "learning_rate": LEARNING_RATE,
+        "weight_decay": WEIGHT_DECAY,
+        "beta1": BETA1,
+        "beta2": BETA2,
+        "epochs": EPOCHS,
+        "steps_per_epoch": STEPS_PER_EPOCH,
+        "batch_size_per_gpu": BATCH_SIZE_PER_GPU,
+        "gradient_accumulation_steps": GRADIENT_ACCUMULATION_STEPS,
+        "mixed_precision": MIXED_PRECISION,
+        "gradient_checkpointing": GRADIENT_CHECKPOINTING,
+        "dataloader_num_workers": DATALOADER_NUM_WORKERS,
+        "max_new_tokens": MAX_NEW_TOKENS,
+    }
 
-def print_dataset_info():
-    """データセット情報の表示"""
-    print("=== データセットパス情報 ===")
-    print(f"Base Dir: {DATASET_BASE_DIR}")
-    print(f"SAM Checkpoint: {SAM_CHECKPOINT_PATH}")
-    paths = get_dataset_paths()
-    for dtype, datasets in paths.items():
-        print(f"\n[{dtype.upper()}]")
-        for name, path in datasets.items():
-            status = "✓" if Path(path).exists() else "✗"
-            print(f"  {status} {name}: {path}")
+def get_path_config() -> Dict[str, str]:
+    """
+    パス設定取得
+    
+    Returns:
+        Dict: パス設定辞書
+    """
+    return {
+        "dataset_base_dir": DATASET_BASE_DIR,
+        "sam_checkpoint_path": SAM_CHECKPOINT_PATH,
+        "hf_cache_dir": HF_CACHE_DIR,
+        "log_base_dir": LOG_BASE_DIR,
+        "weights_dir": WEIGHTS_DIR,
+    }
 
+# ==============================================================================
+# 7. 互換性維持（既存コード用）
+# ==============================================================================
+# 既存のテストスクリプトとの互換性のため、直接アクセス可能な設定を維持
+def check_environment() -> bool:
+    """
+    環境設定確認
+    
+    Returns:
+        bool: 必要なパス・設定が適切かどうか
+    """
+    required_paths = [
+        ("SAMチェックポイント", SAM_CHECKPOINT_PATH),
+        ("データセットベース", DATASET_BASE_DIR),
+    ]
+    
+    all_valid = True
+    print("=== 環境設定確認 ===")
+    
+    for name, path in required_paths:
+        if os.path.exists(path):
+            print(f"✅ {name}: {path}")
+        else:
+            print(f"❌ {name}が見つかりません: {path}")
+            all_valid = False
+    
+    return all_valid
+
+def print_config_summary():
+    """設定サマリ出力"""
+    print("=== LISA-Llama4統合設定サマリ ===")
+    print(f"Model: {LLAMA_MODEL_ID}")
+    print(f"SAM: {SAM_CHECKPOINT_PATH}")
+    print(f"Attention: {ATTN_IMPLEMENTATION}")
+    print(f"Device Map: {DEVICE_MAP}")
+    print(f"Dtype: {TORCH_DTYPE}")
+    print(f"LoRA: r={LORA_R}, alpha={LORA_ALPHA}")
+    print(f"Batch Size: {BATCH_SIZE_PER_GPU} (per GPU)")
+    print(f"Gradient Accumulation: {GRADIENT_ACCUMULATION_STEPS}")
+    print(f"Mixed Precision: {MIXED_PRECISION}")
+
+# ==============================================================================
+# メイン実行（設定確認用）
+# ==============================================================================
 if __name__ == "__main__":
-    print("=== LISA-Llama4 設定検証 ===")
-    try:
-        if check_all_paths():
-            print("✅ パス/ファイル設定OK")
-            print_dataset_info()
-    except FileNotFoundError as e:
-        print(f"❌ エラー: {e}")
-        exit(1)
+    print_config_summary()
+    print("\n")
+    env_ok = check_environment()
+    
+    if env_ok:
+        print("\n🎉 設定確認完了: 全て正常です")
+    else:
+        print("\n⚠️ 設定確認完了: 一部不備があります")

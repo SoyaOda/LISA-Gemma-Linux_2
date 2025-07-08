@@ -223,12 +223,7 @@ def main():
         # Step 1: Model initialization
         print_header("ステップ1: モデル初期化")
         
-        config = LisaLlama4Config(
-            llama_model_id="meta-llama/Llama-4-Scout-17B-16E-Instruct",
-            sam_checkpoint_path=config_linux.SAM_CHECKPOINT_PATH,  # config_linuxからSAMパス取得
-            attn_implementation="eager",
-            torch_dtype="bfloat16"
-        )
+        config = LisaLlama4Config(**config_linux.get_lisa_model_config())
         
         logger.info("LISA-Llama4モデル初期化中...")
         model = LisaLlama4ForCausalLM(config)
@@ -239,16 +234,10 @@ def main():
         
         from peft import LoraConfig, get_peft_model
         
+        lora_config_dict = config_linux.get_lora_config()
         lora_config = LoraConfig(
-            r=8,
-            lora_alpha=16,
-            target_modules=[
-                "q_proj", "k_proj", "v_proj", "o_proj",
-                "gate_proj", "up_proj", "down_proj"
-            ],
-            lora_dropout=0.05,
-            bias="none",
-            task_type="CAUSAL_LM"
+            task_type="CAUSAL_LM",
+            **lora_config_dict
         )
         
         logger.info("LoRA設定適用中...")

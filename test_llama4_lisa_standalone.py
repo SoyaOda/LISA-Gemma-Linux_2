@@ -97,13 +97,8 @@ class LisaLlama4StandaloneTest:
         logger.info("=== テスト1: モデル初期化 ===")
         
         try:
-            # LISA-Llama4設定作成
-            config = LisaLlama4Config(
-                llama_model_id="meta-llama/Llama-4-Scout-17B-16E-Instruct",
-                sam_checkpoint_path=config_linux.SAM_CHECKPOINT_PATH,  # config_linuxからSAMパス取得
-                attn_implementation="eager",  # 安定した設定
-                torch_dtype="bfloat16"
-            )
+            # LISA-Llama4設定作成（config_linux統一設定を使用）
+            config = LisaLlama4Config(**config_linux.get_lisa_model_config())
             
             logger.info("LISA-Llama4モデル初期化開始...")
             self.model = LisaLlama4ForCausalLM(config)
@@ -185,19 +180,11 @@ class LisaLlama4StandaloneTest:
         logger.info("=== テスト3: LoRA適用 ===")
         
         try:
-            # LoRA設定（成功した単独モデルと同じ設定）
+            # LoRA設定（config_linux統一設定を使用）
             lora_config = LoraConfig(
                 task_type=TaskType.CAUSAL_LM,
                 inference_mode=False,
-                r=8,
-                lora_alpha=16,
-                lora_dropout=0.05,
-                target_modules=[
-                    "q_proj", "k_proj", "v_proj", "o_proj",
-                    "gate_proj", "up_proj", "down_proj"
-                ],
-                bias="none",
-                use_rslora=False
+                **config_linux.get_lora_config()
             )
             
             logger.info("LoRA設定適用中...")

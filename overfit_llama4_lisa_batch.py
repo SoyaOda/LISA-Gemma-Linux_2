@@ -44,23 +44,10 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class LisaOverfitConfig:
-    """LISA統合モデル過学習テスト用設定"""
-    # LISA統合モデル設定
-    llama_model_id: str = "meta-llama/Llama-4-Scout-17B-16E-Instruct"
-    sam_checkpoint_path: Optional[str] = None  # SAMパスは後で設定
-    attn_implementation: str = "eager"
-    torch_dtype: str = "bfloat16"
-    
-    # 学習設定
+    """LISA統合モデル過学習テスト用設定（config_linux統一設定使用）"""
+    # 学習固有設定
     max_length: int = 256
     num_epochs: int = 10
-    learning_rate: float = 1e-4
-    
-    # LoRA設定 (成功した単独モデルと同じ設定)
-    lora_r: int = 8
-    lora_alpha: int = 16
-    lora_dropout: float = 0.05
-    lora_target_modules: List[str] = None
     
     # 過学習判定設定
     target_loss: float = 0.1
@@ -69,17 +56,24 @@ class LisaOverfitConfig:
     output_dir: str = "./llama4_lisa_overfit_results"
     
     def __post_init__(self):
-        """デフォルト設定の初期化"""
-        if self.lora_target_modules is None:
-            # 成功した単独モデルと同じターゲットモジュール
-            self.lora_target_modules = [
-                "q_proj", "k_proj", "v_proj", "o_proj",
-                "gate_proj", "up_proj", "down_proj"
-            ]
+        """config_linux統一設定を適用"""
+        # LISA統合モデル設定
+        lisa_config = config_linux.get_lisa_model_config()
+        self.llama_model_id = lisa_config["llama_model_id"]
+        self.sam_checkpoint_path = lisa_config["sam_checkpoint_path"]
+        self.attn_implementation = lisa_config["attn_implementation"]
+        self.torch_dtype = lisa_config["torch_dtype"]
         
-        # SAMパスをconfig_linuxから設定
-        if self.sam_checkpoint_path is None:
-            self.sam_checkpoint_path = config_linux.SAM_CHECKPOINT_PATH
+        # LoRA設定
+        lora_config = config_linux.get_lora_config()
+        self.lora_r = lora_config["r"]
+        self.lora_alpha = lora_config["lora_alpha"]
+        self.lora_dropout = lora_config["lora_dropout"]
+        self.lora_target_modules = lora_config["target_modules"]
+        
+        # 学習設定
+        training_config = config_linux.get_training_config()
+        self.learning_rate = training_config["learning_rate"]
 
 class TensorJSONEncoder(json.JSONEncoder):
     """Tensorオブジェクト用のJSONエンコーダー"""
@@ -125,13 +119,8 @@ class LisaOverfitTest:
             torch.compiler.disable()
             logger.info("動的コンパイル無効化: GPU分散エラー回避のため")
             
-            # LISA統合モデル設定
-            lisa_config = LisaLlama4Config(
-                llama_model_id=self.config.llama_model_id,
-                sam_checkpoint_path=self.config.sam_checkpoint_path,
-                attn_implementation=self.config.attn_implementation,
-                torch_dtype=self.config.torch_dtype
-            )
+            # LISA統合モデル設定（config_linux統一設定を使用）
+            lisa_config = LisaLlama4Config(**config_linux.get_lisa_model_config())
             
             # LISA統合モデル初期化
             model = LisaLlama4ForCausalLM(lisa_config)
@@ -150,16 +139,11 @@ class LisaOverfitTest:
         logger.info("=== LoRA設定適用 ===")
         
         try:
-            # LoRA設定作成 (成功した単独モデルと同じパラメータ)
+            # LoRA設定作成（config_linux統一設定を使用）
             lora_config = LoraConfig(
                 task_type=TaskType.CAUSAL_LM,
                 inference_mode=False,
-                r=self.config.lora_r,
-                lora_alpha=self.config.lora_alpha,
-                lora_dropout=self.config.lora_dropout,
-                target_modules=self.config.lora_target_modules,
-                bias="none",
-                use_rslora=False
+                **config_linux.get_lora_config()
             )
             
             logger.info(f"LoRA設定:")

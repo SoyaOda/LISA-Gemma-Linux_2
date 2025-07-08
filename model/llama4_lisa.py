@@ -240,22 +240,29 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
         config_module = importlib.util.module_from_spec(spec)
         sys.modules["config"] = config_module
         spec.loader.exec_module(config_module)
-        # 設定モジュールからLisaLlama4Configを構築
-        lisa_config = LisaLlama4Config(
-            llama_model_id=getattr(config_module, 'LLAMA_MODEL_ID', "meta-llama/Llama-4-Scout-17B-16E-Instruct"),
-            sam_checkpoint_path=getattr(config_module, 'SAM_CHECKPOINT_PATH', None),
-            seg_token=getattr(config_module, 'SEG_TOKEN', "[SEG]"),
-            llama_hidden_size=getattr(config_module, 'LLAMA_HIDDEN_SIZE', 5120),
-            sam_prompt_embed_dim=getattr(config_module, 'SEG_PROJECTION_DIM', 256),
-            llama_image_size=getattr(config_module, 'LLAMA_IMAGE_SIZE', 448),
-            sam_image_size=getattr(config_module, 'SAM_IMAGE_SIZE', 1024),
-            model_max_length=getattr(config_module, 'MODEL_MAX_LENGTH', 131072),
-            # Llama-4-Scout特有の設定
-            attn_implementation=getattr(config_module, 'ATTN_IMPLEMENTATION', "eager"),
-            device_map=getattr(config_module, 'DEVICE_MAP', "auto"),
-            torch_dtype=getattr(config_module, 'TORCH_DTYPE', "bfloat16"),
-            **kwargs
-        )
+        # 設定モジュールからLisaLlama4Configを構築（統一設定関数を使用）
+        if hasattr(config_module, 'get_lisa_model_config'):
+            # 新しい統一設定関数を使用
+            lisa_config_dict = config_module.get_lisa_model_config()
+            lisa_config_dict.update(kwargs)  # 追加のkwargsをマージ
+            lisa_config = LisaLlama4Config(**lisa_config_dict)
+        else:
+            # 旧設定との互換性保持（フォールバック）
+            lisa_config = LisaLlama4Config(
+                llama_model_id=getattr(config_module, 'LLAMA_MODEL_ID', "meta-llama/Llama-4-Scout-17B-16E-Instruct"),
+                sam_checkpoint_path=getattr(config_module, 'SAM_CHECKPOINT_PATH', None),
+                seg_token=getattr(config_module, 'SEG_TOKEN', "[SEG]"),
+                llama_hidden_size=getattr(config_module, 'LLAMA_HIDDEN_SIZE', 5120),
+                sam_prompt_embed_dim=getattr(config_module, 'SAM_PROMPT_EMBED_DIM', 256),
+                llama_image_size=getattr(config_module, 'LLAMA_IMAGE_SIZE', 448),
+                sam_image_size=getattr(config_module, 'SAM_IMAGE_SIZE', 1024),
+                model_max_length=getattr(config_module, 'MODEL_MAX_LENGTH', 131072),
+                # Llama-4-Scout特有の設定
+                attn_implementation=getattr(config_module, 'ATTN_IMPLEMENTATION', "eager"),
+                device_map=getattr(config_module, 'DEVICE_MAP', "auto"),
+                torch_dtype=getattr(config_module, 'TORCH_DTYPE', "bfloat16"),
+                **kwargs
+            )
         return cls(lisa_config)
 
     def has_sam_capability(self) -> bool:
