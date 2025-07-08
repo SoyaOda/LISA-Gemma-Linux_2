@@ -1018,112 +1018,144 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
 
     def _generate_masks_from_seg_tokens_single(self, hidden_states, seg_positions, sam_features, device):
         """
-        単一入力用: 最後の隠れ状態とSEG位置からマスクを生成
+        単一入力用: 最適化されたSEGトークン処理（統一メソッド使用）
         hidden_states: (1, seq_len, hidden_size)
         """
-        masks = []
-        
-        # multi_modal_projectorのデバイスを取得
-        projector_device = next(self.multi_modal_projector.parameters()).device
-        
-        for batch_idx, token_idx in zip(seg_positions[0], seg_positions[1]):
-            # SEGトークン隠れベクトル抽出とデバイス統一
-            seg_hidden = hidden_states[batch_idx, token_idx]  # (hidden_size,)
-            seg_hidden = seg_hidden.to(projector_device)  # projectorと同じデバイスに移動
-            
-            # PyTorch公式推奨：データ型も統一（BFloat16 -> Float32）
-            projector_dtype = next(self.multi_modal_projector.parameters()).dtype
-            seg_hidden = seg_hidden.to(projector_dtype)
-            
-            seg_emb = self.multi_modal_projector(seg_hidden.unsqueeze(0))  # (1,256)
-            sparse_embeddings = seg_emb.unsqueeze(1)  # (1,1,256)
-            dense_embeddings = torch.zeros(
-                (sam_features.shape[0], sam_features.shape[2], sam_features.shape[3]),
-                device=device, dtype=sam_features.dtype
-            )
-            dense_pe = self.sam_model.prompt_encoder.get_dense_pe()
-            try:
-                # SAMデコーダー入力を統一デバイス管理で処理
-                sam_features, dense_pe, sparse_embeddings, dense_embeddings = self._prepare_sam_inputs_for_device(
-                    sam_features, dense_pe, sparse_embeddings, dense_embeddings,
-                    description="SAMデコーダー入力（単一）"
-                )
-                
-                mask, iou_pred = self.sam_model.mask_decoder(
-                    image_embeddings=sam_features,
-                    image_pe=dense_pe,
-                    sparse_prompt_embeddings=sparse_embeddings,
-                    dense_prompt_embeddings=dense_embeddings,
-                    multimask_output=False
-                )
-                masks.append(mask)
-            except Exception as e:
-                self._handle_model_error(e, "SAMデコーダ（単一）", critical=True)
-        if len(masks) == 0:
-            return None
-        return masks[0] if len(masks) == 1 else torch.cat(masks, dim=0)
+        return self._process_seg_tokens_optimized(
+            hidden_states, seg_positions, sam_features, device
+        )
 
     def _generate_masks_from_seg_tokens_batch(self, hidden_states, seg_positions, sam_features_list, device):
         """
-        バッチ入力用: SEGトークン隠れ状態からマスク生成（単一ストリーム版）
+        バッチ入力用: 最適化されたSEGトークン処理（統一メソッド使用）
+        """
+        return self._process_seg_tokens_optimized(
+            hidden_states, seg_positions, sam_features_list, device
+        )
+
+    def _extract_seg_hidden_states(self, hidden_states, seg_positions):
+        """
+        SEGトークン隠れ状態抽出の統一処理
+        
+        Args:
+            hidden_states: モデル隠れ状態 [batch_size, seq_len, hidden_size]
+            seg_positions: SEGトークン位置タプル (batch_indices, token_indices)
+            
+        Returns:
+            list: SEG隠れ状態リスト [(batch_idx, seg_hidden), ...]
+        """
+        seg_hidden_list = []
+        projector_device = next(self.multi_modal_projector.parameters()).device
+        projector_dtype = next(self.multi_modal_projector.parameters()).dtype
+        
+        for batch_idx, token_idx in zip(seg_positions[0], seg_positions[1]):
+            # SEGトークン隠れベクトル抽出
+            seg_hidden = hidden_states[batch_idx, token_idx]  # (hidden_size,)
+            
+            # デバイス・データ型統一（PyTorch公式推奨方法）
+            seg_hidden = seg_hidden.to(device=projector_device, dtype=projector_dtype)
+            
+            seg_hidden_list.append((batch_idx.item(), seg_hidden))
+            
+        return seg_hidden_list
+    
+    def _generate_sam_embeddings_batch(self, seg_hidden_list):
+        """
+        SEG隠れ状態からSAM埋め込みをバッチ生成
+        
+        Args:
+            seg_hidden_list: SEG隠れ状態リスト [(batch_idx, seg_hidden), ...]
+            
+        Returns:
+            list: SAM埋め込みリスト [(batch_idx, sparse_embeddings), ...]
+        """
+        sam_embeddings_list = []
+        
+        for batch_idx, seg_hidden in seg_hidden_list:
+            # MLPプロジェクタでSAM埋め込み生成
+            seg_emb = self.multi_modal_projector(seg_hidden.unsqueeze(0))  # (1, 256)
+            sparse_embeddings = seg_emb.unsqueeze(1)  # (1, 1, 256)
+            
+            sam_embeddings_list.append((batch_idx, sparse_embeddings))
+            
+        return sam_embeddings_list
+    
+    def _create_sam_dense_embeddings(self, sam_features, device):
+        """
+        SAM dense埋め込み作成（共通処理）
+        
+        Args:
+            sam_features: SAM画像特徴量
+            device: 処理デバイス
+            
+        Returns:
+            torch.Tensor: dense埋め込み
+        """
+        return torch.zeros(
+            (sam_features.shape[0], sam_features.shape[2], sam_features.shape[3]),
+            device=device, 
+            dtype=sam_features.dtype
+        )
+    
+    def _process_seg_tokens_optimized(self, hidden_states, seg_positions, sam_features_input, device):
+        """
+        SEGトークン処理の統一最適化メソッド
+        
+        Args:
+            hidden_states: モデル隠れ状態
+            seg_positions: SEGトークン位置
+            sam_features_input: SAM特徴量（単一 or リスト）
+            device: 処理デバイス
+            
+        Returns:
+            torch.Tensor or None: 生成されたマスク
         """
         if not seg_positions[0].numel():
             return None
+            
+        # Step 1: SEG隠れ状態抽出
+        seg_hidden_list = self._extract_seg_hidden_states(hidden_states, seg_positions)
+        if not seg_hidden_list:
+            return None
+            
+        # Step 2: SAM埋め込み生成
+        sam_embeddings_list = self._generate_sam_embeddings_batch(seg_hidden_list)
+        
+        # Step 3: SAMデコーダでマスク生成
         masks = []
-        seg_count = 0
-        batch_size = hidden_states.shape[0]
+        dense_pe = self.sam_model.prompt_encoder.get_dense_pe()
         
-        # multi_modal_projectorのデバイスを取得
-        projector_device = next(self.multi_modal_projector.parameters()).device
+        # 単一 vs バッチ処理の分岐
+        is_batch_input = isinstance(sam_features_input, list)
         
-        for i in range(batch_size):
-            # 画像iに対応するSEGトークンを探索
-            mask_for_image = None
-            for j in range(len(seg_positions[0])):
-                if seg_positions[0][j] == i:
-                    # i番目の画像にSEGトークンがある場合
-                    token_idx = seg_positions[1][j]
-                    seg_hidden = hidden_states[i, token_idx]
-                    seg_hidden = seg_hidden.to(projector_device)  # projectorと同じデバイスに移動
-                    
-                    # PyTorch公式推奨：データ型も統一（バッチ版）
-                    projector_dtype = next(self.multi_modal_projector.parameters()).dtype
-                    seg_hidden = seg_hidden.to(projector_dtype)
-                    
-                    seg_emb = self.multi_modal_projector(seg_hidden.unsqueeze(0))  # (1,256)
-                    sparse_embeddings = seg_emb.unsqueeze(1)  # (1,1,256)
-                    dense_embeddings = torch.zeros(
-                        (sam_features_list[i].shape[0], sam_features_list[i].shape[2], sam_features_list[i].shape[3]),
-                        device=device, dtype=sam_features_list[i].dtype
-                    )
-                    dense_pe = self.sam_model.prompt_encoder.get_dense_pe()
-                    try:
-                        # SAMデコーダー入力を統一デバイス管理で処理（バッチ版）
-                        sam_features_gpu, dense_pe, sparse_embeddings, dense_embeddings = self._prepare_sam_inputs_for_device(
-                            sam_features_list[i], dense_pe, sparse_embeddings, dense_embeddings,
-                            description=f"SAMデコーダー入力（バッチ{i}）"
-                        )
-                        
-                        mask, _ = self.sam_model.mask_decoder(
-                            image_embeddings=sam_features_gpu,
-                            image_pe=dense_pe,
-                            sparse_prompt_embeddings=sparse_embeddings,
-                            dense_prompt_embeddings=dense_embeddings,
-                            multimask_output=False
-                        )
-                        mask_for_image = mask
-                    except Exception as e:
-                        self._handle_model_error(e, f"SAMデコーダ（バッチ{i}）", critical=True)
-                    break
-            if mask_for_image is None:
-                # その画像にSEG要求が無い場合はエラー
-                self._handle_model_error(
-                    ValueError(f"画像{i}にSEGトークンが見つかりません"), 
-                    f"バッチマスク生成（画像{i}）", 
-                    critical=True
-                )
-            masks.append(mask_for_image)
-        return torch.cat(masks, dim=0) if masks else None
+        for batch_idx, sparse_embeddings in sam_embeddings_list:
+            # SAM特徴量取得
+            if is_batch_input:
+                sam_features = sam_features_input[batch_idx]
+            else:
+                sam_features = sam_features_input
+                
+            # dense埋め込み作成
+            dense_embeddings = self._create_sam_dense_embeddings(sam_features, device)
+            
+            # デバイス統一処理（引数順序厳守：位置引数→キーワード引数）
+            sam_features_gpu, dense_pe_gpu, sparse_emb_gpu, dense_emb_gpu = self._prepare_sam_inputs_for_device(
+                sam_features, dense_pe, sparse_embeddings, dense_embeddings,
+                description=f"SAM最適化処理（バッチ{batch_idx}）"
+            )
+            
+            # SAMデコーダ実行（エラー時は例外投げ）
+            mask = self._safe_sam_decode(
+                sam_features_gpu, sparse_emb_gpu, dense_emb_gpu, dense_pe_gpu,
+                context=f"SAM最適化デコーダ（バッチ{batch_idx}）"
+            )
+            
+            masks.append(mask)
+            
+        # マスク統合
+        if not masks:
+            return None
+        return masks[0] if len(masks) == 1 else torch.cat(masks, dim=0)
 
     def generate_with_segmentation(self, image, text_prompt, max_new_tokens=100):
         """
