@@ -141,15 +141,8 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
                 self.sam_model = sam_model_registry["vit_h"](checkpoint=config.sam_checkpoint_path)
                 self.sam_model.eval()
                 
-                # SAMモデルをGPUに移動（PyTorch公式推奨方法）
-                if torch.cuda.is_available():
-                    # シンプルで確実な方法: cuda()を使用してモデル全体を一度に移動
-                    self.sam_model = self.sam_model.cuda()
-                    print(f"✅ SAMモデルをGPUに移動しました（標準方法）")
-                    
-                    # 同期してデバイス移動完了を確実にする
-                    torch.cuda.synchronize()
-                    print(f"✅ CUDA同期完了 - SAMモデル準備完了")
+                # SAMモデルをGPUに移動（統一管理）
+                self._move_sam_model_to_device()
                 
                 # SAMパラメータを凍結
                 for param in self.sam_model.parameters():
@@ -353,6 +346,323 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
     def set_output_embeddings(self, value):
         self.llama_model.set_output_embeddings(value)
 
+    def _get_model_device(self) -> torch.device:
+        """
+        モデルのメインデバイスを取得
+        
+        Returns:
+            torch.device: Llamaモデルのデバイス
+        """
+        return next(self.llama_model.parameters()).device
+    
+    def _move_to_device(self, tensor_or_tensors, device=None, dtype=None, description=""):
+        """
+        テンソルまたはテンソルリストを指定デバイス・データ型に移動
+        
+        Args:
+            tensor_or_tensors: 単一テンソルまたはテンソルのリスト/辞書
+            device: 移動先デバイス (None=モデルデバイス使用)
+            dtype: 変換先データ型 (None=変換なし)
+            description: ログ用説明
+            
+        Returns:
+            移動後のテンソル(群)
+        """
+        if device is None:
+            device = self._get_model_device()
+            
+        def _move_single_tensor(tensor):
+            if tensor is None:
+                return tensor
+            result = tensor
+            if dtype is not None:
+                result = result.to(dtype)
+            result = result.to(device)
+            return result
+        
+        # 単一テンソル処理
+        if isinstance(tensor_or_tensors, torch.Tensor):
+            result = _move_single_tensor(tensor_or_tensors)
+            if description:
+                print(f"🔄 {description}: {result.shape} → {device}")
+            return result
+        
+        # リスト処理
+        elif isinstance(tensor_or_tensors, (list, tuple)):
+            results = [_move_single_tensor(t) for t in tensor_or_tensors]
+            if description:
+                print(f"🔄 {description}: {len(results)}個のテンソル → {device}")
+            return type(tensor_or_tensors)(results)
+        
+        # 辞書処理
+        elif isinstance(tensor_or_tensors, dict):
+            results = {k: _move_single_tensor(v) for k, v in tensor_or_tensors.items()}
+            if description:
+                print(f"🔄 {description}: 辞書 {list(results.keys())} → {device}")
+            return results
+        
+        else:
+            return tensor_or_tensors
+    
+    def _prepare_sam_inputs_for_device(self, *tensors, description="SAM入力"):
+        """
+        SAM用テンソルをFloat32 + GPU移動の統一処理
+        
+        Args:
+            *tensors: SAM用テンソル群
+            description: ログ用説明
+            
+        Returns:
+            tuple: デバイス・データ型変換後のテンソル群
+        """
+        # SAMはFloat32が必要
+        converted = []
+        for tensor in tensors:
+            if tensor is not None:
+                # BFloat16 → Float32 変換 + GPU移動
+                converted_tensor = self._move_to_device(
+                    tensor, dtype=torch.float32, description=f"{description}変換"
+                )
+                converted.append(converted_tensor)
+            else:
+                converted.append(tensor)
+        
+        return tuple(converted) if len(converted) > 1 else converted[0]
+    
+    def _detect_seg_tokens(self, input_ids):
+        """
+        SEGトークン検出の統一処理
+        
+        Args:
+            input_ids: テキストトークンID
+            
+        Returns:
+            tuple: SEGトークン位置のタプル (batch_indices, token_indices)
+        """
+        seg_positions = (input_ids == self.seg_token_id).nonzero(as_tuple=True)
+        if len(seg_positions[0]) > 0:
+            print(f"SEGトークン検出: {len(seg_positions[0])}個")
+        return seg_positions
+    
+    def _prepare_sam_image_features(self, pixel_values, device):
+        """
+        pixel_valuesからSAM用画像特徴量を生成（統一処理）
+        
+        Args:
+            pixel_values: Llama用画像テンソル [B, C, H, W]
+            device: 処理デバイス
+            
+        Returns:
+            list: SAM画像特徴量リスト
+        """
+        batch_size = pixel_values.shape[0]
+        sam_features_list = []
+        
+        for i in range(batch_size):
+            # 各画像をSAM用に変換
+            img = pixel_values[i:i+1]  # (1,C,H,W)
+            sam_img = F.interpolate(
+                img, 
+                size=(self.sam_image_size, self.sam_image_size), 
+                mode='bilinear', 
+                align_corners=False
+            )
+            sam_img = sam_img * 255.0  # 正規化: 0-1 -> 0-255
+            sam_img = self._prepare_sam_inputs_for_device(
+                sam_img, description=f"SAMバッチ画像{i}"
+            )
+            
+            # SAM画像エンコーディング
+            with torch.no_grad():
+                sam_feat = self.sam_model.image_encoder(sam_img)
+            sam_features_list.append(sam_feat)
+            
+        return sam_features_list
+    
+    def _compute_composite_loss(self, outputs, labels, predicted_masks, ground_truth_mask=None, description="", **kwargs):
+        """
+        CompositeLoss計算の統一処理
+        
+        Args:
+            outputs: モデル出力
+            labels: ラベル
+            predicted_masks: 予測マスク
+            ground_truth_mask: 正解マスク (optional)
+            description: ログ用説明
+            **kwargs: 追加パラメータ（ground_truth_mask取得等）
+            
+        Returns:
+            dict: 統一損失結果
+        """
+        print(f"🔍 CompositeLoss使用による統一損失計算 {description}")
+        
+        # kwargsからground_truth_maskを取得（dual_stream用）
+        if ground_truth_mask is None and 'ground_truth_mask' in kwargs:
+            ground_truth_mask = kwargs['ground_truth_mask']
+            print(f"🔍 ground_truth_mask取得: {ground_truth_mask.shape if ground_truth_mask is not None else 'None'}")
+        
+        # model_outputs準備
+        model_outputs = {
+            "text_loss": outputs.loss,
+            "logits": outputs.logits,
+            "predicted_masks": predicted_masks,
+        }
+        
+        # batch_data準備
+        batch_data = {
+            "labels": labels,
+            "ground_truth_mask": ground_truth_mask,
+        }
+        
+        # CompositeLoss計算
+        losses = self.loss_fn(model_outputs, batch_data)
+        
+        # 損失情報の詳細表示（dual_stream用）
+        if "dual" in description:
+            total_loss = losses.get("total_loss")
+            text_loss = losses.get("text_loss")
+            dice_loss = losses.get("dice_loss")
+            bce_loss = losses.get("bce_loss")
+            
+            print(f"📊 損失結果:")
+            print(f"  - 総損失: {total_loss.item() if total_loss is not None else 'None'}")
+            print(f"  - テキスト損失: {text_loss.item() if text_loss is not None else 'None'}")
+            print(f"  - DICE損失: {dice_loss.item() if dice_loss is not None else 'None'}")
+            print(f"  - BCE損失: {bce_loss.item() if bce_loss is not None else 'None'}")
+        
+        return {
+            "text_loss": losses.get("total_loss"),
+            "losses": losses,
+            "model_outputs": model_outputs
+        }
+    
+    def _handle_model_error(self, error: Exception, context: str, critical: bool = True):
+        """
+        モデル関連エラーの統一ハンドリング
+        
+        Args:
+            error: 発生した例外
+            context: エラー発生文脈
+            critical: クリティカルエラーかどうか
+            
+        Raises:
+            RuntimeError: クリティカルエラーの場合
+        """
+        error_msg = f"❌ {context}でエラー発生: {str(error)}"
+        print(error_msg)
+        
+        if critical:
+            raise RuntimeError(f"{context}の処理に失敗しました: {error}") from error
+        else:
+            print(f"⚠️ {context}: 非クリティカルエラーのため処理を継続")
+    
+
+    
+    def _safe_model_forward(self, model_func, inputs, context="モデル推論", **kwargs):
+        """
+        モデル推論の安全実行ラッパー
+        
+        Args:
+            model_func: 実行するモデル関数
+            inputs: 入力データ
+            context: エラー文脈
+            **kwargs: 追加引数
+            
+        Returns:
+            モデル出力
+        """
+        try:
+            return model_func(**inputs, **kwargs)
+        except Exception as e:
+            self._handle_model_error(e, context, critical=True)
+    
+    def _safe_sam_decode(self, sam_features, sparse_embeddings, dense_embeddings, dense_pe, context="SAMデコーダ"):
+        """
+        SAMデコーダの安全実行（エラー時は例外を投げる）
+        
+        Args:
+            sam_features: SAM画像特徴量
+            sparse_embeddings: スパース埋め込み
+            dense_embeddings: デンス埋め込み  
+            dense_pe: Dense Position Encoding
+            context: エラー文脈
+            
+        Returns:
+            torch.Tensor: 生成されたマスク
+            
+        Raises:
+            RuntimeError: SAMデコーダ処理失敗時
+        """
+        try:
+            mask, iou_pred = self.sam_model.mask_decoder(
+                image_embeddings=sam_features,
+                image_pe=dense_pe,
+                sparse_prompt_embeddings=sparse_embeddings,
+                dense_prompt_embeddings=dense_embeddings,
+                multimask_output=False
+            )
+            return mask
+            
+        except Exception as e:
+            self._handle_model_error(e, context, critical=True)
+    
+    def _move_sam_model_to_device(self):
+        """
+        SAMモデルをGPUに移動（初期化専用）
+        """
+        if hasattr(self, 'sam_model') and self.sam_model is not None:
+            if torch.cuda.is_available():
+                # PyTorch公式推奨: シンプルで確実なモデル移動
+                self.sam_model = self.sam_model.cuda()
+                print(f"✅ SAMモデルをGPUに移動しました（統一管理）")
+                
+                # 同期してデバイス移動完了を確実にする
+                torch.cuda.synchronize()
+                print(f"✅ CUDA同期完了 - SAMモデル準備完了")
+            else:
+                print("⚠️ CUDA利用不可 - SAMモデルはCPUのまま")
+    
+    def _validate_and_route_inputs(
+        self, 
+        input_ids: Optional[torch.LongTensor],
+        pixel_values: Optional[torch.FloatTensor],
+        images_for_llama: Optional[torch.FloatTensor],
+        images_for_sam: Optional[torch.FloatTensor],
+        image,
+        text_prompt: str
+    ) -> str:
+        """
+        入力を検証し、適切な処理ルートを決定
+        
+        Args:
+            入力パラメータ群
+        
+        Returns:
+            str: 処理ルート ('single', 'dual_stream', 'single_stream')
+        
+        Raises:
+            ValueError: 不正な入力組み合わせの場合
+        """
+        # 推論モード: 単一画像 + テキスト
+        if image is not None and text_prompt is not None:
+            return 'single'
+        
+        # 学習/バッチモード
+        if input_ids is not None:
+            # デュアルストリーム入力
+            if images_for_llama is not None and images_for_sam is not None:
+                return 'dual_stream'
+            # 後方互換: 単一ストリーム入力
+            elif pixel_values is not None:
+                return 'single_stream'
+        
+        # 不正な入力組み合わせ
+        raise ValueError(
+            "適切な入力が与えられていません: "
+            "(image, text_prompt) または (input_ids, images_for_llama, images_for_sam) "
+            "または (input_ids, pixel_values) が必要です"
+        )
+
     def forward(
         self,
         input_ids: Optional[torch.LongTensor] = None,
@@ -367,31 +677,50 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
         **kwargs
     ) -> Dict[str, Any]:
         """
-        LISA-Llama4のフォワードパス
-        1) 単一の画像+テキスト (推論時)
-        2) バッチ入力 (トレーニング時) - デュアルストリーム画像対応
+        LISA-Llama4の統合フォワードパス
+        
+        処理ルート:
+        1) 単一画像+テキスト (推論時)
+        2) デュアルストリーム (学習時 - 新方式)
+        3) 単一ストリーム (学習時 - 後方互換)
+        
+        Args:
+            input_ids: テキストトークンID
+            attention_mask: アテンションマスク
+            pixel_values: 単一ストリーム用画像テンソル
+            labels: 学習用ラベル
+            images_for_llama: Llama4用画像テンソル
+            images_for_sam: SAM用画像テンソル
+            image: PIL画像 (推論用)
+            text_prompt: テキストプロンプト (推論用)
+            generate_mask: セグメンテーションマスク生成フラグ
+            
+        Returns:
+            Dict[str, Any]: モデル出力 (logits, masks, losses等)
         """
         try:
-            device = next(self.llama_model.parameters()).device
-
-            # 推論モード: 単一画像 + テキストの場合
-            if image is not None and text_prompt is not None:
-                return self._forward_single(image, text_prompt, generate_mask, device)
+            # 1. 入力検証とルーティング判定
+            route = self._validate_and_route_inputs(
+                input_ids, pixel_values, images_for_llama, 
+                images_for_sam, image, text_prompt
+            )
             
-            # 学習/バッチモード:
-            if input_ids is not None and (images_for_llama is not None or pixel_values is not None):
-                # 新しいデュアルストリーム入力
-                if images_for_llama is not None and images_for_sam is not None:
-                    return self._forward_dual_stream_batch(
-                        input_ids, attention_mask, images_for_llama, images_for_sam,
-                        labels, generate_mask, **kwargs  # ✅ kwargsを正しく渡す
-                    )
-                # 後方互換: pixel_valuesのみ使用の場合 (images_for_llamaがNone)
-                elif pixel_values is not None:
-                    return self._forward_single_stream_batch(
-                        input_ids, attention_mask, pixel_values, labels, generate_mask, device
-                    )
-            raise ValueError("適切な入力が与えられていません: (image, text_prompt) または (input_ids, images_for_llama, images_for_sam) が必要です")
+            # 2. デバイス取得
+            device = self._get_model_device()
+            
+            # 3. ルートに応じた処理実行
+            if route == 'single':
+                return self._forward_single(image, text_prompt, generate_mask, device)
+            elif route == 'dual_stream':
+                return self._forward_dual_stream_batch(
+                    input_ids, attention_mask, images_for_llama, images_for_sam,
+                    labels, generate_mask, **kwargs
+                )
+            elif route == 'single_stream':
+                return self._forward_single_stream_batch(
+                    input_ids, attention_mask, pixel_values, labels, generate_mask, device
+                )
+                
         except Exception as e:
             print(f"フォワード中にエラー発生: {e}")
             import traceback
@@ -418,14 +747,15 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
         # 3. SEGトークンが出現したらマスク生成
         if generate_mask and self.sam_model is not None:
             input_ids = llama_inputs.get("input_ids")
-            seg_positions = (input_ids == self.seg_token_id).nonzero(as_tuple=True)
+            seg_positions = self._detect_seg_tokens(input_ids)
             if len(seg_positions[0]) > 0:
                 print(f"入力中にSEGトークンを{len(seg_positions[0])}個検出")
                 # 画像をSAM用に整形 (1024x1024)
                 sam_image = image.resize((self.sam_image_size, self.sam_image_size))
                 sam_image_tensor = torch.tensor(np.array(sam_image)).permute(2, 0, 1).float().unsqueeze(0)
-                sam_image_tensor = sam_image_tensor.cuda()  # SAM互換性のためFloat32でGPU移動
-                print(f"🔄 SAM入力をGPUに移動: {sam_image_tensor.shape}")
+                sam_image_tensor = self._prepare_sam_inputs_for_device(
+                    sam_image_tensor, description="SAM画像入力"
+                )
                 
                 # SAM画像エンコーダから特徴抽出
                 with torch.no_grad():
@@ -465,23 +795,11 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
         }
         # セグメンテーションマスク生成処理
         if generate_mask and self.sam_model is not None:
-            seg_positions = (input_ids == self.seg_token_id).nonzero(as_tuple=True)
+            seg_positions = self._detect_seg_tokens(input_ids)
             if len(seg_positions[0]) > 0:
                 print(f"バッチ内SEGトークン数: {len(seg_positions[0])}")
                 batch_size = pixel_values.shape[0]
-                sam_features_list = []
-                for i in range(batch_size):
-                    # pixel_valuesの各画像テンソルを(3,H,W)から(1,3,1024,1024)へ変換
-                    img = pixel_values[i:i+1]  # (1,3,H,W)
-                    # Llamaの画像入力がタイル処理済みの場合でも、簡易的に全体をresize (注意:情報損失の可能性)
-                    sam_img = F.interpolate(img, size=(self.sam_image_size, self.sam_image_size), mode='bilinear', align_corners=False)
-                    sam_img = sam_img * 255.0  # 正規化: 0-1 -> 0-255
-                    sam_img = sam_img.float()  # BFloat16 -> Float32 変換（SAM互換性のため）
-                    sam_img = sam_img.cuda()  # シンプルなGPU移動
-                    
-                    with torch.no_grad():
-                        sam_feat = self.sam_model.image_encoder(sam_img)
-                    sam_features_list.append(sam_feat)
+                sam_features_list = self._prepare_sam_image_features(pixel_values, device)
                 masks = self._generate_masks_from_seg_tokens_batch(outputs.hidden_states[-1], seg_positions, sam_features_list, device)
                 results["predicted_masks"] = masks if masks is not None else None
             else:
@@ -490,28 +808,12 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
             # マスク生成しない場合でもマスクを設定（CompositeLoss統一のため）
             results["predicted_masks"] = None
         
-        # CompositeLossを使用して統一された損失計算
-        print("🔍 CompositeLoss使用による統一損失計算 (single stream)")
-        
-        # model_outputsの準備
-        model_outputs = {
-            "text_loss": outputs.loss,
-            "logits": outputs.logits,
-            "predicted_masks": results["predicted_masks"],
-        }
-        
-        # バッチデータの準備
-        batch_data = {
-            "labels": labels,
-            "ground_truth_mask": None,  # TODO: 実際の学習時にground truthマスクを設定
-        }
-        
-        # CompositeLossで損失計算
-        losses = self.loss_fn(model_outputs, batch_data)
-        
-        # 統一された損失を結果に設定
-        results["text_loss"] = losses.get("total_loss")
-        results["losses"] = losses
+        # 統一CompositeLoss処理
+        loss_results = self._compute_composite_loss(
+            outputs, labels, results["predicted_masks"], 
+            ground_truth_mask=None, description="(single stream)"
+        )
+        results.update(loss_results)
         
         return results
 
@@ -670,15 +972,7 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
                             predicted_masks_list.append(low_res_masks)
                             
                         except Exception as e:
-                            print(f"⚠️ マスク生成エラー (#{i}): {e}")
-                            # ダミーマスクを生成（エラー回避）
-                            dummy_mask = torch.zeros(
-                                (1, 1, 256, 256), 
-                                device=device, 
-                                dtype=torch.float32,
-                                requires_grad=True
-                            )
-                            predicted_masks_list.append(dummy_mask)
+                            self._handle_model_error(e, f"マスク生成 (#{i})", critical=True)
                     
                     if predicted_masks_list:
                         pred_masks = torch.cat(predicted_masks_list, dim=0)
@@ -695,42 +989,31 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
         else:
             print("ℹ️ SEGトークンなし - セグメンテーション処理をスキップ")
         
-        # CompositeLossを使用して統一された損失計算
-        print("🔍 CompositeLoss使用による統一損失計算")
+        # 統一CompositeLoss処理（dual_stream用）
+        # outputsオブジェクトを構築（統一メソッド用）
+        class OutputsWrapper:
+            def __init__(self, loss, logits):
+                self.loss = loss
+                self.logits = logits
         
-        # バッチデータの準備
-        # kwargsからground_truth_maskを取得（verify_loss_and_gradients.pyから渡される）
-        ground_truth_mask = kwargs.get("ground_truth_mask", None)
-        print(f"🔍 ground_truth_mask取得: {ground_truth_mask.shape if ground_truth_mask is not None else 'None'}")
+        outputs_wrapper = OutputsWrapper(
+            loss=model_outputs.get("text_loss"),
+            logits=model_outputs.get("logits")
+        )
         
-        batch_data = {
-            "labels": labels,
-            "ground_truth_mask": ground_truth_mask,
-        }
-        
-        # CompositeLossで損失計算
-        losses = self.loss_fn(model_outputs, batch_data)
-        
-        # 損失情報の表示
-        total_loss = losses.get("total_loss")
-        text_loss = losses.get("text_loss")
-        dice_loss = losses.get("dice_loss")
-        bce_loss = losses.get("bce_loss")
-        
-        print(f"📊 損失結果:")
-        print(f"  - 総損失: {total_loss.item() if total_loss is not None else 'None'}")
-        print(f"  - テキスト損失: {text_loss.item() if text_loss is not None else 'None'}")
-        print(f"  - DICE損失: {dice_loss.item() if dice_loss is not None else 'None'}")
-        print(f"  - BCE損失: {bce_loss.item() if bce_loss is not None else 'None'}")
+        loss_results = self._compute_composite_loss(
+            outputs_wrapper, labels, model_outputs["predicted_masks"],
+            description="(dual stream)", **kwargs
+        )
         
         return {
-            "text_loss": total_loss,  # CompositeLossによる総損失
+            "text_loss": loss_results["text_loss"],
             "logits": model_outputs["logits"],
             "hidden_states": hidden_states,
             "pred_masks": model_outputs["predicted_masks"],
             "sam_embeddings": sam_embeddings,
-            "losses": losses,  # 個別損失の詳細情報
-            "model_outputs": model_outputs  # デバッグ用
+            "losses": loss_results["losses"],
+            "model_outputs": loss_results["model_outputs"]
         }
 
     def _generate_masks_from_seg_tokens_single(self, hidden_states, seg_positions, sam_features, device):
@@ -760,11 +1043,11 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
             )
             dense_pe = self.sam_model.prompt_encoder.get_dense_pe()
             try:
-                # PyTorch公式推奨: SAMデコーダー入力を全て確実にGPUに統一
-                sam_features = sam_features.cuda()
-                dense_pe = dense_pe.cuda()
-                sparse_embeddings = sparse_embeddings.cuda()
-                dense_embeddings = dense_embeddings.cuda()
+                # SAMデコーダー入力を統一デバイス管理で処理
+                sam_features, dense_pe, sparse_embeddings, dense_embeddings = self._prepare_sam_inputs_for_device(
+                    sam_features, dense_pe, sparse_embeddings, dense_embeddings,
+                    description="SAMデコーダー入力（単一）"
+                )
                 
                 mask, iou_pred = self.sam_model.mask_decoder(
                     image_embeddings=sam_features,
@@ -775,9 +1058,7 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
                 )
                 masks.append(mask)
             except Exception as e:
-                print(f"SAMデコーダエラー: {e}")
-                dummy_mask = torch.zeros((1, 1, 256, 256), device=device, dtype=sam_features.dtype)
-                masks.append(dummy_mask)
+                self._handle_model_error(e, "SAMデコーダ（単一）", critical=True)
         if len(masks) == 0:
             return None
         return masks[0] if len(masks) == 1 else torch.cat(masks, dim=0)
@@ -817,11 +1098,11 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
                     )
                     dense_pe = self.sam_model.prompt_encoder.get_dense_pe()
                     try:
-                        # PyTorch公式推奨: SAMデコーダー入力を全て確実にGPUに統一（バッチ版）
-                        sam_features_gpu = sam_features_list[i].cuda()
-                        dense_pe = dense_pe.cuda()
-                        sparse_embeddings = sparse_embeddings.cuda()
-                        dense_embeddings = dense_embeddings.cuda()
+                        # SAMデコーダー入力を統一デバイス管理で処理（バッチ版）
+                        sam_features_gpu, dense_pe, sparse_embeddings, dense_embeddings = self._prepare_sam_inputs_for_device(
+                            sam_features_list[i], dense_pe, sparse_embeddings, dense_embeddings,
+                            description=f"SAMデコーダー入力（バッチ{i}）"
+                        )
                         
                         mask, _ = self.sam_model.mask_decoder(
                             image_embeddings=sam_features_gpu,
@@ -832,12 +1113,15 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
                         )
                         mask_for_image = mask
                     except Exception as e:
-                        print(f"SAMデコーダエラー(バッチ): {e}")
-                        mask_for_image = torch.zeros((1, 1, 256, 256), device=device, dtype=sam_features_list[i].dtype)
+                        self._handle_model_error(e, f"SAMデコーダ（バッチ{i}）", critical=True)
                     break
             if mask_for_image is None:
-                # その画像にSEG要求が無い場合はダミーマスク
-                mask_for_image = torch.zeros((1, 1, 256, 256), device=device, dtype=sam_features_list[i].dtype)
+                # その画像にSEG要求が無い場合はエラー
+                self._handle_model_error(
+                    ValueError(f"画像{i}にSEGトークンが見つかりません"), 
+                    f"バッチマスク生成（画像{i}）", 
+                    critical=True
+                )
             masks.append(mask_for_image)
         return torch.cat(masks, dim=0) if masks else None
 
