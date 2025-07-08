@@ -118,74 +118,78 @@ def verify_loss_calculation(model: nn.Module, inputs: Dict[str, torch.Tensor], v
             if isinstance(value, torch.Tensor):
                 logger.info(f"  {key}: {value.shape}")
     
-    # Forward pass - CompositeLossを迂回して直接logitsを取得
+    # Forward pass - 実際のLISA統合モデルを使用（SAM機能付き）
     try:
-        # LISA統合モデルの内部Llamaモデルを直接呼び出し（CompositeLoss迂回）
-        if hasattr(model, 'llama_model'):
-            # LoRAラッパーを考慮してbase modelにアクセス
-            if hasattr(model, 'base_model'):
-                base_model = model.base_model
-                if hasattr(base_model, 'llama_model'):
-                    llama_model = base_model.llama_model
-                else:
-                    llama_model = base_model
-            else:
-                llama_model = model.llama_model
-            
-            if verbose:
-                logger.info("LISA統合モデル：内部Llamaモデルを直接呼び出し")
-                logger.info(f"Llamaモデル型: {type(llama_model)}")
-            
-            # 内部Llamaモデルで順伝播（CompositeLoss迂回）
-            outputs = llama_model(**inputs)
-            
-        else:
-            # 通常のforward（フォールバック）
-            outputs = model(**inputs)
-        
         if verbose:
-            logger.info(f"出力型: {type(outputs)}")
-            logger.info(f"出力キー: {list(outputs.keys()) if hasattr(outputs, 'keys') else 'no keys'}")
+            logger.info("LISA統合モデル：完全なフォワードパス実行（SAM機能付き）")
         
-        # Llama4では常に手動で損失を計算（成功した単独モデルと同じ方法）
-        if verbose:
-            logger.info("手動損失計算実行中（Llama4公式推奨方法）...")
-        
-        # logitsを取得
-        if hasattr(outputs, 'logits'):
-            logits = outputs.logits
-        elif isinstance(outputs, dict) and 'logits' in outputs:
-            logits = outputs['logits']
-        else:
-            raise ValueError("logitsが見つかりません")
-        
-        if verbose:
-            logger.info(f"logits shape: {logits.shape}")
-        
-        # ラベルとして入力IDsを使用（言語モデリング）
-        labels = inputs.get('input_ids')
-        if labels is None:
-            raise ValueError("input_idsが見つかりません")
-        
-        if verbose:
-            logger.info(f"labels shape: {labels.shape}")
-        
-        # 言語モデリング損失を手動計算（成功した単独モデルと同じ方法）
-        shift_logits = logits[..., :-1, :].contiguous()
-        shift_labels = labels[..., 1:].contiguous()
-        
-        if verbose:
-            logger.info(f"shift logits shape: {shift_logits.shape}")
-            logger.info(f"shift labels shape: {shift_labels.shape}")
-        
-        loss_fct = nn.CrossEntropyLoss()
-        loss = loss_fct(
-            shift_logits.view(-1, shift_logits.size(-1)), 
-            shift_labels.view(-1)
+        # 実際のLISA統合モデルの完全フォワードパス
+        # SAMを有効にしてセグメンテーション機能も検証
+        model_outputs = model(
+            input_ids=inputs['input_ids'],
+            attention_mask=inputs.get('attention_mask'),
+            pixel_values=inputs.get('pixel_values'),
+            labels=inputs['input_ids'],  # 言語モデリング用
+            generate_mask=True  # SAM機能を有効化
         )
         
         if verbose:
-            logger.info("✅ 手動交差エントロピー損失計算完了")
+            logger.info(f"出力型: {type(model_outputs)}")
+            logger.info(f"出力キー: {list(model_outputs.keys()) if isinstance(model_outputs, dict) else 'no keys'}")
+        
+        # CompositeLoss統合による損失取得
+        if isinstance(model_outputs, dict):
+            # CompositeLossからの統一損失
+            if 'text_loss' in model_outputs:
+                loss = model_outputs['text_loss']
+                if verbose:
+                    logger.info("✅ CompositeLoss統合損失を使用")
+            # 予備処理：lossキーも確認
+            elif 'loss' in model_outputs:
+                loss = model_outputs['loss']
+                if verbose:
+                    logger.info("✅ 通常のloss損失を使用")
+            # フォールバック：手動計算
+            else:
+                if verbose:
+                    logger.info("手動損失計算に切り替え...")
+                
+                logits = model_outputs.get('logits')
+                if logits is None:
+                    raise ValueError("logitsが見つかりません")
+                
+                labels = inputs.get('input_ids')
+                if labels is None:
+                    raise ValueError("input_idsが見つかりません")
+                
+                # 言語モデリング損失を手動計算
+                shift_logits = logits[..., :-1, :].contiguous()
+                shift_labels = labels[..., 1:].contiguous()
+                
+                loss_fct = nn.CrossEntropyLoss()
+                loss = loss_fct(
+                    shift_logits.view(-1, shift_logits.size(-1)), 
+                    shift_labels.view(-1)
+                )
+                
+                if verbose:
+                    logger.info("✅ 手動交差エントロピー損失計算完了")
+        else:
+            # 非辞書型出力の場合
+            if hasattr(model_outputs, 'loss'):
+                loss = model_outputs.loss
+            else:
+                raise ValueError("損失が見つかりません")
+        
+        # SAM機能確認
+        if isinstance(model_outputs, dict) and 'predicted_masks' in model_outputs:
+            masks = model_outputs['predicted_masks']
+            if masks is not None:
+                if verbose:
+                    logger.info(f"✅ SAMマスク生成成功: {masks.shape if hasattr(masks, 'shape') else type(masks)}")
+            else:
+                if verbose:
+                    logger.info("ℹ️ SAMマスク未生成（SEGトークンなしまたはSAM無効）")
         
         if verbose:
             logger.info(f"✅ 損失値: {loss.item():.6f}")

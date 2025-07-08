@@ -423,7 +423,8 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
                 print(f"入力中にSEGトークンを{len(seg_positions[0])}個検出")
                 # 画像をSAM用に整形 (1024x1024)
                 sam_image = image.resize((self.sam_image_size, self.sam_image_size))
-                sam_image_tensor = torch.tensor(np.array(sam_image)).permute(2, 0, 1).float().unsqueeze(0).cuda()
+                sam_image_tensor = torch.tensor(np.array(sam_image)).permute(2, 0, 1).float().unsqueeze(0)
+                sam_image_tensor = sam_image_tensor.cuda()  # SAM互換性のためFloat32でGPU移動
                 print(f"🔄 SAM入力をGPUに移動: {sam_image_tensor.shape}")
                 
                 # SAM画像エンコーダから特徴抽出
@@ -475,6 +476,7 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
                     # Llamaの画像入力がタイル処理済みの場合でも、簡易的に全体をresize (注意:情報損失の可能性)
                     sam_img = F.interpolate(img, size=(self.sam_image_size, self.sam_image_size), mode='bilinear', align_corners=False)
                     sam_img = sam_img * 255.0  # 正規化: 0-1 -> 0-255
+                    sam_img = sam_img.float()  # BFloat16 -> Float32 変換（SAM互換性のため）
                     sam_img = sam_img.cuda()  # シンプルなGPU移動
                     
                     with torch.no_grad():
@@ -577,6 +579,7 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
             
             # SAMモデルのデバイスを取得し、入力テンソルを適切なデバイスに移動
             sam_device = next(self.sam_model.image_encoder.parameters()).device
+            images_for_sam = images_for_sam.float()  # BFloat16 -> Float32 変換（SAM互換性のため）
             images_for_sam = images_for_sam.to(sam_device)
             print(f"🔄 SAM入力をデバイス {sam_device} に移動: {images_for_sam.shape}")
             

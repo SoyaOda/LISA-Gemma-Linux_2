@@ -268,40 +268,44 @@ class LisaOverfitTest:
         first_device = next(iter(model.hf_device_map.values())) if hasattr(model, 'hf_device_map') else next(model.parameters()).device
         inputs = {k: v.to(first_device) if hasattr(v, 'to') else v for k, v in inputs.items()}
         
-        # CompositeLoss迂回：内部Llamaモデルを直接呼び出し（勾配フロー検証で成功）
-        if hasattr(model, 'llama_model'):
-            # LoRAラッパーを考慮してbase modelにアクセス
-            if hasattr(model, 'base_model'):
-                base_model = model.base_model
-                if hasattr(base_model, 'llama_model'):
-                    llama_model = base_model.llama_model
-                else:
-                    llama_model = base_model
-            else:
-                llama_model = model.llama_model
-            
-            # 内部Llamaモデルで順伝播（CompositeLoss迂回）
-            outputs = llama_model(**inputs)
-        else:
-            # 通常のforward（フォールバック）
-            outputs = model(**inputs)
-        
-        # 手動損失計算（成功した単独モデルと同じ方法）
-        if hasattr(outputs, 'logits'):
-            logits = outputs.logits
-        elif isinstance(outputs, dict) and 'logits' in outputs:
-            logits = outputs['logits']
-        else:
-            raise ValueError("logitsが見つかりません")
-        
-        # 言語モデリング損失を手動計算
-        shift_logits = logits[..., :-1, :].contiguous()
-        shift_labels = inputs["input_ids"][..., 1:].contiguous()
-        loss_fct = nn.CrossEntropyLoss()
-        loss = loss_fct(
-            shift_logits.view(-1, shift_logits.size(-1)), 
-            shift_labels.view(-1)
+        # 実際のLISA統合モデル使用：完全なフォワードパス（SAM機能付き）
+        # verify_llama4_lisa_gradients.pyで成功した実装と同じ方法
+        model_outputs = model(
+            input_ids=inputs['input_ids'],
+            attention_mask=inputs.get('attention_mask'),
+            pixel_values=inputs.get('pixel_values'),
+            labels=inputs['input_ids'],  # 言語モデリング用
+            generate_mask=True  # SAM機能を有効化
         )
+        
+        # CompositeLoss統合による損失取得
+        if isinstance(model_outputs, dict):
+            # CompositeLossからの統一損失
+            if 'text_loss' in model_outputs:
+                loss = model_outputs['text_loss']
+            # 予備処理：lossキーも確認
+            elif 'loss' in model_outputs:
+                loss = model_outputs['loss']
+            # フォールバック：手動計算
+            else:
+                logits = model_outputs.get('logits')
+                if logits is None:
+                    raise ValueError("logitsが見つかりません")
+                
+                # 言語モデリング損失を手動計算
+                shift_logits = logits[..., :-1, :].contiguous()
+                shift_labels = inputs["input_ids"][..., 1:].contiguous()
+                loss_fct = nn.CrossEntropyLoss()
+                loss = loss_fct(
+                    shift_logits.view(-1, shift_logits.size(-1)), 
+                    shift_labels.view(-1)
+                )
+        else:
+            # 非辞書型出力の場合
+            if hasattr(model_outputs, 'loss'):
+                loss = model_outputs.loss
+            else:
+                raise ValueError("損失が見つかりません")
         
         # 逆伝播
         loss.backward()
