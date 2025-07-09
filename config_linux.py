@@ -57,37 +57,37 @@ MODEL_MAX_LENGTH = 131072              # Llama4最大コンテキスト長（128
 SEG_TOKEN = "[SEG]"
 
 # ==============================================================================
-# 3. LoRA（PEFT）設定（テストスクリプト実使用値）
+# 3. LoRA（PEFT）設定（2024年最適化推奨値）
 # ==============================================================================
-LORA_R = 8                             # LoRAランク（実使用値）
-LORA_ALPHA = 16                        # LoRAアルファ（実使用値）
-LORA_DROPOUT = 0.05                    # LoRAドロップアウト（実使用値）
+LORA_R = 64                            # LoRAランク（2024年推奨：大型マルチモーダルモデル用）
+LORA_ALPHA = 128                       # LoRAアルファ（2024年推奨：2:1 ratio）
+LORA_DROPOUT = 0.05                    # LoRAドロップアウト（維持）
 
-# ターゲットモジュール（Llama4-Scout全Attention+FFN）
-LORA_TARGET_MODULES = [
-    # Attention プロジェクション層
-    "q_proj", "k_proj", "v_proj", "o_proj",
-    # FFN プロジェクション層  
-    "gate_proj", "up_proj", "down_proj"
-]
+# ターゲットモジュール（2024年推奨：全線形層ターゲット）
+LORA_TARGET_MODULES = "all"            # 全線形層をターゲット（LlamaFactory推奨設定）
+# 従来設定（参考用）:
+# LORA_TARGET_MODULES = [
+#     "q_proj", "k_proj", "v_proj", "o_proj",  # Attention層
+#     "gate_proj", "up_proj", "down_proj"      # FFN層
+# ]
 
 # ==============================================================================
-# 4. 学習・最適化設定（分散学習対応）
+# 4. 学習・最適化設定（A100 80GB × 8GPU最適化）
 # ==============================================================================
-# 基本学習設定
-LEARNING_RATE = 1e-4                   # AdamW学習率
-WEIGHT_DECAY = 1e-2                    # 重み減衰
-BETA1 = 0.9                            # Adam beta1
-BETA2 = 0.95                           # Adam beta2
+# 基本学習設定（2024年推奨値）
+LEARNING_RATE = 2e-4                   # AdamW学習率（2024年LoRA標準）
+WEIGHT_DECAY = 1e-2                    # 重み減衰（維持）
+BETA1 = 0.9                            # Adam beta1（維持）
+BETA2 = 0.95                           # Adam beta2（維持）
 
 # エポック・ステップ設定
 EPOCHS = 10                            # デフォルトエポック数
 STEPS_PER_EPOCH = 500                  # ステップ/エポック
 
-# バッチサイズ・勾配設定（分散学習対応）
-BATCH_SIZE_PER_GPU = 1                 # GPU単位バッチサイズ（Scout大容量対応）
-GRADIENT_ACCUMULATION_STEPS = 8        # 勾配蓄積ステップ数
-# 実効バッチサイズ = BATCH_SIZE_PER_GPU × GRADIENT_ACCUMULATION_STEPS × GPU数
+# バッチサイズ・勾配設定（A100 80GB × 8GPU最適化）
+BATCH_SIZE_PER_GPU = 2                 # GPU単位バッチサイズ（A100 80GB最適化）
+GRADIENT_ACCUMULATION_STEPS = 8        # 勾配蓄積ステップ数（維持）
+# 実効バッチサイズ = 2 × 8 × 8GPU = 128（従来64から倍増）
 
 # システム最適化設定
 MIXED_PRECISION = True                 # BF16混合精度学習
@@ -96,6 +96,16 @@ DATALOADER_NUM_WORKERS = 4             # データローダワーカー数
 
 # 推論設定
 MAX_NEW_TOKENS = 100                   # 生成時最大新規トークン数
+
+# 量子化設定（Vision層とMoEルーター用）
+QUANTIZATION_CONFIG = {
+    "load_in_4bit": True,
+    "bnb_4bit_compute_dtype": "bfloat16",
+    "bnb_4bit_use_double_quant": True,
+    "bnb_4bit_quant_type": "nf4",
+    "quantize_vision_layers": True,      # Vision層の量子化を有効化
+    "quantize_moe_routers": True         # MoEルーターの量子化を有効化
+}
 
 # ==============================================================================
 # 5. データセット設定（最小限）
@@ -142,11 +152,26 @@ def get_lora_config() -> Dict[str, Any]:
     Returns:
         Dict: LoraConfig用設定辞書
     """
+    # target_modules の処理：文字列"all"の場合とリストの場合に対応
+    if LORA_TARGET_MODULES == "all":
+        # PEFTライブラリでは"all"は直接サポートされていないため、
+        # 主要な線形層を明示的に指定
+        target_modules = [
+            # Attention プロジェクション層
+            "q_proj", "k_proj", "v_proj", "o_proj",
+            # FFN プロジェクション層  
+            "gate_proj", "up_proj", "down_proj",
+            # 追加の線形層（全線形層ターゲットのため）
+            "lm_head", "embed_tokens"
+        ]
+    else:
+        target_modules = LORA_TARGET_MODULES
+    
     return {
         "r": LORA_R,
         "lora_alpha": LORA_ALPHA,
         "lora_dropout": LORA_DROPOUT,
-        "target_modules": LORA_TARGET_MODULES,
+        "target_modules": target_modules,
         "bias": "none",
         "use_rslora": False
     }
@@ -171,7 +196,17 @@ def get_training_config() -> Dict[str, Any]:
         "gradient_checkpointing": GRADIENT_CHECKPOINTING,
         "dataloader_num_workers": DATALOADER_NUM_WORKERS,
         "max_new_tokens": MAX_NEW_TOKENS,
+        "quantization_config": QUANTIZATION_CONFIG,
     }
+
+def get_quantization_config() -> Dict[str, Any]:
+    """
+    量子化設定取得
+    
+    Returns:
+        Dict: 量子化設定辞書
+    """
+    return QUANTIZATION_CONFIG
 
 def get_path_config() -> Dict[str, str]:
     """

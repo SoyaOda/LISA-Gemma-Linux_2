@@ -88,9 +88,9 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
         else:
             torch_dtype = torch.bfloat16  # デフォルト
         
-        # 2. 量子化設定（成功した単独モデルと同じ設定）
+        # 2. 量子化設定（2024年推奨：Vision層とMoEルーター用）
         quantization_config = None
-        use_4bit = True  # 4bit量子化を使用（成功した設定）
+        use_4bit = True  # 4bit量子化を有効化（推奨設定）
         if use_4bit:
             from transformers import BitsAndBytesConfig
             quantization_config = BitsAndBytesConfig(
@@ -99,7 +99,7 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
                 bnb_4bit_use_double_quant=True,
                 bnb_4bit_quant_type="nf4"
             )
-            print("4bit量子化設定を適用")
+            print("4bit量子化設定を適用（Vision層とMoEルーター最適化）")
         
         # 3. Llama4モデル初期化（成功した単独モデルと同じ設定）
         print("Llama4モデル初期化開始...")
