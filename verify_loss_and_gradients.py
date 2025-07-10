@@ -368,6 +368,11 @@ def main():
             batch_modified = batch.copy()
             batch_modified['generate_mask'] = False  # SAM処理を無効化
             
+            # 🔧 学習モード有効化: labelsを追加（ForConditionalGeneration準拠）
+            if 'labels' not in batch_modified and 'input_ids' in batch_modified:
+                batch_modified['labels'] = batch_modified['input_ids'].clone()
+                print(f"  🎯 学習モード有効化: labels追加 {batch_modified['labels'].shape}")
+            
             try:
                 # メモリクリアを念のため実行
         if torch.cuda.is_available():
@@ -553,6 +558,11 @@ def main():
             print("  🔄 フォワードパス実行中（SAMマスク生成無効）...")
             batch_modified = batch.copy()
             batch_modified['generate_mask'] = False  # SAM処理を無効化
+            
+            # 🔧 学習モード有効化: labelsを追加（ForConditionalGeneration準拠）
+            if 'labels' not in batch_modified and 'input_ids' in batch_modified:
+                batch_modified['labels'] = batch_modified['input_ids'].clone()
+                print(f"  🎯 学習モード有効化: labels追加 {batch_modified['labels'].shape}")
             
             try:
                 # メモリクリアを念のため実行

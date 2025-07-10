@@ -25,6 +25,21 @@ ssh -i ~/.ssh/lambda_cloud_key ubuntu@<ip address> "cd /lambda/nfs/lisa-gemma-pr
 
 1. **Reference Existing Implementations**: 最も重要な方針として、本プロジェクトは既存の実際に実行できたオリジナルLISAとGemma-LISAにおいて、VLMをLlama-4-Scout-17B-16E-Instructに変更したプロジェクトである。原則としてGemma-LISAプロジェクト（./Gemma_LISA-Code/）とオリジナルLISA（./Original-LISA-Code/）を参考に進めて
 
+※現状以下のテストスクリプトが走ることが確認されているので、積極的に参照すること
+
+A. データセット初期化や一部前処理
+・verify_dataset_integrity.py
+・verify_input_formatting.py
+
+B. モデル関連
+・verify_loss_and_gradients.py
+・overfit_llama4_lisa_batch.py
+
+C. トレーニング関連
+・train_llama4_lisa_single_process.py
+
+※公式で推奨されてる方法とかはWebになさそう？もしなければカスタムコードでいいが、公式が準備してくれているメソッドなどがあればそちらを使うこと！
+
 2. **Web Research for Official Methods (2025年最新情報ベース)**: 
    - Llama-4-Scout-17B-16E-Instructの使い方については、積極的にWebリサーチを行い、overfit_llama4_lisa_batch.pyの成功パターンをベースに、PEFT device_map preservationなどの既知の問題対策を積極的に参照して実装すること
    - DeepSpeed ZeROとPEFTの組み合わせについては、LlamaFactoryやNVIDIA NeMoの成功事例を参考にすること

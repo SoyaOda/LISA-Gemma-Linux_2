@@ -1388,34 +1388,34 @@ class LisaLlama4ForCausalLM(PreTrainedModel):
         # SEGトークンの検出と処理
         seg_mask = (input_ids == self.seg_token_id)
         
-        # model/losses.pyのCompositeLossを使用するための出力構造
-        # NaN損失対策：Llama4からのNaN損失を手動計算で修正
-        llama_loss = outputs.loss if hasattr(outputs, 'loss') else None
-        if llama_loss is not None and torch.isnan(llama_loss):
-            print(f"⚠️ Llama4からNaN損失を検出 - CrossEntropyで再計算")
-            # NaNの場合は手動でCrossEntropy損失を計算
-            if labels is not None and hasattr(outputs, 'logits'):
-                import torch.nn as nn
-                ce_loss_fn = nn.CrossEntropyLoss(ignore_index=-100)
-                logits_flat = outputs.logits.view(-1, outputs.logits.size(-1))
-                labels_flat = labels.view(-1)
-                valid_labels = (labels_flat != -100).sum().item()
-                if valid_labels > 0:
-                    llama_loss = ce_loss_fn(logits_flat, labels_flat)
-                    print(f"✅ 手動計算損失: {llama_loss.item():.6f}")
-                else:
-                    llama_loss = torch.zeros(1, device=device, requires_grad=True).squeeze()
-                    print(f"⚠️ 有効ラベルなし - 損失を0に設定")
-            else:
-                llama_loss = torch.zeros(1, device=device, requires_grad=True).squeeze()
-                print(f"⚠️ ラベルまたはlogitsなし - 損失を0に設定")
+        # 公式ForConditionalGeneration準拠の損失処理
+        # 推論時（labels=None）と学習時（labels提供）を自然に分離
+        llama_loss = outputs.loss if hasattr(outputs, 'loss') and outputs.loss is not None else None
         
-        model_outputs = {
-            "text_loss": llama_loss,
-            "logits": outputs.logits if hasattr(outputs, 'logits') else None,
-            "hidden_states": hidden_states,
-            "predicted_masks": None,  # セグメンテーション後に設定
-        }
+        # 公式の動作に準拠：推論時はlossはNone、学習時のみ計算
+        if labels is None:
+            # 推論モード：公式ForConditionalGenerationの動作に準拠
+            model_outputs = {
+                "text_loss": None,  # 推論時は自然にNone
+                "logits": outputs.logits if hasattr(outputs, 'logits') else None,
+                "hidden_states": hidden_states,
+                "predicted_masks": None,  # セグメンテーション後に設定
+            }
+            print(f"🔍 推論モード: 公式ForConditionalGeneration準拠 - 損失計算なし")
+        else:
+            # 学習モード：公式ForConditionalGenerationが計算した損失を使用
+            model_outputs = {
+                "text_loss": llama_loss,  # 公式が計算した損失（またはNone）
+                "logits": outputs.logits if hasattr(outputs, 'logits') else None,
+                "hidden_states": hidden_states,
+                "predicted_masks": None,  # セグメンテーション後に設定
+            }
+            
+            # 学習時の損失状態をログ
+            if llama_loss is not None:
+                print(f"📚 学習モード: 公式損失計算成功 - {llama_loss.item():.6f}")
+            else:
+                print(f"⚠️ 学習モード: 公式損失計算なし（labels形式を確認）")
         
         if seg_mask.any():
             print(f"🎯 SEGトークン検出: {seg_mask.sum().item()}個")
