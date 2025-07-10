@@ -56,13 +56,16 @@ class LisaOverfitConfig:
     output_dir: str = "./llama4_lisa_overfit_results"
     
     def __post_init__(self):
-        """config_linux統一設定を適用"""
+        """config_linux統一設定を適用（デバッグ情報付き）"""
         # LISA統合モデル設定
         lisa_config = config_linux.get_lisa_model_config()
+        print(f"📋 取得したlisa_config: {lisa_config}")
+        
         self.llama_model_id = lisa_config["llama_model_id"]
         self.sam_checkpoint_path = lisa_config["sam_checkpoint_path"]
         self.attn_implementation = lisa_config["attn_implementation"]
         self.torch_dtype = lisa_config["torch_dtype"]
+        print(f"🔧 適用されたtorch_dtype: {self.torch_dtype}")
         
         # LoRA設定
         lora_config = config_linux.get_lora_config()
@@ -135,10 +138,26 @@ class LisaOverfitTest:
             raise
     
     def apply_lora_config(self, model) -> Any:
-        """成功した単独モデルと同じLoRA設定適用"""
+        """Web調査結果に基づくLoRA設定適用（device_map preservation対応）"""
         logger.info("=== LoRA設定適用 ===")
         
         try:
+            # PEFT適用前にdevice_mapを保存（Web調査：既知の問題対策）
+            original_device_map = None
+            original_device_map_location = None
+            
+            # device_mapの場所を特定して保存
+            if hasattr(model, 'hf_device_map') and model.hf_device_map:
+                original_device_map = model.hf_device_map.copy()
+                original_device_map_location = "direct"
+                logger.info(f"✓ 元のdevice_map保存（直接アクセス）: {len(original_device_map)} エントリ")
+            elif hasattr(model, 'llama_model') and hasattr(model.llama_model, 'hf_device_map') and model.llama_model.hf_device_map:
+                original_device_map = model.llama_model.hf_device_map.copy()
+                original_device_map_location = "llama_model"
+                logger.info(f"✓ 元のdevice_map保存（llama_model経由）: {len(original_device_map)} エントリ")
+            else:
+                logger.warning("⚠️ device_mapが見つかりません。Model Parallelismが未設定の可能性があります。")
+            
             # LoRA設定作成（config_linux統一設定を使用）
             lora_config = LoraConfig(
                 task_type=TaskType.CAUSAL_LM,
@@ -155,6 +174,45 @@ class LisaOverfitTest:
             # LoRA適用
             model = get_peft_model(model, lora_config)
             
+            # device_mapの復元試行（Web調査：PEFT既知問題の対策）
+            if original_device_map and original_device_map_location:
+                # 複数のアクセス方法を試行
+                restoration_success = False
+                
+                # 方法1: 直接アクセス確認
+                if hasattr(model, 'hf_device_map') and model.hf_device_map:
+                    logger.info("✓ 直接device_mapアクセス確認済み")
+                    restoration_success = True
+                
+                # 方法2: base_model経由のアクセス
+                elif hasattr(model, 'base_model') and hasattr(model.base_model, 'hf_device_map') and model.base_model.hf_device_map:
+                    logger.info("✓ base_model経由device_mapアクセス確認済み")
+                    restoration_success = True
+                
+                # 方法3: llama_model経由のアクセス（LISA統合モデル特有）
+                elif hasattr(model, 'base_model') and hasattr(model.base_model, 'llama_model') and hasattr(model.base_model.llama_model, 'hf_device_map') and model.base_model.llama_model.hf_device_map:
+                    logger.info("✓ base_model.llama_model経由device_mapアクセス確認済み")
+                    restoration_success = True
+                
+                # 方法4: 手動復元
+                if not restoration_success:
+                    logger.warning("⚠️ device_mapが失われました。手動復元を試行...")
+                    
+                    # 元の場所に基づいて復元
+                    if original_device_map_location == "llama_model":
+                        if hasattr(model, 'base_model') and hasattr(model.base_model, 'llama_model'):
+                            model.base_model.llama_model.hf_device_map = original_device_map
+                            logger.info("✓ base_model.llama_model.hf_device_mapを手動復元")
+                            restoration_success = True
+                    elif original_device_map_location == "direct":
+                        if hasattr(model, 'base_model'):
+                            model.base_model.hf_device_map = original_device_map
+                            logger.info("✓ base_model.hf_device_mapを手動復元")
+                            restoration_success = True
+                
+                if not restoration_success:
+                    logger.error("❌ device_mapの復元に失敗しました")
+            
             # 学習可能パラメータ統計
             trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
             total_params = sum(p.numel() for p in model.parameters())
@@ -164,11 +222,42 @@ class LisaOverfitTest:
             logger.info(f"  - 全パラメータ: {total_params:,}")
             logger.info(f"  - 学習可能割合: {100 * trainable_params / total_params:.3f}%")
             
+            # 最終device_map確認
+            self.verify_device_map_after_lora(model)
+            
             return model
             
         except Exception as e:
             logger.error(f"LoRA適用エラー: {e}")
             raise
+    
+    def verify_device_map_after_lora(self, model):
+        """LoRA適用後のdevice_map確認（LISA統合モデル対応）"""
+        logger.info("=== LoRA適用後device_map確認 ===")
+        
+        device_map = None
+        access_path = None
+        
+        # 複数のアクセス方法を試行
+        if hasattr(model, 'hf_device_map') and model.hf_device_map:
+            device_map = model.hf_device_map
+            access_path = "直接アクセス"
+        elif hasattr(model, 'base_model') and hasattr(model.base_model, 'hf_device_map') and model.base_model.hf_device_map:
+            device_map = model.base_model.hf_device_map
+            access_path = "base_model経由"
+        elif hasattr(model, 'base_model') and hasattr(model.base_model, 'llama_model') and hasattr(model.base_model.llama_model, 'hf_device_map') and model.base_model.llama_model.hf_device_map:
+            device_map = model.base_model.llama_model.hf_device_map
+            access_path = "base_model.llama_model経由"
+        
+        if device_map:
+            logger.info(f"✓ {access_path}でhf_device_mapアクセス成功")
+            logger.info(f"  - デバイスマップ: {dict(list(device_map.items())[:5])}...")
+            logger.info(f"  - 使用GPU数: {len(set(device_map.values()))}")
+            return True
+        else:
+            logger.error("❌ device_mapが見つかりません")
+            logger.error("Model Parallelismが設定されていません。103Bモデルには必須です。")
+            return False
     
     def prepare_fixed_data(self, model) -> Dict[str, Any]:
         """固定データ準備（公式推奨方法）"""
@@ -247,9 +336,29 @@ class LisaOverfitTest:
         model.train()
         optimizer.zero_grad()
         
-        # 固定データを適切なデバイスに移動
+        # 固定データを適切なデバイスに移動（Web調査：フォールバック処理を削除）
         inputs = self.fixed_data["inputs"]
-        first_device = next(iter(model.hf_device_map.values())) if hasattr(model, 'hf_device_map') else next(model.parameters()).device
+        
+        # Model Parallelismのdevice_mapを厳密にチェック（LISA統合モデル対応）
+        device_map = None
+        access_path = None
+        
+        # 複数のアクセス方法を試行
+        if hasattr(model, 'hf_device_map') and model.hf_device_map:
+            device_map = model.hf_device_map
+            access_path = "直接アクセス"
+        elif hasattr(model, 'base_model') and hasattr(model.base_model, 'hf_device_map') and model.base_model.hf_device_map:
+            device_map = model.base_model.hf_device_map
+            access_path = "base_model経由"
+        elif hasattr(model, 'base_model') and hasattr(model.base_model, 'llama_model') and hasattr(model.base_model.llama_model, 'hf_device_map') and model.base_model.llama_model.hf_device_map:
+            device_map = model.base_model.llama_model.hf_device_map
+            access_path = "base_model.llama_model経由"
+        
+        if not device_map:
+            raise RuntimeError("Model Parallelismが設定されていません。103Bモデルには必須です。")
+        
+        logger.info(f"Model Parallelismデバイスマップ確認: {access_path}")
+        first_device = next(iter(device_map.values()))
         inputs = {k: v.to(first_device) if hasattr(v, 'to') else v for k, v in inputs.items()}
         
         # 実際のLISA統合モデル使用：完全なフォワードパス（SAM機能付き）

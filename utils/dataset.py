@@ -124,12 +124,11 @@ def preprocess_llama_image(image: Image.Image, processor: AutoProcessor, target_
 def build_correct_labels_for_llama4(input_ids: torch.Tensor, tokenizer) -> torch.Tensor:
     """
     Llama4チャットテンプレートに準拠した正確なラベルマスキング
+    言語モデリング用に全トークンを予測対象にする（overfit成功パターン準拠）
     """
     labels = input_ids.clone()
-    # 全トークンをデフォルトで無視
-    labels.fill_(-100)
-    # 必要なら、アシスタント応答部分のトークンをラベルに設定
-    # （デフォルトでは、全てのユーザープロンプトを無視し応答トークンのみ予測対象にします）
+    # overfit成功パターンに合わせて、全トークンを予測対象にする
+    # これにより有効なラベルが存在し、損失が正常に計算される
     return labels
 
 def preprocess_mask(mask: np.ndarray, target_size: Optional[int] = None) -> torch.Tensor:

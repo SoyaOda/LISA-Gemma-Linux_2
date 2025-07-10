@@ -25,8 +25,9 @@ ssh -i ~/.ssh/lambda_cloud_key ubuntu@<ip address> "cd /lambda/nfs/lisa-gemma-pr
 
 1. **Reference Existing Implementations**: 最も重要な方針として、本プロジェクトは既存の実際に実行できたオリジナルLISAとGemma-LISAにおいて、VLMをLlama-4-Scout-17B-16E-Instructに変更したプロジェクトである。原則としてGemma-LISAプロジェクト（./Gemma_LISA-Code/）とオリジナルLISA（./Original-LISA-Code/）を参考に進めて
 
-2. **Web Research for Official Methods**: 
-   - Llama-4-Scout-17B-16E-Instructの使い方については、積極的にWebリサーチを行い、test_llama4_standalone.py, verify_llama4_loss_and_gradients.py, overfit_llama4_single_batch.pyを参照して、公式や非公式の実際に動くコードを積極的に参照して、カスタムコードでなく用意されている方法でシンプルに実装すること
+2. **Web Research for Official Methods (2025年最新情報ベース)**: 
+   - Llama-4-Scout-17B-16E-Instructの使い方については、積極的にWebリサーチを行い、overfit_llama4_lisa_batch.pyの成功パターンをベースに、PEFT device_map preservationなどの既知の問題対策を積極的に参照して実装すること
+   - DeepSpeed ZeROとPEFTの組み合わせについては、LlamaFactoryやNVIDIA NeMoの成功事例を参考にすること
    - SAMの使い方については、積極的にWebリサーチを行い、公式や非公式の実際に動くコードを積極的に参照して、カスタムコードでなく用意されている方法でシンプルに実装すること
 
 3. **Error Handling Strategy**: フォールバック的なコードはエラーを隠蔽するので、エラーを出して止め、一つ一つデバッグするように実装すること
@@ -41,54 +42,96 @@ ssh -i ~/.ssh/lambda_cloud_key ubuntu@<ip address> "cd /lambda/nfs/lisa-gemma-pr
 - Add detailed docstrings for complex functions
 - Never commit sensitive information (API keys, tokens)
 
-## Implementation Status
+## Implementation Status & Roadmap
 
-### [実装完了部分]
-- llama4_lisa.pyでLlama-4-Scout-17B-16E-InstructとSAMの統合モデルの実装を完了した
-- test_llama4_lisa_standalone.py, verify_llama4_lisa_gradients.py, overfit_llama4_lisa_batch.pyでLlama-4-Scout-17B-16E-InstructとSAMの統合モデルの学習前の検証スクリプトの実装が完了した
+### 🏆 **Phase 1: Model Parallelism Baseline (COMPLETED)**
+- ✅ llama4_lisa.pyでLlama-4-Scout-17B-16E-InstructとSAMの統合モデルの実装完了
+- ✅ Web調査ベースのPEFT device_map preservation実装完了
+- ✅ overfit_llama4_lisa_batch.pyで109Bモデル(17B active)の学習能力検証成功
+- ✅ Model Parallelismでの安定学習ベースライン確立
+
+### 🔄 **Phase 2: DeepSpeed ZeRO-2 Integration (NEXT)**
+- 🛠️ NCCL/TCP "Broken pipe"エラーの根本解決
+- 🛠️ DeepSpeed ZeRO-2 + device_map preservationの組み合わせ
+- 🛠️ 中規模データセットでの分散学習検証
+
+### 🎯 **Phase 3: Large-Scale Distributed Training (FUTURE)**
+- 🕰️ DeepSpeed ZeRO-3 + LoRAで大規模分散学習
+- 🕰️ NVIDIA NeMo統合 or LlamaFactory採用検討
+- 🕰️ 最終プロダクションシステム確立
 
 ## Architecture Components
 
 ### Model Implementations
 - **LISA-Gemma3**: Integration with Google's Gemma-3-4B-IT model using dual-stream data pipeline
-- **LISA-Llama4**: Integration with Meta's Llama-4-Scout-17B-16E-Instruct model  
+- **LISA-Llama4**: Integration with Meta's Llama-4-Scout-17B-16E-Instruct (109B total, 17B active per token) 
 - **Segment Anything Model (SAM)**: SAM ViT-H for segmentation tasks
-- **Dual-stream Architecture**: Separate image processing pipelines for Gemma (896x896) and SAM (1024x1024)
+- **Dual-stream Architecture**: Separate image processing pipelines for Llama4 (336x336) and SAM (1024x1024)
 
 ### Core Components
 - **MLP Projector**: Bridges between language model hidden states and SAM prompt embeddings
-- **LoRA Configuration**: Parameter-efficient fine-tuning for both Gemma and Llama models
+- **LoRA Configuration**: Parameter-efficient fine-tuning with device_map preservation (Web研究ベース)
 - **HybridDataset**: Unified dataset handling for multiple data sources (ReasonSeg, VQA, ReferSeg, SemSeg)
-- **DeepSpeed Integration**: Distributed training with ZeRO Stage 2 optimization
+- **Model Parallelism**: HuggingFace device_map="auto" for 109B model across 8 A100 GPUs
+- **PEFT Device Map Preservation**: Web調査に基づくget_peft_model後のdevice_map復元ロジック
 
 ## Common Development Commands
 
 ### Training Commands
+
+#### **Phase 1: Model Parallelism (Current - Stable)**
 ```bash
-# Llama-4 training (recommended)
-python train_llama4.py --batch_size 1 --lr 1e-4 --exp_name "llama4_experiment"
+# Quick validation test
+python launch_simple_training.py --exp_name quick_test --steps_per_epoch 10 --epochs 1
 
-# Llama-4 with DeepSpeed
-python train_llama4_deepspeed.py --deepspeed_config ds_config_llama4_moe.json
+# Small-scale training (recommended for current phase)
+python launch_simple_training.py --exp_name lisa_small_scale --epochs 5
 
-# Gemma-3 training (legacy)
-python Gemma_LISA-Code/train_simple_test.py --batch_size 1 --lr 1e-4
+# Direct single process execution
+python train_llama4_lisa_single_process.py --exp_name lisa_mp --batch_size 1 --epochs 3
 ```
 
-### Testing Commands
+#### **Phase 2: DeepSpeed ZeRO-2 (Development)**
 ```bash
-# Llama-4 standalone tests
+# Medium-scale distributed training (when Phase 2 ready)
+python launch_training.py --exp_name lisa_zero2 --zero_stage 2 --batch_size 1
+```
+
+#### **Phase 3: DeepSpeed ZeRO-3 (Future)**
+```bash
+# Large-scale distributed training (future implementation)
+python train_llama4_deepspeed.py --deepspeed_config ds_config_llama4_zero3.json
+```
+
+### Testing & Verification Commands
+
+#### **Core Verification (Always run before training)**
+```bash
+# Basic model functionality
 python test_llama4_standalone.py          # Basic model test
 python test_llama4_lisa_standalone.py     # Full LISA integration test
-python test_llama4_inference_pipeline.py  # Inference pipeline test
 
-# Verification scripts
+# Learning capability verification (CRITICAL - use this as baseline)
+python overfit_llama4_lisa_batch.py       # ✅ PROVEN: Model Parallelism + device_map preservation
+
+# Gradient flow verification
 python verify_llama4_lisa_gradients.py    # Gradient flow verification
-python overfit_llama4_lisa_batch.py       # Learning capability test
+```
 
+#### **Dataset & Environment Verification**
+```bash
 # Dataset verification
 python verify_dataset_integrity.py        # Dataset health check
 python verify_model_architecture.py       # Model architecture check
+
+# Environment verification
+python verify_config_and_setup.py         # Full environment check
+```
+
+#### **Performance Benchmarking**
+```bash
+# Inference pipeline test
+python test_llama4_inference_pipeline.py  # Inference pipeline test
 ```
 
 ### Environment Setup
@@ -101,52 +144,38 @@ python config_linux.py                    # Verify paths and settings
 
 # Environment verification
 python verify_config_and_setup.py         # Full environment check
+
+# Lambda Cloud setup (A100 80GB × 8GPU)
+export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+export CUDA_DEVICE_ORDER=PCI_BUS_ID
 ```
 
-## Configuration Management
+## Web Research Insights (2025年最新)
 
-### Primary Configuration
-- **config_linux.py**: Central configuration file containing all model, training, and path settings
-- Key settings accessed via:
-  - `get_lisa_model_config()`: Model architecture settings
-  - `get_lora_config()`: LoRA fine-tuning parameters
-  - `get_training_config()`: Training hyperparameters
-  - `get_path_config()`: Dataset and checkpoint paths
+### **Llama-4-Scout-17B-16E-Instruct の特性**
+- **総パラメータ**: 109B (16 experts MoE)
+- **アクティブパラメータ**: 17B per token
+- **コンテキスト長**: 10M tokens
+- **推奨量子化**: INT4 (single H100 可能)
+
+### **知られている課題**
+- H100 80GB でもLoRA学習時にOOM発生報告あり
+- Multi-GPU LoRA学習でPEFTライブラリにバグあり
+- Model Parallelismのみでは大規模データ学習は非現実的
+
+### **成功報告のある手法**
+- **LlamaFactory + DeepSpeed ZeRO-3**: 8 × L20 48G GPUs
+- **NVIDIA NeMo**: 公式Llama-4 LoRA/PEFT サポート
+- **Flash Attention + Gradient Checkpointing**: 必須の最適化
+
+### **推奨される次期実装**
+1. **DeepSpeed ZeRO-2復活** + device_map preservation
+2. **段階的スケールアップ**: 小→中→大規模データ
+3. **NVIDIA NeMo統合検討**: プロダクション環境向け
+
+
 
 ### Model-Specific Settings
 - **Llama-4**: Uses `meta-llama/Llama-4-Scout-17B-16E-Instruct` with 5120 hidden size
-- **Gemma-3**: Uses `google/gemma-3-4b-it` with 2560 hidden size
 - **SAM**: Uses ViT-H checkpoint with 256 prompt embedding dimension
 
-### DeepSpeed Configurations
-- **ds_config_local.json**: Local development (no CPU offload)
-- **ds_config_cloud.json**: Cloud GPU training (CPU offload enabled)
-- **ds_config_llama4_moe.json**: Llama-4 specific optimization
-
-## Dataset Requirements
-
-### Required Datasets
-- **ReasonSeg**: Explanatory segmentation dataset
-- **VQA**: LLaVA instruct 150k dataset
-- **ReferSeg**: RefCOCO/RefCOCO+/RefCOCOg datasets
-- **SemSeg**: ADE20k semantic segmentation
-
-### SAM Checkpoint
-- Required: SAM ViT-H checkpoint (`sam_vit_h_4b8939.pth`)
-- Path configured in `SAM_CHECKPOINT_PATH` environment variable
-
-## Development Workflow
-
-1. **Environment Setup**: Run `python config_linux.py` to verify configuration
-2. **Dataset Verification**: Use `verify_dataset_integrity.py` to check data
-3. **Model Testing**: Run appropriate standalone tests before training
-4. **Training**: Use DeepSpeed-enabled training scripts for best performance
-5. **Lambda Cloud Deployment**: Transfer files and execute remotely for production training
-
-## Memory and Performance Considerations
-
-- **Mixed Precision**: Uses bfloat16 for memory efficiency
-- **Gradient Checkpointing**: Enabled for large models
-- **Batch Size**: Typically 1 per GPU for Llama-4, 2-4 for Gemma-3
-- **Gradient Accumulation**: 8 steps recommended for effective batch size
-- **DeepSpeed**: ZeRO Stage 2 for distributed training
